@@ -94,10 +94,13 @@
   .critere .indicateur{color:var(--texte-2); font-size:13px; margin:3px 0 10px;}
   .notes{display:grid; grid-template-columns:repeat(4,1fr); gap:7px;}
   .note-btn{
-    border:1.5px solid var(--bord); background:#fdfbf8; border-radius:10px;
-    padding:11px 2px; text-align:center; font-weight:700; font-size:14px; cursor:pointer;
+    border:1.5px solid var(--bord); background:#fdfbf8; border-radius:12px;
+    padding:8px 2px 7px; text-align:center; font-weight:700; font-size:12.5px; cursor:pointer;
     color:var(--texte-2); transition:transform .06s;
+    display:flex; flex-direction:column; align-items:center; gap:2px; line-height:1.1;
   }
+  .note-btn .ico{font-size:22px; filter:grayscale(1); opacity:.55; transition:filter .1s,opacity .1s;}
+  .note-btn[class*=sel-] .ico{filter:none; opacity:1;}
   .note-btn:active{transform:scale(.94);}
   .note-btn.sel-na{background:var(--na); border-color:var(--na); color:#fff;}
   .note-btn.sel-eca{background:var(--eca); border-color:var(--eca); color:#fff;}
@@ -120,10 +123,13 @@
   .detail-calcul{font-size:12.5px; color:var(--texte-2);}
   .niveaux{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
   .niveau-btn{
-    border:1.5px solid var(--bord); background:#fdfbf8; border-radius:10px; padding:11px 6px;
+    border:1.5px solid var(--bord); background:#fdfbf8; border-radius:10px; padding:9px 6px;
     font-size:13.5px; font-weight:600; text-align:center; cursor:pointer; color:var(--texte-2);
+    display:flex; align-items:center; justify-content:center; gap:7px;
   }
+  .niveau-btn .ico{font-size:18px; filter:grayscale(1); opacity:.55;}
   .niveau-btn.actif{background:var(--brun-fonce); border-color:var(--brun-fonce); color:#fff;}
+  .niveau-btn.actif .ico{filter:none; opacity:1;}
   .ajuste{display:flex; align-items:center; gap:10px; margin-top:10px;}
   .ajuste input{width:90px; text-align:center; font-weight:700;}
 
@@ -208,7 +214,7 @@ const GRILLE = {
   reference: "BTM Pâtissier-Glacier-Chocolatier-Confiseur-Traiteur (RNCP 41998) — Domaine Professionnel, Bloc BC01/BC04",
   sections: [
     {
-      id:"s1", titre:"Journée 1 — Hygiène, sécurité alimentaire & organisation (diagnostique)",
+      id:"s1", ico:"🧼", titre:"Journée 1 — Hygiène, sécurité alimentaire & organisation (diagnostique)",
       criteres:[
         {id:"c1", titre:"Tenue professionnelle & hygiène", ind:"Tenue complète et propre, mains lavées/désinfectées, ongles courts, bijoux retirés"},
         {id:"c2", titre:"Marche en avant", ind:"Identifie et respecte les zones du laboratoire (réception, stockage, préparation, cuisson, finition)"},
@@ -218,7 +224,7 @@ const GRILLE = {
       ]
     },
     {
-      id:"s2", titre:"Journée 1 — Techniques de base : pâtes (sablée, brisée, feuilletée rapide)",
+      id:"s2", ico:"🥐", titre:"Journée 1 — Techniques de base : pâtes (sablée, brisée, feuilletée rapide)",
       criteres:[
         {id:"c6", titre:"Pâte sablée — pesée & dosage", ind:"Respect des grammages de la fiche technique, pesée précise"},
         {id:"c7", titre:"Pâte sablée — texture", ind:"Pâte non travaillée, homogène, sans excès d'élasticité"},
@@ -228,7 +234,7 @@ const GRILLE = {
       ]
     },
     {
-      id:"s3", titre:"Journée 2 — Mise en œuvre : tarte, crumble & clafoutis (formative)",
+      id:"s3", ico:"🥧", titre:"Journée 2 — Mise en œuvre : tarte, crumble & clafoutis (formative)",
       criteres:[
         {id:"c11", titre:"Fonçage de tarte", ind:"Épaisseur régulière (3 mm), pas de trous ni de surépaisseurs, bords nets"},
         {id:"c12", titre:"Crème d'amande", ind:"Texture crémeuse, dosage respecté, application régulière sur le fond de tarte"},
@@ -241,7 +247,7 @@ const GRILLE = {
       ]
     },
     {
-      id:"s4", titre:"Savoir-être professionnel (transversal aux 2 journées)",
+      id:"s4", ico:"🤝", titre:"Savoir-être professionnel (transversal aux 2 journées)",
       criteres:[
         {id:"c19", titre:"Autonomie", ind:"Réalise les tâches sans sollicitation excessive du formateur"},
         {id:"c20", titre:"Respect des consignes et du temps", ind:"Suit la fiche technique et le minutage donné"},
@@ -253,6 +259,7 @@ const GRILLE = {
 };
 const NIVEAUX = ["NA","ECA","A","M"];
 const NIVEAUX_LONG = {NA:"Non acquis", ECA:"En cours d'acquisition", A:"Acquis", M:"Maîtrisé"};
+const NIVEAUX_ICO = {NA:"❌", ECA:"⏳", A:"✅", M:"⭐"};
 const POINTS = {NA:0, ECA:1, A:2, M:3};
 const TOUS_CRITERES = GRILLE.sections.flatMap(s=>s.criteres);
 const CLE_STOCKAGE = "evaluations_tp_session1";
@@ -379,7 +386,7 @@ const app = {
       <div class="barre"><div class="rempli" id="prog-rempli" style="width:${c.total?c.nb/c.total*100:0}%"></div></div>
       <div class="txt" id="prog-txt">${c.nb}/${c.total} critères évalués</div>
     </div>
-    <div class="legende"><b class="lg-na">NA</b> Non acquis · <b class="lg-eca">ECA</b> En cours d'acquisition · <b class="lg-a">A</b> Acquis · <b class="lg-m">M</b> Maîtrisé</div>
+    <div class="legende">❌ <b class="lg-na">NA</b> Non acquis · ⏳ <b class="lg-eca">ECA</b> En cours d'acquisition · ✅ <b class="lg-a">A</b> Acquis · ⭐ <b class="lg-m">M</b> Maîtrisé</div>
 
     <div class="bloc"><div class="bloc-titre">👤 Identification</div><div class="bloc-corps">
       <label class="champ">Apprenti(e)</label>
@@ -390,13 +397,13 @@ const app = {
       <input type="date" value="${e.date}" oninput="app.maj('date',this.value)">
       <label class="champ">Journée(s) évaluée(s)</label>
       <div class="jours">
-        <div class="puce ${e.jours.j1?"actif":""}" onclick="app.basculeJour('j1',this)">Jour 1</div>
-        <div class="puce ${e.jours.j2?"actif":""}" onclick="app.basculeJour('j2',this)">Jour 2</div>
+        <div class="puce ${e.jours.j1?"actif":""}" onclick="app.basculeJour('j1',this)">📅 Jour 1</div>
+        <div class="puce ${e.jours.j2?"actif":""}" onclick="app.basculeJour('j2',this)">📅 Jour 2</div>
       </div>
     </div></div>`;
 
     for(const s of GRILLE.sections){
-      html += `<div class="bloc"><div class="bloc-titre">${s.titre}</div>`;
+      html += `<div class="bloc"><div class="bloc-titre">${s.ico} ${s.titre}</div>`;
       for(const cr of s.criteres){
         const sel = e.notes[cr.id]||"";
         const obs = e.obs[cr.id]||"";
@@ -404,9 +411,9 @@ const app = {
           <div class="titre">${cr.titre}</div>
           <div class="indicateur">${cr.ind}</div>
           <div class="notes">`+
-          NIVEAUX.map(n=>`<button class="note-btn ${sel===n?"sel-"+n.toLowerCase():""}" onclick="app.noter('${cr.id}','${n}',this)">${n}</button>`).join("")+
+          NIVEAUX.map(n=>`<button class="note-btn ${sel===n?"sel-"+n.toLowerCase():""}" onclick="app.noter('${cr.id}','${n}',this)"><span class="ico">${NIVEAUX_ICO[n]}</span>${n}</button>`).join("")+
           `</div>
-          <button class="obs-toggle" onclick="app.toggleObs('${cr.id}',this)">${obs?"✏️ Observation":"＋ Ajouter une observation"}</button>
+          <button class="obs-toggle" onclick="app.toggleObs('${cr.id}',this)">${obs?"✏️ Observation":"💬 Ajouter une observation"}</button>
           <textarea id="obs-${cr.id}" style="display:${obs?"block":"none"}" placeholder="Observation…" oninput="app.majObs('${cr.id}',this.value)">${this.echap(obs)}</textarea>
         </div>`;
       }
@@ -428,7 +435,7 @@ const app = {
       </div>
       <label class="champ" style="margin-top:14px">Niveau global atteint ${sugg?`<span style="font-weight:400">(suggestion : ${NIVEAUX_LONG[sugg]})</span>`:""}</label>
       <div class="niveaux">`+
-      NIVEAUX.map(n=>`<button class="niveau-btn ${e.niveauGlobal===n?"actif":""}" onclick="app.majNiveau('${n}',this)">${NIVEAUX_LONG[n]}</button>`).join("")+
+      NIVEAUX.map(n=>`<button class="niveau-btn ${e.niveauGlobal===n?"actif":""}" onclick="app.majNiveau('${n}',this)"><span class="ico">${NIVEAUX_ICO[n]}</span>${NIVEAUX_LONG[n]}</button>`).join("")+
       `</div>
       <label class="champ" style="margin-top:14px">Appréciation générale et axes de progrès</label>
       <textarea rows="4" placeholder="Points forts, points à travailler…" oninput="app.maj('appreciation',this.value)">${this.echap(e.appreciation)}</textarea>

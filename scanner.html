@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a5fb4">
+<title>Scanner de documents — PDF &amp; e-mail</title>
+<style>
+  :root {
+    --bleu: #1a5fb4;
+    --bleu-fonce: #14487f;
+    --vert: #26a269;
+    --orange: #e66100;
+    --rouge: #c01c28;
+    --fond: #f4f6f9;
+    --carte: #ffffff;
+    --texte: #1c2733;
+    --texte-2: #5d6b7a;
+    --bord: #dde3ea;
+    --champ: #fbfcfe;
+    --info-fond: #eef4fc;
+    --info-ok-fond: #eaf7f0;
+    --info-ok-texte: #17663f;
+    --vignette-fond: #eef1f5;
+    --voile: rgba(255,255,255,.85);
+    --vert-statut: #26a269;
+    --rayon: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bleu: #4a8fdc;
+      --fond: #10161d;
+      --carte: #1a222c;
+      --texte: #e8edf3;
+      --texte-2: #9aa8b6;
+      --bord: #2d3947;
+      --champ: #141c25;
+      --info-fond: #172433;
+      --info-ok-fond: #14291f;
+      --info-ok-texte: #6fd0a0;
+      --vignette-fond: #232d39;
+      --voile: rgba(12,17,23,.85);
+      --vert-statut: #4fc48d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bleu: #4a8fdc;
+    --fond: #10161d;
+    --carte: #1a222c;
+    --texte: #e8edf3;
+    --texte-2: #9aa8b6;
+    --bord: #2d3947;
+    --champ: #141c25;
+    --info-fond: #172433;
+    --info-ok-fond: #14291f;
+    --info-ok-texte: #6fd0a0;
+    --vignette-fond: #232d39;
+    --voile: rgba(12,17,23,.85);
+    --vert-statut: #4fc48d;
+  }
+  :root[data-theme="light"] {
+    --bleu: #1a5fb4;
+    --fond: #f4f6f9;
+    --carte: #ffffff;
+    --texte: #1c2733;
+    --texte-2: #5d6b7a;
+    --bord: #dde3ea;
+    --champ: #fbfcfe;
+    --info-fond: #eef4fc;
+    --info-ok-fond: #eaf7f0;
+    --info-ok-texte: #17663f;
+    --vignette-fond: #eef1f5;
+    --voile: rgba(255,255,255,.85);
+    --vert-statut: #26a269;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--fond);
+    color: var(--texte);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+  header {
+    background: linear-gradient(135deg, var(--bleu), var(--bleu-fonce));
+    color: #fff;
+    padding: 18px 16px 16px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18);
+  }
+  header h1 { font-size: 1.15rem; font-weight: 700; }
+  header p { font-size: .8rem; opacity: .85; margin-top: 3px; }
+  main { max-width: 560px; margin: 0 auto; padding: 14px; }
+
+  .etape {
+    background: var(--carte);
+    border-radius: var(--rayon);
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(20,40,70,.07);
+  }
+  .etape-titre {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: .98rem;
+    margin-bottom: 12px;
+  }
+  .etape-num {
+    background: var(--bleu);
+    color: #fff;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .85rem;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    background: var(--bleu);
+    transition: transform .08s, opacity .15s;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.vert { background: var(--vert); }
+  .btn.orange { background: var(--orange); }
+  .btn.contour {
+    background: var(--carte);
+    color: var(--bleu);
+    border: 2px solid var(--bleu);
+  }
+  .btn + .btn { margin-top: 10px; }
+  .btn .ico { font-size: 1.25rem; }
+
+  /* Galerie de pages */
+  #galerie {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .vignette {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--bord);
+    background: var(--vignette-fond);
+    aspect-ratio: 3/4;
+  }
+  .vignette img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .vignette .num {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: rgba(0,0,0,.6);
+    color: #fff;
+    font-size: .7rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+  .vignette .actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    background: rgba(0,0,0,.55);
+  }
+  .vignette .actions button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: #fff;
+    padding: 6px 0;
+    font-size: .95rem;
+    cursor: pointer;
+  }
+  .vignette .actions button:active { background: rgba(255,255,255,.2); }
+
+  .vide {
+    text-align: center;
+    color: var(--texte-2);
+    font-size: .85rem;
+    padding: 14px 6px 4px;
+  }
+
+  label { font-size: .82rem; font-weight: 600; color: var(--texte-2); display: block; margin-bottom: 5px; }
+  input[type=email], input[type=text], textarea {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1.5px solid var(--bord);
+    border-radius: 10px;
+    font-size: .95rem;
+    font-family: inherit;
+    background: var(--champ);
+    color: var(--texte);
+    margin-bottom: 12px;
+  }
+  input:focus, textarea:focus { outline: none; border-color: var(--bleu); }
+  textarea { resize: vertical; min-height: 110px; }
+
+  .info {
+    font-size: .8rem;
+    color: var(--texte-2);
+    background: var(--info-fond);
+    border-left: 3px solid var(--bleu);
+    padding: 9px 11px;
+    border-radius: 0 8px 8px 0;
+    margin-top: 12px;
+    line-height: 1.45;
+  }
+  .info.ok { background: var(--info-ok-fond); border-color: var(--vert); color: var(--info-ok-texte); }
+
+  #statut, #statutEnvoi {
+    text-align: center;
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--vert-statut);
+    min-height: 20px;
+    margin-top: 8px;
+  }
+  #statut.erreur, #statutEnvoi.erreur { color: var(--rouge); }
+
+  .compteur {
+    background: var(--bleu);
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 20px;
+    margin-left: auto;
+  }
+  input[type=file] { display: none; }
+  .cache { display: none !important; }
+
+  .bandeau {
+    background: var(--info-fond);
+    border-left: 3px solid var(--orange);
+    color: var(--texte);
+    font-size: .82rem;
+    line-height: 1.45;
+    padding: 10px 12px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 14px;
+  }
+
+  #secoursMail { margin-top: 12px; }
+  .champ-copie {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .champ-copie > div { flex: 1; min-width: 0; }
+  .btn-copier {
+    border: 1.5px solid var(--bleu);
+    background: var(--carte);
+    color: var(--bleu);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: .8rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-top: 21px;
+  }
+
+  #chargement {
+    position: fixed;
+    inset: 0;
+    background: var(--voile);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    z-index: 50;
+    font-weight: 600;
+    color: var(--bleu);
+  }
+  #chargement.actif { display: flex; }
+  .spin {
+    width: 42px;
+    height: 42px;
+    border: 4px solid #cfe0f5;
+    border-top-color: var(--bleu);
+    border-radius: 50%;
+    animation: rot .8s linear infinite;
+  }
+  @keyframes rot { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📄 Scanner de documents</h1>
+  <p>Photos → PDF unique → e-mail pré-rempli</p>
+</header>
+
+<main>
+
+  <div id="avertIframe" class="bandeau cache">
+    ⚠️ <strong>Vous utilisez l’aperçu intégré</strong> (fenêtre Claude) : l’ouverture de
+    l’application e-mail et le partage peuvent y être bloqués par sécurité.
+    La création du PDF fonctionne, mais pour l’envoi, utilisez l’appli depuis
+    une vraie page web (par ex. hébergée sur GitHub Pages) ou servez-vous des
+    boutons « Copier » qui apparaissent à l’étape 3.
+  </div>
+
+  <!-- ÉTAPE 1 : prendre les photos -->
+  <section class="etape">
+    <div class="etape-titre">
+      <span class="etape-num">1</span>
+      Photographier les documents
+      <span class="compteur" id="compteur">0 page</span>
+    </div>
+    <button class="btn" id="btnPhoto">
+      <span class="ico">📷</span> Prendre une photo
+    </button>
+    <button class="btn contour" id="btnImport">
+      <span class="ico">🖼️</span> Importer depuis la galerie
+    </button>
+    <input type="file" id="entreePhoto" accept="image/*" capture="environment">
+    <input type="file" id="entreeGalerie" accept="image/*" multiple>
+    <div id="galerie"></div>
+    <p class="vide" id="msgVide">Aucune page pour l’instant. Chaque photo devient une page du PDF, dans l’ordre affiché (⬅️ ➡️ pour réorganiser, 🗑️ pour supprimer).</p>
+  </section>
+
+  <!-- ÉTAPE 2 : générer le PDF -->
+  <section class="etape">
+    <div class="etape-titre">
+      <span class="etape-num">2</span>
+      Créer le PDF
+    </div>
+    <label for="nomPdf">Nom du document</label>
+    <input type="text" id="nomPdf" value="" placeholder="ex. Justificatifs juillet">
+    <button class="btn vert" id="btnPdf" disabled>
+      <span class="ico">📄</span> Générer le PDF
+    </button>
+    <button class="btn contour" id="btnVoir" disabled>
+      <span class="ico">👁️</span> Vérifier le PDF (l’ouvrir)
+    </button>
+    <div id="statut"></div>
+  </section>
+
+  <!-- ÉTAPE 3 : envoyer -->
+  <section class="etape">
+    <div class="etape-titre">
+      <span class="etape-num">3</span>
+      Envoyer par e-mail
+    </div>
+    <label for="dest">Destinataire</label>
+    <input type="email" id="dest" placeholder="nom@exemple.fr" inputmode="email" autocomplete="email">
+    <label for="objet">Objet (pré-rempli)</label>
+    <input type="text" id="objet">
+    <label for="corps">Message (pré-rempli, modifiable)</label>
+    <textarea id="corps"></textarea>
+
+    <button class="btn orange" id="btnPartager" disabled>
+      <span class="ico">📤</span> Envoyer le PDF (partage du téléphone)
+    </button>
+    <button class="btn contour" id="btnTelecharger" disabled>
+      <span class="ico">⬇️</span> Télécharger le PDF
+    </button>
+    <button class="btn contour" id="btnMail" disabled>
+      <span class="ico">✉️</span> Ouvrir l’e-mail pré-rempli
+    </button>
+
+    <div id="statutEnvoi"></div>
+
+    <div id="secoursMail" class="cache">
+      <div class="info">
+        Si votre application e-mail ne s’est pas ouverte, créez le message
+        vous-même : copiez l’objet et le texte ci-dessous, et joignez le PDF téléchargé.
+      </div>
+      <div class="champ-copie">
+        <div>
+          <label>Objet</label>
+          <input type="text" id="copieObjet" readonly>
+        </div>
+        <button class="btn-copier" data-copie="copieObjet">📋 Copier</button>
+      </div>
+      <div class="champ-copie">
+        <div>
+          <label>Message</label>
+          <textarea id="copieCorps" readonly></textarea>
+        </div>
+        <button class="btn-copier" data-copie="copieCorps">📋 Copier</button>
+      </div>
+    </div>
+
+    <div class="info">
+      <strong>📱 Sur téléphone :</strong> utilisez « Envoyer le PDF » puis choisissez Mail ou Gmail — le PDF est joint automatiquement.<br>
+      <strong>💻 Sur ordinateur :</strong> téléchargez le PDF, ouvrez l’e-mail pré-rempli, puis glissez le fichier dans le message (les navigateurs interdisent de joindre un fichier automatiquement à un e-mail).
+    </div>
+  </section>
+
+</main>
+
+<div id="chargement"><div class="spin"></div><span id="txtChargement">Traitement…</span></div>
+
+<script>
+"use strict";
+
+/* ================= État ================= */
+const pages = [];        // { jpeg: Uint8Array, largeur, hauteur, apercu (dataURL) }
+let pdfBlob = null;
+let pdfNomFichier = "";
+
+const $ = id => document.getElementById(id);
+
+/* ================= Utilitaires UI ================= */
+function chargement(actif, texte) {
+  $("txtChargement").textContent = texte || "Traitement…";
+  $("chargement").classList.toggle("actif", !!actif);
+}
+function statut(msg, erreur) {
+  const s = $("statut");
+  s.textContent = msg || "";
+  s.classList.toggle("erreur", !!erreur);
+}
+function statutEnvoi(msg, erreur) {
+  const s = $("statutEnvoi");
+  s.textContent = msg || "";
+  s.classList.toggle("erreur", !!erreur);
+}
+function dateFr() {
+  return new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+}
+
+/* ================= Capture / import des photos ================= */
+$("btnPhoto").addEventListener("click", () => $("entreePhoto").click());
+$("btnImport").addEventListener("click", () => $("entreeGalerie").click());
+$("entreePhoto").addEventListener("change", e => ajouterFichiers(e.target.files, e.target));
+$("entreeGalerie").addEventListener("change", e => ajouterFichiers(e.target.files, e.target));
+
+async function ajouterFichiers(fichiers, entree) {
+  if (!fichiers || !fichiers.length) return;
+  chargement(true, "Ajout des photos…");
+  try {
+    for (const f of fichiers) {
+      const page = await preparerImage(f);
+      if (page) pages.push(page);
+    }
+    invaliderPdf();
+    rafraichir();
+  } catch (err) {
+    alert("Impossible de lire cette image : " + err.message);
+  } finally {
+    entree.value = "";
+    chargement(false);
+  }
+}
+
+/* Redimensionne, corrige l'orientation et convertit en JPEG via canvas */
+function preparerImage(fichier) {
+  return new Promise((resoudre, rejeter) => {
+    const url = URL.createObjectURL(fichier);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1700; // suffisant pour un A4 lisible, garde le PDF léger
+      let l = img.naturalWidth, h = img.naturalHeight;
+      if (!l || !h) return rejeter(new Error("image vide"));
+      const echelle = Math.min(1, MAX / Math.max(l, h));
+      l = Math.round(l * echelle);
+      h = Math.round(h * echelle);
+      const canvas = document.createElement("canvas");
+      canvas.width = l;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, l, h);
+      ctx.drawImage(img, 0, 0, l, h);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      const base64 = dataUrl.split(",")[1];
+      const bin = atob(base64);
+      const octets = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) octets[i] = bin.charCodeAt(i);
+      // Aperçu plus petit pour la galerie
+      const cMini = document.createElement("canvas");
+      const eMini = 260 / Math.max(l, h);
+      cMini.width = Math.max(1, Math.round(l * eMini));
+      cMini.height = Math.max(1, Math.round(h * eMini));
+      cMini.getContext("2d").drawImage(canvas, 0, 0, cMini.width, cMini.height);
+      resoudre({ jpeg: octets, largeur: l, hauteur: h, apercu: cMini.toDataURL("image/jpeg", 0.7) });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rejeter(new Error("format non pris en charge")); };
+    img.src = url;
+  });
+}
+
+/* ================= Galerie ================= */
+function rafraichir() {
+  const g = $("galerie");
+  g.innerHTML = "";
+  pages.forEach((p, i) => {
+    const v = document.createElement("div");
+    v.className = "vignette";
+    v.innerHTML =
+      '<img src="' + p.apercu + '" alt="Page ' + (i + 1) + '">' +
+      '<span class="num">' + (i + 1) + "</span>" +
+      '<div class="actions">' +
+      '<button title="Déplacer à gauche" data-a="gauche" data-i="' + i + '">⬅️</button>' +
+      '<button title="Supprimer" data-a="suppr" data-i="' + i + '">🗑️</button>' +
+      '<button title="Déplacer à droite" data-a="droite" data-i="' + i + '">➡️</button>' +
+      "</div>";
+    g.appendChild(v);
+  });
+  $("msgVide").classList.toggle("cache", pages.length > 0);
+  $("compteur").textContent = pages.length + (pages.length > 1 ? " pages" : " page");
+  $("btnPdf").disabled = pages.length === 0;
+  majTextesEmail();
+}
+
+$("galerie").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const i = +b.dataset.i;
+  const a = b.dataset.a;
+  if (a === "suppr") pages.splice(i, 1);
+  else if (a === "gauche" && i > 0) [pages[i - 1], pages[i]] = [pages[i], pages[i - 1]];
+  else if (a === "droite" && i < pages.length - 1) [pages[i + 1], pages[i]] = [pages[i], pages[i + 1]];
+  else return;
+  invaliderPdf();
+  rafraichir();
+});
+
+function invaliderPdf() {
+  pdfBlob = null;
+  $("btnPartager").disabled = true;
+  $("btnTelecharger").disabled = true;
+  $("btnMail").disabled = true;
+  $("btnVoir").disabled = true;
+  $("secoursMail").classList.add("cache");
+  statut("");
+  statutEnvoi("");
+}
+
+/* ================= Textes e-mail pré-remplis ================= */
+let objetModifie = false, corpsModifie = false;
+$("objet").addEventListener("input", () => { objetModifie = true; });
+$("corps").addEventListener("input", () => { corpsModifie = true; });
+$("nomPdf").addEventListener("input", majTextesEmail);
+
+function nomDocument() {
+  return ($("nomPdf").value.trim() || "Documents scannés");
+}
+
+function majTextesEmail() {
+  const n = pages.length;
+  if (!objetModifie) {
+    $("objet").value = nomDocument() + " — " + dateFr();
+  }
+  if (!corpsModifie) {
+    $("corps").value =
+      "Bonjour,\n\n" +
+      "Veuillez trouver ci-joint le document PDF « " + nomDocument() + " » " +
+      "(" + Math.max(n, 1) + (n > 1 ? " pages" : " page") + ", numérisé le " + dateFr() + ").\n\n" +
+      "Contenu du document :\n" +
+      (n ? Array.from({ length: n }, (_, i) => "  - Page " + (i + 1)).join("\n") : "  - (aucune page pour l’instant)") +
+      "\n\nCordialement";
+  }
+}
+
+/* ================= Génération du PDF (sans bibliothèque externe) =================
+   Chaque photo JPEG est insérée telle quelle (filtre DCTDecode) sur une page A4. */
+const A4_L = 595.28, A4_H = 841.89, MARGE = 24;
+
+function genererPdf() {
+  const morceaux = [];
+  let position = 0;
+  const positionsObjets = [0]; // l'objet 0 n'existe pas
+  const enc = new TextEncoder();
+
+  function ecrire(donnee) {
+    const o = typeof donnee === "string" ? enc.encode(donnee) : donnee;
+    morceaux.push(o);
+    position += o.length;
+  }
+  function debutObjet(num) {
+    positionsObjets[num] = position;
+    ecrire(num + " 0 obj\n");
+  }
+
+  const nbPages = pages.length;
+  // Numérotation : 1=Catalog, 2=Pages, puis par page i : 3+3i=Page, 4+3i=Contenu, 5+3i=Image
+  const numPage = i => 3 + 3 * i, numContenu = i => 4 + 3 * i, numImage = i => 5 + 3 * i;
+  const totalObjets = 2 + 3 * nbPages;
+
+  ecrire("%PDF-1.4\n%âãÏÓ\n");
+
+  debutObjet(1);
+  ecrire("<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+
+  debutObjet(2);
+  ecrire("<< /Type /Pages /Count " + nbPages + " /Kids [" +
+    pages.map((_, i) => numPage(i) + " 0 R").join(" ") + "] >>\nendobj\n");
+
+  pages.forEach((p, i) => {
+    // Ajuste l'image dans la page A4 avec marges, centrée
+    const e = Math.min((A4_L - 2 * MARGE) / p.largeur, (A4_H - 2 * MARGE) / p.hauteur);
+    const l = p.largeur * e, h = p.hauteur * e;
+    const x = (A4_L - l) / 2, y = (A4_H - h) / 2;
+
+    debutObjet(numPage(i));
+    ecrire("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + A4_L + " " + A4_H + "]" +
+      " /Resources << /XObject << /Im" + i + " " + numImage(i) + " 0 R >> >>" +
+      " /Contents " + numContenu(i) + " 0 R >>\nendobj\n");
+
+    const flux = "q " + l.toFixed(2) + " 0 0 " + h.toFixed(2) + " " +
+      x.toFixed(2) + " " + y.toFixed(2) + " cm /Im" + i + " Do Q";
+    debutObjet(numContenu(i));
+    ecrire("<< /Length " + flux.length + " >>\nstream\n" + flux + "\nendstream\nendobj\n");
+
+    debutObjet(numImage(i));
+    ecrire("<< /Type /XObject /Subtype /Image /Width " + p.largeur + " /Height " + p.hauteur +
+      " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
+      p.jpeg.length + " >>\nstream\n");
+    ecrire(p.jpeg);
+    ecrire("\nendstream\nendobj\n");
+  });
+
+  const debutXref = position;
+  ecrire("xref\n0 " + (totalObjets + 1) + "\n");
+  ecrire("0000000000 65535 f \n");
+  for (let n = 1; n <= totalObjets; n++) {
+    ecrire(String(positionsObjets[n]).padStart(10, "0") + " 00000 n \n");
+  }
+  ecrire("trailer\n<< /Size " + (totalObjets + 1) + " /Root 1 0 R >>\nstartxref\n" +
+    debutXref + "\n%%EOF");
+
+  return new Blob(morceaux, { type: "application/pdf" });
+}
+
+$("btnPdf").addEventListener("click", () => {
+  if (!pages.length) return;
+  chargement(true, "Création du PDF…");
+  setTimeout(() => {
+    try {
+      pdfBlob = genererPdf();
+      pdfNomFichier = nomDocument()
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "document";
+      pdfNomFichier += ".pdf";
+      $("btnTelecharger").disabled = false;
+      $("btnMail").disabled = false;
+      $("btnPartager").disabled = false;
+      $("btnVoir").disabled = false;
+      const taille = (pdfBlob.size / 1024 / 1024).toFixed(2);
+      statut("✅ PDF prêt : " + pages.length + (pages.length > 1 ? " pages" : " page") +
+        " (" + taille + " Mo)");
+    } catch (err) {
+      statut("Erreur lors de la création du PDF : " + err.message, true);
+    } finally {
+      chargement(false);
+    }
+  }, 50);
+});
+
+/* ================= Vérification du PDF ================= */
+$("btnVoir").addEventListener("click", () => {
+  if (!pdfBlob) return;
+  const url = URL.createObjectURL(pdfBlob);
+  const fenetre = window.open(url, "_blank");
+  if (!fenetre) {
+    statut("Ouverture bloquée par le navigateur — utilisez « Télécharger le PDF » pour le vérifier.", true);
+  } else {
+    statut("PDF ouvert dans un nouvel onglet : vérifiez que toutes les pages y sont.");
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+});
+
+/* ================= Envoi ================= */
+function montrerSecours() {
+  $("copieObjet").value = $("objet").value;
+  $("copieCorps").value = $("corps").value;
+  $("secoursMail").classList.remove("cache");
+}
+
+document.querySelectorAll(".btn-copier").forEach(b => {
+  b.addEventListener("click", async () => {
+    const champ = $(b.dataset.copie);
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(champ.value);
+      ok = true;
+    } catch (e) {
+      champ.focus();
+      champ.select();
+      try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    }
+    b.textContent = ok ? "✅ Copié" : "❌ Échec";
+    setTimeout(() => { b.textContent = "📋 Copier"; }, 2000);
+  });
+});
+
+$("btnTelecharger").addEventListener("click", () => {
+  if (!pdfBlob) return;
+  const url = URL.createObjectURL(pdfBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = pdfNomFichier;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  statutEnvoi("📥 Téléchargement lancé : « " + pdfNomFichier + " » (dossier Téléchargements). " +
+    "S’il n’apparaît pas, le navigateur l’a bloqué.");
+});
+
+$("btnMail").addEventListener("click", () => {
+  const lien = "mailto:" + encodeURIComponent($("dest").value.trim()) +
+    "?subject=" + encodeURIComponent($("objet").value) +
+    "&body=" + encodeURIComponent($("corps").value +
+      "\n\n(Pièce jointe : " + pdfNomFichier + " — pensez à joindre le fichier téléchargé.)");
+  // Un clic sur un lien passe mieux qu'une navigation directe dans certains contextes
+  const a = document.createElement("a");
+  a.href = lien;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  statutEnvoi("Si votre application e-mail ne s’est pas ouverte après quelques secondes, " +
+    "utilisez les boutons « Copier » ci-dessous.");
+  montrerSecours();
+});
+
+$("btnPartager").addEventListener("click", async () => {
+  if (!pdfBlob) return;
+  const fichier = new File([pdfBlob], pdfNomFichier, { type: "application/pdf" });
+  if (navigator.canShare && navigator.canShare({ files: [fichier] })) {
+    try {
+      await navigator.share({
+        files: [fichier],
+        title: $("objet").value,
+        text: $("corps").value
+      });
+      statutEnvoi("✅ Partage effectué — le PDF a été transmis à l’application choisie.");
+      return;
+    } catch (err) {
+      if (err.name === "AbortError") { statutEnvoi("Partage annulé."); return; }
+      statutEnvoi("Partage refusé ici (" + err.name + "). Passez par « Télécharger » + « Copier » ci-dessous.", true);
+      montrerSecours();
+      return;
+    }
+  }
+  statutEnvoi("Le partage direct n’existe pas sur ce navigateur. " +
+    "Téléchargez le PDF, puis copiez l’objet et le message ci-dessous.", true);
+  montrerSecours();
+});
+
+/* Masque le bouton de partage là où il n'est pas pris en charge (ordinateur) */
+(function () {
+  const test = new File([new Blob(["x"], { type: "application/pdf" })], "t.pdf", { type: "application/pdf" });
+  if (!(navigator.canShare && navigator.canShare({ files: [test] }))) {
+    $("btnPartager").classList.add("cache");
+  }
+})();
+
+/* Avertit si l'appli tourne dans un cadre intégré (aperçu Claude, etc.) */
+if (window.self !== window.top) {
+  $("avertIframe").classList.remove("cache");
+}
+
+/* ================= Initialisation ================= */
+majTextesEmail();
+rafraichir();
+</script>
+</body>
+</html>

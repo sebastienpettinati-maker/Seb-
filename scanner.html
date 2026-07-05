@@ -236,7 +236,7 @@
   }
   .info.ok { background: var(--info-ok-fond); border-color: var(--vert); color: var(--info-ok-texte); }
 
-  #statut {
+  #statut, #statutEnvoi {
     text-align: center;
     font-size: .85rem;
     font-weight: 600;
@@ -244,7 +244,7 @@
     min-height: 20px;
     margin-top: 8px;
   }
-  #statut.erreur { color: var(--rouge); }
+  #statut.erreur, #statutEnvoi.erreur { color: var(--rouge); }
 
   .compteur {
     background: var(--bleu);
@@ -257,6 +257,38 @@
   }
   input[type=file] { display: none; }
   .cache { display: none !important; }
+
+  .bandeau {
+    background: var(--info-fond);
+    border-left: 3px solid var(--orange);
+    color: var(--texte);
+    font-size: .82rem;
+    line-height: 1.45;
+    padding: 10px 12px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 14px;
+  }
+
+  #secoursMail { margin-top: 12px; }
+  .champ-copie {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .champ-copie > div { flex: 1; min-width: 0; }
+  .btn-copier {
+    border: 1.5px solid var(--bleu);
+    background: var(--carte);
+    color: var(--bleu);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: .8rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-top: 21px;
+  }
 
   #chargement {
     position: fixed;
@@ -292,6 +324,14 @@
 
 <main>
 
+  <div id="avertIframe" class="bandeau cache">
+    ⚠️ <strong>Vous utilisez l’aperçu intégré</strong> (fenêtre Claude) : l’ouverture de
+    l’application e-mail et le partage peuvent y être bloqués par sécurité.
+    La création du PDF fonctionne, mais pour l’envoi, utilisez l’appli depuis
+    une vraie page web (par ex. hébergée sur GitHub Pages) ou servez-vous des
+    boutons « Copier » qui apparaissent à l’étape 3.
+  </div>
+
   <!-- ÉTAPE 1 : prendre les photos -->
   <section class="etape">
     <div class="etape-titre">
@@ -322,6 +362,9 @@
     <button class="btn vert" id="btnPdf" disabled>
       <span class="ico">📄</span> Générer le PDF
     </button>
+    <button class="btn contour" id="btnVoir" disabled>
+      <span class="ico">👁️</span> Vérifier le PDF (l’ouvrir)
+    </button>
     <div id="statut"></div>
   </section>
 
@@ -347,6 +390,29 @@
     <button class="btn contour" id="btnMail" disabled>
       <span class="ico">✉️</span> Ouvrir l’e-mail pré-rempli
     </button>
+
+    <div id="statutEnvoi"></div>
+
+    <div id="secoursMail" class="cache">
+      <div class="info">
+        Si votre application e-mail ne s’est pas ouverte, créez le message
+        vous-même : copiez l’objet et le texte ci-dessous, et joignez le PDF téléchargé.
+      </div>
+      <div class="champ-copie">
+        <div>
+          <label>Objet</label>
+          <input type="text" id="copieObjet" readonly>
+        </div>
+        <button class="btn-copier" data-copie="copieObjet">📋 Copier</button>
+      </div>
+      <div class="champ-copie">
+        <div>
+          <label>Message</label>
+          <textarea id="copieCorps" readonly></textarea>
+        </div>
+        <button class="btn-copier" data-copie="copieCorps">📋 Copier</button>
+      </div>
+    </div>
 
     <div class="info">
       <strong>📱 Sur téléphone :</strong> utilisez « Envoyer le PDF » puis choisissez Mail ou Gmail — le PDF est joint automatiquement.<br>
@@ -375,6 +441,11 @@ function chargement(actif, texte) {
 }
 function statut(msg, erreur) {
   const s = $("statut");
+  s.textContent = msg || "";
+  s.classList.toggle("erreur", !!erreur);
+}
+function statutEnvoi(msg, erreur) {
+  const s = $("statutEnvoi");
   s.textContent = msg || "";
   s.classList.toggle("erreur", !!erreur);
 }
@@ -485,7 +556,10 @@ function invaliderPdf() {
   $("btnPartager").disabled = true;
   $("btnTelecharger").disabled = true;
   $("btnMail").disabled = true;
+  $("btnVoir").disabled = true;
+  $("secoursMail").classList.add("cache");
   statut("");
+  statutEnvoi("");
 }
 
 /* ================= Textes e-mail pré-remplis ================= */
@@ -597,6 +671,7 @@ $("btnPdf").addEventListener("click", () => {
       $("btnTelecharger").disabled = false;
       $("btnMail").disabled = false;
       $("btnPartager").disabled = false;
+      $("btnVoir").disabled = false;
       const taille = (pdfBlob.size / 1024 / 1024).toFixed(2);
       statut("✅ PDF prêt : " + pages.length + (pages.length > 1 ? " pages" : " page") +
         " (" + taille + " Mo)");
@@ -608,7 +683,43 @@ $("btnPdf").addEventListener("click", () => {
   }, 50);
 });
 
+/* ================= Vérification du PDF ================= */
+$("btnVoir").addEventListener("click", () => {
+  if (!pdfBlob) return;
+  const url = URL.createObjectURL(pdfBlob);
+  const fenetre = window.open(url, "_blank");
+  if (!fenetre) {
+    statut("Ouverture bloquée par le navigateur — utilisez « Télécharger le PDF » pour le vérifier.", true);
+  } else {
+    statut("PDF ouvert dans un nouvel onglet : vérifiez que toutes les pages y sont.");
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+});
+
 /* ================= Envoi ================= */
+function montrerSecours() {
+  $("copieObjet").value = $("objet").value;
+  $("copieCorps").value = $("corps").value;
+  $("secoursMail").classList.remove("cache");
+}
+
+document.querySelectorAll(".btn-copier").forEach(b => {
+  b.addEventListener("click", async () => {
+    const champ = $(b.dataset.copie);
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(champ.value);
+      ok = true;
+    } catch (e) {
+      champ.focus();
+      champ.select();
+      try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    }
+    b.textContent = ok ? "✅ Copié" : "❌ Échec";
+    setTimeout(() => { b.textContent = "📋 Copier"; }, 2000);
+  });
+});
+
 $("btnTelecharger").addEventListener("click", () => {
   if (!pdfBlob) return;
   const url = URL.createObjectURL(pdfBlob);
@@ -619,6 +730,8 @@ $("btnTelecharger").addEventListener("click", () => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+  statutEnvoi("📥 Téléchargement lancé : « " + pdfNomFichier + " » (dossier Téléchargements). " +
+    "S’il n’apparaît pas, le navigateur l’a bloqué.");
 });
 
 $("btnMail").addEventListener("click", () => {
@@ -626,7 +739,15 @@ $("btnMail").addEventListener("click", () => {
     "?subject=" + encodeURIComponent($("objet").value) +
     "&body=" + encodeURIComponent($("corps").value +
       "\n\n(Pièce jointe : " + pdfNomFichier + " — pensez à joindre le fichier téléchargé.)");
-  location.href = lien;
+  // Un clic sur un lien passe mieux qu'une navigation directe dans certains contextes
+  const a = document.createElement("a");
+  a.href = lien;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  statutEnvoi("Si votre application e-mail ne s’est pas ouverte après quelques secondes, " +
+    "utilisez les boutons « Copier » ci-dessous.");
+  montrerSecours();
 });
 
 $("btnPartager").addEventListener("click", async () => {
@@ -639,17 +760,32 @@ $("btnPartager").addEventListener("click", async () => {
         title: $("objet").value,
         text: $("corps").value
       });
+      statutEnvoi("✅ Partage effectué — le PDF a été transmis à l’application choisie.");
       return;
     } catch (err) {
-      if (err.name === "AbortError") return; // l'utilisateur a annulé
+      if (err.name === "AbortError") { statutEnvoi("Partage annulé."); return; }
+      statutEnvoi("Partage refusé ici (" + err.name + "). Passez par « Télécharger » + « Copier » ci-dessous.", true);
+      montrerSecours();
+      return;
     }
   }
-  // Secours (navigateur sans partage de fichiers, ex. Firefox ordinateur)
-  alert("Le partage direct n’est pas disponible sur ce navigateur.\n\n" +
-    "1. Téléchargez le PDF\n2. Ouvrez l’e-mail pré-rempli\n3. Joignez le fichier téléchargé.");
-  $("btnTelecharger").click();
-  $("btnMail").click();
+  statutEnvoi("Le partage direct n’existe pas sur ce navigateur. " +
+    "Téléchargez le PDF, puis copiez l’objet et le message ci-dessous.", true);
+  montrerSecours();
 });
+
+/* Masque le bouton de partage là où il n'est pas pris en charge (ordinateur) */
+(function () {
+  const test = new File([new Blob(["x"], { type: "application/pdf" })], "t.pdf", { type: "application/pdf" });
+  if (!(navigator.canShare && navigator.canShare({ files: [test] }))) {
+    $("btnPartager").classList.add("cache");
+  }
+})();
+
+/* Avertit si l'appli tourne dans un cadre intégré (aperçu Claude, etc.) */
+if (window.self !== window.top) {
+  $("avertIframe").classList.remove("cache");
+}
 
 /* ================= Initialisation ================= */
 majTextesEmail();

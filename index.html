@@ -231,6 +231,35 @@
   }
   .toast.visible{opacity:1;}
 
+  /* ============ RÉGLAGES / SYNCHRO ============ */
+  .etat-sync{
+    display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:13px;
+    font-size:14px; font-weight:700; margin-bottom:12px;
+  }
+  .etat-sync.ok{background:var(--m-fond); color:var(--m);}
+  .etat-sync.off{background:#f3efe8; color:var(--encre-2);}
+  .etat-sync.attente{background:var(--eca-fond); color:var(--eca);}
+  .guide{counter-reset:etp; font-size:14px;}
+  .guide .pas{display:flex; gap:11px; padding:9px 0; border-top:1px solid var(--bord); align-items:flex-start;}
+  .guide .pas:first-child{border-top:none;}
+  .guide .pas::before{
+    counter-increment:etp; content:counter(etp);
+    width:24px; height:24px; flex-shrink:0; border-radius:50%; background:var(--caramel-clair);
+    color:var(--choco-2); font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center;
+    margin-top:1px;
+  }
+  .guide code{background:#f3efe8; border-radius:6px; padding:1px 6px; font-size:12.5px; word-break:break-all;}
+  .bloc-code{
+    background:#2b2016; color:#e8ddc8; border-radius:13px; padding:12px; font-size:11px;
+    font-family:ui-monospace,Menlo,Consolas,monospace; white-space:pre; overflow-x:auto;
+    max-height:220px; overflow-y:auto; margin-top:10px;
+  }
+  .b-bloc{
+    width:100%; margin-top:10px; border:1.5px solid var(--bord); background:#fffdf9; color:var(--choco-2);
+    border-radius:13px; padding:12px; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .b-bloc.plein{background:var(--choco); border-color:var(--choco); color:#fff;}
+
   /* ============ IMPRESSION ============ */
   #vue-impression{display:none;}
   @media print{
@@ -325,6 +354,75 @@ const NIVEAUX_ICO = {NA:"❌", ECA:"⏳", A:"✅", M:"⭐"};
 const POINTS = {NA:0, ECA:1, A:2, M:3};
 const TOUS_CRITERES = GRILLE.sections.flatMap(s=>s.criteres);
 const CLE_STOCKAGE = "evaluations_tp_session1";
+const CLE_SYNC_URL = "sync_url_tp";
+const CLE_ATTENTE = "sync_attente_tp";
+
+/* Script à coller dans Google Apps Script (Extensions › Apps Script de la feuille Google) */
+const APPS_SCRIPT_CODE = `const NOM_FEUILLE = "Évaluations";
+
+function doGet() { return reponse({ ok: true }); }
+
+function doPost(e) {
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(15000);
+  try {
+    const d = JSON.parse(e.postData.contents);
+    const f = feuille();
+    if (d.action === "delete") {
+      const r = trouverLigne(f, d.id);
+      if (r > 0) f.deleteRow(r);
+      return reponse({ ok: true });
+    }
+    const entetes = assurerEntetes(f, Object.keys(d.ligne));
+    const valeurs = entetes.map(function (h) {
+      return d.ligne[h] !== undefined ? d.ligne[h] : "";
+    });
+    const r = trouverLigne(f, d.ligne["ID"]);
+    if (r > 0) f.getRange(r, 1, 1, valeurs.length).setValues([valeurs]);
+    else f.appendRow(valeurs);
+    return reponse({ ok: true });
+  } catch (err) {
+    return reponse({ ok: false, erreur: String(err) });
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+function feuille() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let f = ss.getSheetByName(NOM_FEUILLE);
+  if (!f) f = ss.insertSheet(NOM_FEUILLE);
+  return f;
+}
+
+function assurerEntetes(f, cles) {
+  if (f.getLastRow() === 0) {
+    f.appendRow(cles);
+    f.setFrozenRows(1);
+    return cles;
+  }
+  let entetes = f.getRange(1, 1, 1, f.getLastColumn() || 1).getValues()[0].filter(String);
+  const manquantes = cles.filter(function (c) { return entetes.indexOf(c) < 0; });
+  if (manquantes.length) {
+    f.getRange(1, entetes.length + 1, 1, manquantes.length).setValues([manquantes]);
+    entetes = entetes.concat(manquantes);
+  }
+  return entetes;
+}
+
+function trouverLigne(f, id) {
+  if (f.getLastRow() < 2) return -1;
+  const ids = f.getRange(2, 1, f.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(id)) return i + 2;
+  }
+  return -1;
+}
+
+function reponse(o) {
+  return ContentService.createTextOutput(JSON.stringify(o))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
 // étapes = infos + sections + synthèse
 const ETAPES = [
   {id:"infos", ico:"👤", court:"Élève"},
@@ -344,6 +442,7 @@ const app = {
     if(this.ecran==="form") this.sauvegarder(false);
     this.ecran="liste"; this.courante=null; this.rendre();
   },
+  ouvrirReglages(){ this.ecran="reglages"; this.rendre(); },
   nouvelle(){
     this.courante={
       id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
@@ -363,8 +462,9 @@ const app = {
   supprimer(id,ev){
     ev.stopPropagation();
     const e=this.charger().find(x=>x.id===id);
-    if(!confirm("Supprimer l'évaluation de « "+(e?.apprenti||"sans nom")+" » ?")) return;
+    if(!confirm("Supprimer l'évaluation de « "+(e?.apprenti||"sans nom")+" » ?"+(this.urlSync()?"\n(Elle sera aussi retirée de la feuille Google.)":""))) return;
     this.persister(this.charger().filter(x=>x.id!==id));
+    this.planifier({type:"delete",id});
     this.rendre(); this.toast("Évaluation supprimée");
   },
   dupliquer(id,ev){
@@ -408,13 +508,13 @@ const app = {
 
   /* ---------- rendu ---------- */
   rendre(){
-    const form=this.ecran==="form";
-    document.getElementById("btn-retour").style.display=form?"":"none";
-    document.getElementById("btn-nouveau").style.display=form?"none":"";
+    const form=this.ecran==="form", reglages=this.ecran==="reglages";
+    document.getElementById("btn-retour").style.display=(form||reglages)?"":"none";
+    document.getElementById("btn-nouveau").style.display=this.ecran==="liste"?"":"none";
     document.getElementById("barre-form").style.display=form?"":"none";
     document.getElementById("etapes").style.display=form?"flex":"none";
     document.getElementById("anneau").style.display=form?"":"none";
-    if(form) this.rendreForm(); else this.rendreListe();
+    if(form) this.rendreForm(); else if(reglages) this.rendreReglages(); else this.rendreListe();
     window.scrollTo(0,0);
   },
 
@@ -423,7 +523,7 @@ const app = {
     const liste=this.charger().sort((a,b)=>b.creeLe-a.creeLe);
     const M=document.getElementById("contenu");
     if(!liste.length){
-      M.innerHTML='<div class="vide"><div class="picto">🧑‍🍳</div>Aucune évaluation pour le moment.<br>Appuyez sur « Nouvelle évaluation » pour commencer.</div>';
+      M.innerHTML='<div class="vide"><div class="picto">🧑‍🍳</div>Aucune évaluation pour le moment.<br>Appuyez sur « Nouvelle évaluation » pour commencer.<br><br><button class="b-second" style="padding:12px 18px" onclick="app.ouvrirReglages()">☁️ Synchronisation Google Sheets</button></div>';
       return;
     }
     const notes=liste.map(e=>this.noteFinale(e)).filter(n=>n!==null&&!isNaN(n));
@@ -436,6 +536,7 @@ const app = {
     </div>
     <div style="display:flex;gap:10px;margin-bottom:14px">
       <button class="b-second" style="flex:1;padding:12px" onclick="app.exportCSV()">⬇️ Exporter tout (CSV)</button>
+      <button class="b-second" style="flex:0 0 auto;padding:12px 16px" onclick="app.ouvrirReglages()">☁️ Synchro${this.urlSync()?(this.fileAttente().length?" ⏳":" ✅"):""}</button>
     </div>`;
     for(const e of liste){
       const n=this.noteFinale(e), c=this.calcul(e);
@@ -542,6 +643,127 @@ const app = {
     this.majProgression(); this.majSynthese();
   },
 
+  /* ---------- réglages / synchro Google Sheets ---------- */
+  urlSync(){ return localStorage.getItem(CLE_SYNC_URL)||""; },
+  fileAttente(){ try{ return JSON.parse(localStorage.getItem(CLE_ATTENTE))||[]; }catch(e){ return []; } },
+  persisterAttente(a){ localStorage.setItem(CLE_ATTENTE, JSON.stringify(a)); },
+
+  rendreReglages(){
+    document.getElementById("titre-header").innerHTML='☁️ Synchronisation<small>Feuille Google Sheets partagée</small>';
+    const url=this.urlSync(), attente=this.fileAttente();
+    const etat = !url
+      ? '<div class="etat-sync off">📴 Synchronisation non configurée — les données restent sur cet appareil.</div>'
+      : attente.length
+        ? `<div class="etat-sync attente">⏳ ${attente.length} évaluation(s) en attente d'envoi (hors ligne ?).</div>`
+        : '<div class="etat-sync ok">✅ Synchronisation active — chaque enregistrement est envoyé vers la feuille Google.</div>';
+    document.getElementById("contenu").innerHTML=`
+    ${etat}
+    <div class="carte">
+      <div class="titre-panneau" style="margin-top:0"><div class="pico">🔗</div><div>Adresse de synchronisation<small>URL du script Google (se termine par /exec)</small></div></div>
+      <input type="text" id="f-sync-url" value="${this.attr(url)}" placeholder="https://script.google.com/macros/s/…/exec"
+        autocomplete="off" autocapitalize="off" spellcheck="false" oninput="app.majUrlSync(this.value)">
+      <button class="b-bloc plein" onclick="app.testerSync()">🔌 Tester la connexion</button>
+      <button class="b-bloc" onclick="app.toutSynchroniser()">☁️ Envoyer toutes les évaluations de cet appareil</button>
+    </div>
+    <div class="carte">
+      <div class="titre-panneau" style="margin-top:0"><div class="pico">🛠</div><div>Mise en place (une seule fois)<small>≈ 15 minutes, à faire par un seul formateur</small></div></div>
+      <div class="guide">
+        <div class="pas"><div>Sur un ordinateur, créez une feuille sur <code>sheets.google.com</code> (par ex. « Évaluations TP Session 1 ») et partagez-la avec les autres formateurs.</div></div>
+        <div class="pas"><div>Dans la feuille : menu <b>Extensions › Apps Script</b>. Effacez le contenu proposé, puis collez le script ci-dessous.</div></div>
+        <div class="pas"><div>Cliquez sur <b>Déployer › Nouveau déploiement</b>, choisissez le type <b>Application Web</b>.</div></div>
+        <div class="pas"><div>Réglez <b>Exécuter en tant que : Moi</b> et <b>Qui a accès : Tout le monde</b>, puis validez (Google demandera une autorisation : choisissez votre compte puis « Paramètres avancés › Accéder au projet »).</div></div>
+        <div class="pas"><div>Copiez l'<b>URL de l'application Web</b> (elle se termine par <code>/exec</code>) et collez-la dans le champ ci-dessus, sur le téléphone de <b>chaque</b> formateur.</div></div>
+        <div class="pas"><div>Appuyez sur « Tester la connexion » puis « Envoyer toutes les évaluations ». C'est prêt : chaque enregistrement alimentera la même feuille.</div></div>
+      </div>
+      <button class="b-bloc" onclick="app.copierScript(this)">📋 Copier le script Google Apps Script</button>
+      <div class="bloc-code" id="code-script"></div>
+    </div>`;
+    document.getElementById("code-script").textContent=APPS_SCRIPT_CODE;
+  },
+
+  majUrlSync(v){
+    v=v.trim();
+    if(v) localStorage.setItem(CLE_SYNC_URL,v); else localStorage.removeItem(CLE_SYNC_URL);
+  },
+  copierScript(btn){
+    navigator.clipboard.writeText(APPS_SCRIPT_CODE)
+      .then(()=>{ this.toast("📋 Script copié"); btn.textContent="✅ Script copié — collez-le dans Apps Script"; })
+      .catch(()=>this.toast("Copie impossible — sélectionnez le texte manuellement"));
+  },
+  async testerSync(){
+    const url=this.urlSync();
+    if(!url){ this.toast("Collez d'abord l'URL du script"); return; }
+    this.toast("🔌 Test en cours…");
+    try{
+      const r=await fetch(url,{method:"GET"});
+      const d=await r.json();
+      if(d.ok){ this.toast("✅ Connexion réussie !"); }
+      else this.toast("⚠️ Le script répond mais signale une erreur");
+    }catch(err){ this.toast("❌ Échec — vérifiez l'URL et le déploiement"); }
+  },
+  async toutSynchroniser(){
+    const url=this.urlSync();
+    if(!url){ this.toast("Collez d'abord l'URL du script"); return; }
+    const liste=this.charger();
+    if(!liste.length){ this.toast("Aucune évaluation sur cet appareil"); return; }
+    const attente=this.fileAttente();
+    for(const e of liste) if(!attente.some(t=>t.type==="upsert"&&t.id===e.id)) attente.push({type:"upsert",id:e.id});
+    this.persisterAttente(attente);
+    this.toast("☁️ Envoi de "+liste.length+" évaluation(s)…");
+    await this.viderAttente();
+    const reste=this.fileAttente().length;
+    this.toast(reste?("⚠️ "+reste+" envoi(s) en échec — réessayez"):"✅ Tout est synchronisé");
+    if(this.ecran==="reglages") this.rendreReglages();
+  },
+
+  lignePourFeuille(e){
+    const note=this.noteFinale(e);
+    const l={ "ID":e.id, "Apprenti(e)":e.apprenti, "Formateur":e.formateur, "Date":e.date,
+      "Jour 1":e.jours.j1?"X":"", "Jour 2":e.jours.j2?"X":"" };
+    for(const c of TOUS_CRITERES) l[c.titre]=e.notes[c.id]||"";
+    for(const c of TOUS_CRITERES) l["Obs — "+c.titre]=e.obs[c.id]||"";
+    l["Note /20"]=note===null?"":note;
+    l["Niveau global"]=e.niveauGlobal?NIVEAUX_LONG[e.niveauGlobal]:"";
+    l["Appréciation"]=e.appreciation||"";
+    l["Modifié le"]=new Date().toLocaleString("fr-FR");
+    return l;
+  },
+  async envoyer(payload){
+    const url=this.urlSync();
+    if(!url) return false;
+    try{
+      const r=await fetch(url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+      const d=await r.json();
+      return !!d.ok;
+    }catch(err){ return false; }
+  },
+  planifier(tache){
+    if(!this.urlSync()) return;
+    const attente=this.fileAttente().filter(t=>!(t.type===tache.type&&t.id===tache.id));
+    attente.push(tache);
+    this.persisterAttente(attente);
+    this.viderAttente();
+  },
+  async viderAttente(){
+    if(this._vidage||!this.urlSync()) return;
+    this._vidage=true;
+    try{
+      let attente=this.fileAttente();
+      while(attente.length){
+        const t=attente[0];
+        let ok;
+        if(t.type==="delete") ok=await this.envoyer({action:"delete",id:t.id});
+        else{
+          const e=this.charger().find(x=>x.id===t.id);
+          ok=e?await this.envoyer({action:"upsert",ligne:this.lignePourFeuille(e)}):true;
+        }
+        if(!ok) break;
+        attente=this.fileAttente().filter(x=>!(x.type===t.type&&x.id===t.id));
+        this.persisterAttente(attente);
+      }
+    }finally{ this._vidage=false; }
+  },
+
   /* ---------- mutations ---------- */
   maj(ch,val){ this.courante[ch]=val; if(ch==="apprenti") this.majHeader(); },
   majHeader(){
@@ -634,7 +856,8 @@ const app = {
     const i=l.findIndex(x=>x.id===e.id);
     if(i>=0) l[i]=JSON.parse(JSON.stringify(e)); else l.push(JSON.parse(JSON.stringify(e)));
     this.persister(l);
-    if(notifier) this.toast("💾 Évaluation enregistrée");
+    if(notifier) this.toast(this.urlSync()?"💾 Enregistré · ☁️ envoi vers Google Sheets…":"💾 Évaluation enregistrée");
+    this.planifier({type:"upsert",id:e.id});
   },
 
   /* ---------- exports ---------- */
@@ -730,6 +953,8 @@ const app = {
 };
 
 app.rendre();
+app.viderAttente();
+window.addEventListener("online",()=>app.viderAttente());
 </script>
 </body>
 </html>

@@ -17,7 +17,61 @@
     --texte: #1c2733;
     --texte-2: #5d6b7a;
     --bord: #dde3ea;
+    --champ: #fbfcfe;
+    --info-fond: #eef4fc;
+    --info-ok-fond: #eaf7f0;
+    --info-ok-texte: #17663f;
+    --vignette-fond: #eef1f5;
+    --voile: rgba(255,255,255,.85);
+    --vert-statut: #26a269;
     --rayon: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bleu: #4a8fdc;
+      --fond: #10161d;
+      --carte: #1a222c;
+      --texte: #e8edf3;
+      --texte-2: #9aa8b6;
+      --bord: #2d3947;
+      --champ: #141c25;
+      --info-fond: #172433;
+      --info-ok-fond: #14291f;
+      --info-ok-texte: #6fd0a0;
+      --vignette-fond: #232d39;
+      --voile: rgba(12,17,23,.85);
+      --vert-statut: #4fc48d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bleu: #4a8fdc;
+    --fond: #10161d;
+    --carte: #1a222c;
+    --texte: #e8edf3;
+    --texte-2: #9aa8b6;
+    --bord: #2d3947;
+    --champ: #141c25;
+    --info-fond: #172433;
+    --info-ok-fond: #14291f;
+    --info-ok-texte: #6fd0a0;
+    --vignette-fond: #232d39;
+    --voile: rgba(12,17,23,.85);
+    --vert-statut: #4fc48d;
+  }
+  :root[data-theme="light"] {
+    --bleu: #1a5fb4;
+    --fond: #f4f6f9;
+    --carte: #ffffff;
+    --texte: #1c2733;
+    --texte-2: #5d6b7a;
+    --bord: #dde3ea;
+    --champ: #fbfcfe;
+    --info-fond: #eef4fc;
+    --info-ok-fond: #eaf7f0;
+    --info-ok-texte: #17663f;
+    --vignette-fond: #eef1f5;
+    --voile: rgba(255,255,255,.85);
+    --vert-statut: #26a269;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body {
@@ -90,7 +144,7 @@
   .btn.vert { background: var(--vert); }
   .btn.orange { background: var(--orange); }
   .btn.contour {
-    background: #fff;
+    background: var(--carte);
     color: var(--bleu);
     border: 2px solid var(--bleu);
   }
@@ -109,7 +163,7 @@
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid var(--bord);
-    background: #eef1f5;
+    background: var(--vignette-fond);
     aspect-ratio: 3/4;
   }
   .vignette img {
@@ -163,7 +217,7 @@
     border-radius: 10px;
     font-size: .95rem;
     font-family: inherit;
-    background: #fbfcfe;
+    background: var(--champ);
     color: var(--texte);
     margin-bottom: 12px;
   }
@@ -173,20 +227,20 @@
   .info {
     font-size: .8rem;
     color: var(--texte-2);
-    background: #eef4fc;
+    background: var(--info-fond);
     border-left: 3px solid var(--bleu);
     padding: 9px 11px;
     border-radius: 0 8px 8px 0;
     margin-top: 12px;
     line-height: 1.45;
   }
-  .info.ok { background: #eaf7f0; border-color: var(--vert); color: #17663f; }
+  .info.ok { background: var(--info-ok-fond); border-color: var(--vert); color: var(--info-ok-texte); }
 
   #statut {
     text-align: center;
     font-size: .85rem;
     font-weight: 600;
-    color: var(--vert);
+    color: var(--vert-statut);
     min-height: 20px;
     margin-top: 8px;
   }
@@ -207,7 +261,7 @@
   #chargement {
     position: fixed;
     inset: 0;
-    background: rgba(255,255,255,.85);
+    background: var(--voile);
     display: none;
     align-items: center;
     justify-content: center;

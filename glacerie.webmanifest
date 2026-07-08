@@ -1,0 +1,15 @@
+{
+  "name": "Calculateur de glacerie",
+  "short_name": "Glacerie",
+  "description": "Équilibrez sorbets, glaces et crèmes glacées : table analytique, coûts, prix de vente et étiquettes de traçabilité.",
+  "lang": "fr",
+  "start_url": "./glacerie.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf4ec",
+  "theme_color": "#e8467c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

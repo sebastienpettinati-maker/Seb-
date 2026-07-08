@@ -13,22 +13,20 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   :root{
-    --page:#faf4ec;
-    --page-grad:linear-gradient(180deg,#ffe7dd 0%,#fdeee8 120px,#faf4ec 380px);
+    --page:#f7f3ed;
     --surface-1:#ffffff;
     --ink-1:#28211a; --ink-2:#645a4e; --ink-3:#9b8f80;
-    --grid:#ecdfd2; --border:rgba(40,33,26,.08);
+    --grid:#e9decf; --border:rgba(40,33,26,.08);
     --accent:#e8467c; --accent-2:#f2745f; --accent-soft:#fdeaf1;
     --grad:linear-gradient(135deg,#e8467c 0%,#f2745f 100%);
     --zebra:rgba(140,100,70,.045);
     --good:#0ca30c; --good-text:#006300; --warn:#fab219; --bad:#d03b3b;
     --good-bg:rgba(12,163,12,.10); --warn-bg:rgba(250,178,25,.16); --bad-bg:rgba(208,59,59,.10);
-    --shadow:0 2px 8px rgba(120,70,40,.06),0 12px 32px rgba(120,70,40,.07);
+    --shadow:0 1px 2px rgba(120,70,40,.05),0 8px 20px rgba(120,70,40,.06);
   }
   @media (prefers-color-scheme: dark){
     :root{
       --page:#171310;
-      --page-grad:linear-gradient(180deg,#2b1712 0%,#221410 120px,#171310 380px);
       --surface-1:#211c17;
       --ink-1:#f8f2e9; --ink-2:#cbbfb0; --ink-3:#94897a;
       --grid:#3b332a; --border:rgba(255,255,255,.09);
@@ -37,29 +35,45 @@
       --zebra:rgba(255,255,255,.03);
       --good:#0ca30c; --good-text:#3fd43f; --warn:#fab219; --bad:#e05252;
       --good-bg:rgba(12,163,12,.18); --warn-bg:rgba(250,178,25,.15); --bad-bg:rgba(224,82,82,.16);
-      --shadow:0 2px 8px rgba(0,0,0,.35),0 14px 34px rgba(0,0,0,.3);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 24px rgba(0,0,0,.28);
     }
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;background:var(--page);background-image:var(--page-grad);background-repeat:no-repeat;
-    color:var(--ink-1);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
-  header.app{padding:24px 24px 6px;max-width:1180px;margin:0 auto}
-  .hero{position:relative;overflow:hidden;background:var(--grad);border-radius:24px;
-    padding:28px 30px;color:#fff;box-shadow:var(--shadow)}
-  .hero h1{margin:0;font-size:1.85rem;letter-spacing:-.015em;text-shadow:0 1px 2px rgba(0,0,0,.15)}
-  .hero p{margin:8px 0 0;max-width:72ch;color:rgba(255,255,255,.93);font-size:.95rem}
-  .hero .deco{position:absolute;right:-6px;top:50%;transform:translateY(-50%) rotate(8deg);
-    font-size:96px;line-height:1;opacity:.28;pointer-events:none;user-select:none}
-  @media(max-width:700px){.hero .deco{display:none}}
-  .wrap{max-width:1180px;margin:0 auto;padding:14px 24px 70px}
-  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:20px;
-    padding:22px;margin-bottom:20px;box-shadow:var(--shadow)}
-  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:1.15rem;letter-spacing:-.01em}
-  .card h2::after{content:"";flex:1;height:4px;border-radius:2px;background:var(--grad);opacity:.16;min-width:30px}
-  .toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+  body{margin:0;background:var(--page);color:var(--ink-1);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+  /* --- barre supérieure : titre, onglets, actions --- */
+  .top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;
+    background:var(--surface-1);border-bottom:1px solid var(--grid);padding:0 14px;min-height:56px}
+  .brand{font-weight:800;font-size:1.02rem;white-space:nowrap}
+  nav.tabs{display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto}
+  .tab{display:flex;align-items:center;gap:7px;border:none;background:none;box-shadow:none;
+    padding:8px 13px;border-radius:12px;font:inherit;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+  .tab:hover{background:var(--zebra);color:var(--ink-1)}
+  .tab.active{background:var(--accent-soft);color:var(--accent);font-weight:800}
+  .tab .ico{font-size:1.05rem;line-height:1}
+  .actions{display:flex;gap:8px;margin-left:auto}
+  @media(max-width:760px){
+    nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface-1);
+      border-top:1px solid var(--grid);justify-content:space-around;
+      padding:6px 6px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+    .tab{flex:1;flex-direction:column;gap:2px;font-size:.66rem;padding:5px 4px;border-radius:10px}
+    .tab .ico{font-size:1.3rem}
+    .actions .lbl{display:none}
+    body{padding-bottom:84px}
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 60px}
+  .panel{display:none}
+  .panel.active{display:block}
+  /* --- cartes --- */
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;
+    padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:1.08rem;letter-spacing:-.01em}
+  .card h2::after{content:"";flex:1;order:1;height:3px;border-radius:2px;background:var(--grad);opacity:.15;min-width:24px}
+  .card h2 .ghost{order:2}
+  .hint{font-size:.85rem;color:var(--ink-2);margin:0 0 12px;max-width:80ch}
+  .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
   .field{display:flex;flex-direction:column;gap:5px}
-  .field label{font-size:.74rem;color:var(--ink-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .field label{font-size:.72rem;color:var(--ink-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
   select,input[type=text],input[type=number],input[type=date]{
     background:var(--surface-1);color:var(--ink-1);border:1.5px solid var(--grid);
     border-radius:12px;padding:9px 12px;font:inherit;transition:border-color .15s, box-shadow .15s}
@@ -75,11 +89,12 @@
   button.primary{background:var(--grad);border:none;color:#fff;padding:11px 20px;
     box-shadow:0 4px 14px rgba(232,70,124,.35)}
   button.primary:hover{color:#fff;filter:brightness(1.07);box-shadow:0 7px 18px rgba(232,70,124,.4)}
+  button.small{padding:7px 14px;font-size:.84rem}
   button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 9px;font-size:1.05rem;box-shadow:none}
   button.ghost:hover{color:var(--bad);background:var(--bad-bg);transform:none;box-shadow:none}
-  .cols{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:20px;align-items:start}
+  .cols{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:16px;align-items:start}
   @media(max-width:920px){.cols{grid-template-columns:1fr}}
-  /* --- recette --- */
+  /* --- tableaux --- */
   table{border-collapse:collapse;width:100%}
   th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);
      text-align:left;padding:8px;border-bottom:2px solid var(--grid);font-weight:700}
@@ -125,19 +140,11 @@
   .verdict.bad{background:var(--bad-bg);color:var(--bad);border:1.5px solid rgba(208,59,59,.35)}
   .footnote{font-size:.8rem;color:var(--ink-3);margin-top:10px;line-height:1.5}
   .scroll{overflow-x:auto}
-  /* --- dialogues --- */
-  dialog{background:var(--surface-1);color:var(--ink-1);border:1px solid var(--border);
-    border-radius:20px;padding:24px;max-width:540px;width:92vw;box-shadow:var(--shadow)}
-  dialog::backdrop{background:rgba(20,10,8,.55);backdrop-filter:blur(2px)}
-  dialog h3{margin:0 0 6px;font-size:1.2rem}
-  dialog p.sub{margin:0 0 16px;color:var(--ink-2);font-size:.88rem}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
-  .dlg-note{font-size:.8rem;color:var(--ink-2);margin-top:10px}
-  .err{color:var(--bad);font-size:.85rem;font-weight:700;margin-top:8px}
+  details.more{margin-top:12px;font-size:.82rem;color:var(--ink-2);line-height:1.5}
+  details.more summary{cursor:pointer;font-weight:700;color:var(--ink-3)}
+  details.more[open] summary{margin-bottom:6px}
   .card pre{background:var(--zebra);border:1px solid var(--grid);border-radius:12px;
     padding:12px 14px;overflow-x:auto;font-size:.78rem;line-height:1.5}
-  .card details{margin-top:6px}
   /* --- aperçu avant impression --- */
   #apercu{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);overflow:auto;padding:14px}
   .apercu-bar{max-width:860px;margin:0 auto 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
@@ -148,7 +155,8 @@
     font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
   .docview h1{font-size:20px;margin:0 0 2px}
   .docview .sub{color:#444;margin:0 0 14px;font-size:12px}
-  .docview h2{font-size:14px;margin:16px 0 6px;border-bottom:1.5px solid #000;padding-bottom:3px;color:#000}
+  .docview h2{font-size:14px;margin:16px 0 6px;border-bottom:1.5px solid #000;padding-bottom:3px;color:#000;display:block}
+  .docview h2::after{display:none}
   .docview table{width:100%;border-collapse:collapse}
   .docview th,.docview td{border:1px solid #999;padding:4px 6px;font-size:12px;color:#000}
   .docview th{background:#eee;color:#000;text-transform:none;letter-spacing:0}
@@ -167,7 +175,7 @@
   #printArea{display:none}
   @media print{
     body{background:#fff;color:#000;font-size:12px}
-    .app,.wrap,#apercu{display:none !important}
+    .top,.wrap,#apercu{display:none !important}
     #printArea{display:block;padding:0 4mm}
     #printArea h1{font-size:18px;margin:0 0 2px}
     #printArea .sub{color:#444;margin:0 0 14px;font-size:11px}
@@ -191,219 +199,244 @@
 </head>
 <body>
 
-<header class="app">
-  <div class="hero">
-    <span class="deco">🍨🍓</span>
-    <h1>🍨 Calculateur de glacerie</h1>
-    <p>Équilibrez vos sorbets, glaces et crèmes glacées, vérifiez les repères professionnels, chiffrez vos coûts et imprimez
-       recettes, tables analytiques et étiquettes de traçabilité. Données issues des fiches BTM Glacier.</p>
+<header class="top">
+  <div class="brand">🍨 Glacerie</div>
+  <nav class="tabs">
+    <button class="tab" data-tab="recette" type="button"><span class="ico">🧮</span><span class="lbl">Recette</span></button>
+    <button class="tab" data-tab="analyse" type="button"><span class="ico">📊</span><span class="lbl">Analyse &amp; coûts</span></button>
+    <button class="tab" data-tab="etiquettes" type="button"><span class="ico">🏷️</span><span class="lbl">Étiquettes</span></button>
+    <button class="tab" data-tab="recettes" type="button"><span class="ico">📁</span><span class="lbl">Mes recettes</span></button>
+  </nav>
+  <div class="actions">
+    <button id="btnSauverRecette" title="Enregistrer dans « Mes recettes »">💾<span class="lbl"> Enregistrer</span></button>
+    <button class="primary" id="btnPDF" title="Aperçu puis impression / export PDF">📄<span class="lbl"> PDF</span></button>
   </div>
 </header>
 
 <div class="wrap">
 
-  <section class="card" id="autoCard">
-    <h2>⚡ Recette automatique — un seul poids à saisir</h2>
-    <p class="footnote" style="margin:0 0 12px">Indiquez uniquement le poids de votre ingrédient principal — une ou plusieurs purées de fruits
-       pour un sorbet (même multi-fruits), ou le lait entier pour une glace : l'application calcule tout le reste — mélange de sucres
-       (saccharose, glucose atomisé, dextrose, sucre inverti), poudre de lait, crème, jaunes, stabilisateur, eau — pour un mix équilibré,
-       conforme aux appellations légales, avec une texture optimale.</p>
-    <div class="toolbar">
-      <div class="field">
-        <label for="autoType">Produit</label>
-        <select id="autoType">
-          <option value="sorbet">Sorbet (purée de fruits)</option>
-          <option value="creme_glacee">Crème glacée (lait entier)</option>
-          <option value="glace_oeufs">Glace aux œufs (lait entier)</option>
-        </select>
-      </div>
-      <div class="field" id="autoFruitField" style="min-width:320px">
-        <label>Purées de fruits — poids (g) et % de sucre ajouté (0 si purée non sucrée)</label>
-        <div id="autoFruitRows"></div>
-        <button id="autoAddFruit" type="button" style="margin-top:6px">＋ Ajouter un fruit</button>
-      </div>
-      <div class="field" id="autoPoidsField">
-        <label for="autoPoids" id="autoPoidsLabel">Poids de lait entier (g)</label>
-        <input type="number" id="autoPoids" value="1000" min="50" step="50">
-      </div>
-      <div class="field">
-        <label for="autoTech">Sucre technique (texture)</label>
-        <select id="autoTech">
-          <option value="reco">Glucose atomisé + dextrose + inverti (recommandé)</option>
-          <option value="gluc">Glucose atomisé seul</option>
-          <option value="dext">Dextrose seul</option>
-          <option value="sacch">Saccharose seul (basique)</option>
-        </select>
-      </div>
-      <button class="primary" id="btnAuto">Calculer la recette complète</button>
-    </div>
-    <p class="footnote" id="autoNote" style="margin-bottom:0"></p>
-  </section>
+  <!-- ==================== Onglet RECETTE ==================== -->
+  <section class="panel" data-panel="recette">
 
-  <section class="card">
-    <div class="toolbar">
-      <div class="field">
-        <label for="produitType">Type de produit</label>
-        <select id="produitType"></select>
-      </div>
-      <div class="field" style="flex:1;min-width:200px">
-        <label for="produitNom">Nom de la recette</label>
-        <input type="text" id="produitNom" placeholder="Ex. : Sorbet fraise plein fruit">
-      </div>
-      <div class="field">
-        <label for="presets">Exemples</label>
-        <select id="presets">
-          <option value="">— Charger un exemple —</option>
-          <option value="cg_vanille">Crème glacée vanille (fiche, ex. n° 1)</option>
-          <option value="sorbet_fraise">Sorbet fraise</option>
-          <option value="sorbet_citron">Sorbet citron</option>
-        </select>
-      </div>
-      <button id="btnSauverRecette">💾 Enregistrer dans mes recettes</button>
-      <button class="primary" id="btnPDF">⬇ Exporter en PDF</button>
-    </div>
-  </section>
-
-  <section class="card" id="bibliCard">
-    <h2>📁 Mes recettes</h2>
-    <div class="scroll">
-      <table id="bibliTable">
-        <thead>
-          <tr><th>Recette</th><th class="num">Mix (g)</th><th>Statut</th><th style="width:1%"></th></tr>
-        </thead>
-        <tbody id="bibliBody"></tbody>
-      </table>
-    </div>
-    <p class="footnote" id="bibliVide">Aucune recette enregistrée pour l'instant : calculez une recette puis cliquez sur « 💾 Enregistrer dans mes recettes ». Elles restent disponibles sur cet appareil, même hors connexion.</p>
-    <div class="recipe-actions">
-      <button id="btnExportBibli">⬇ Sauvegarder le dossier (fichier)</button>
-      <button id="btnImportBibli">⬆ Restaurer un dossier</button>
-      <input type="file" id="importFile" accept=".json,application/json" hidden>
-    </div>
-    <p class="footnote">Le fichier de sauvegarde (.json) contient toutes vos recettes : gardez-en une copie, ou utilisez-le pour transférer votre dossier sur un autre appareil.</p>
-  </section>
-
-  <div class="cols">
     <section class="card">
-      <h2>Recette (pesées)</h2>
+      <div class="toolbar">
+        <div class="field">
+          <label for="produitType">Type de produit</label>
+          <select id="produitType"></select>
+        </div>
+        <div class="field" style="flex:1;min-width:200px">
+          <label for="produitNom">Nom de la recette</label>
+          <input type="text" id="produitNom" placeholder="Ex. : Sorbet fraise plein fruit">
+        </div>
+        <div class="field">
+          <label for="presets">Exemples</label>
+          <select id="presets">
+            <option value="">— Charger un exemple —</option>
+            <option value="cg_vanille">Crème glacée vanille (fiche, ex. n° 1)</option>
+            <option value="sorbet_fraise">Sorbet fraise</option>
+            <option value="sorbet_citron">Sorbet citron</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="autoCard">
+      <h2>⚡ Recette automatique</h2>
+      <p class="hint">Indiquez seulement le poids de votre ingrédient principal — purées de fruits pour un sorbet,
+         lait entier pour une glace : sucres, poudre de lait, crème, jaunes, stabilisateur et eau sont calculés
+         pour un mix équilibré, conforme aux appellations légales.</p>
+      <div class="toolbar">
+        <div class="field">
+          <label for="autoType">Produit</label>
+          <select id="autoType">
+            <option value="sorbet">Sorbet (purée de fruits)</option>
+            <option value="creme_glacee">Crème glacée (lait entier)</option>
+            <option value="glace_oeufs">Glace aux œufs (lait entier)</option>
+          </select>
+        </div>
+        <div class="field" id="autoPoidsField">
+          <label for="autoPoids" id="autoPoidsLabel">Poids de lait entier (g)</label>
+          <input type="number" id="autoPoids" value="1000" min="50" step="50">
+        </div>
+        <div class="field">
+          <label for="autoTech">Sucre technique (texture)</label>
+          <select id="autoTech">
+            <option value="reco">Glucose atomisé + dextrose + inverti (recommandé)</option>
+            <option value="gluc">Glucose atomisé seul</option>
+            <option value="dext">Dextrose seul</option>
+            <option value="sacch">Saccharose seul (basique)</option>
+          </select>
+        </div>
+        <div class="field" id="autoFruitField" style="flex-basis:100%;min-width:280px">
+          <label>Purées de fruits — poids (g) et % de sucre ajouté (0 si purée non sucrée)</label>
+          <div id="autoFruitRows"></div>
+          <button class="small" id="autoAddFruit" type="button" style="margin-top:6px;align-self:flex-start">＋ Ajouter un fruit</button>
+        </div>
+        <button class="primary" id="btnAuto">Calculer la recette</button>
+      </div>
+      <p class="footnote" id="autoNote" style="margin-bottom:0"></p>
+    </section>
+
+    <div class="cols">
+      <section class="card">
+        <h2><span>⚖️ Pesées</span><button class="ghost" id="btnClear" title="Vider la recette" type="button">🗑</button></h2>
+        <div class="scroll">
+          <table id="recetteTable">
+            <thead>
+              <tr><th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">% du mix</th><th></th></tr>
+            </thead>
+            <tbody id="recetteBody"></tbody>
+            <tfoot>
+              <tr class="total"><td>TOTAL</td><td class="num" id="totalG">0 g</td><td class="num">100 %</td><td></td></tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="recipe-actions">
+          <button class="small" id="btnAdd" type="button">＋ Ajouter un ingrédient</button>
+          <button class="small" id="btnRebal" type="button" title="Recalcule les sucres (et le lait/crème/poudre pour une glace) selon les objectifs en cours">🔁 Rééquilibrer</button>
+        </div>
+        <div class="footnote" id="rebalInfo" style="margin-top:8px"></div>
+        <details class="more"><summary>Sources des compositions</summary>
+          Compositions issues du formulaire BTM Glacier ; les teneurs en sucres des fruits non détaillées dans le formulaire
+          sont complétées d'après la table Ciqual 2020 (ANSES) / fiches Aprifel (USDA pour airelle, raisin et noix de coco).
+          Les valeurs marquées d'un astérisque (*) restent des estimations.
+        </details>
+      </section>
+
+      <aside class="card">
+        <h2>🎯 Équilibre du mix</h2>
+        <div id="verdict"></div>
+        <div id="meters"></div>
+        <p class="footnote" id="regleNote"></p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ==================== Onglet ANALYSE & COÛTS ==================== -->
+  <section class="panel" data-panel="analyse">
+
+    <section class="card">
+      <h2>📋 Table analytique</h2>
       <div class="scroll">
-        <table id="recetteTable">
+        <table id="analyseTable">
           <thead>
-            <tr><th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">% du mix</th><th></th></tr>
+            <tr>
+              <th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">% mix</th>
+              <th class="num">Eau (g)</th><th class="num">MG (g)</th><th class="num">ESDL (g)</th>
+              <th class="num">Sucres (g)</th><th class="num">PS (g éq. sacch.)</th>
+              <th class="num">Autres ES (g)</th><th class="num">EST (g)</th>
+            </tr>
           </thead>
-          <tbody id="recetteBody"></tbody>
+          <tbody id="analyseBody"></tbody>
+        </table>
+      </div>
+      <details class="more"><summary>Lire les colonnes (MG, ESDL, PS, EST)</summary>
+        MG = matière grasse (la MG non laitière — jaunes, cacao, fruits secs — est repérée par « ° » et comptée à part de la MG butyrique).
+        ESDL = extrait sec dégraissé du lait. PS = pouvoir sucrant exprimé en équivalent saccharose (poids de sucre × PSR ÷ 100 ;
+        le sucre des fruits est compté à PSR 100). EST = extrait sec total = MG + ESDL + sucres + autres extraits secs.
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>💰 Coût matières &amp; prix de vente</h2>
+      <div class="scroll">
+        <table id="coutTable">
+          <thead>
+            <tr><th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">Prix (€/kg)</th><th class="num">Coût (€)</th></tr>
+          </thead>
+          <tbody id="coutBody"></tbody>
           <tfoot>
-            <tr class="total"><td>TOTAL</td><td class="num" id="totalG">0 g</td><td class="num">100 %</td><td></td></tr>
+            <tr class="total"><td>Coût matières du mix</td><td></td><td class="num" id="coutKg">—</td><td class="num" id="coutTotal">—</td></tr>
           </tfoot>
         </table>
       </div>
-      <div class="footnote" id="rebalInfo" style="margin-top:8px"></div>
-      <div class="recipe-actions">
-        <button id="btnAdd">＋ Ajouter un ingrédient</button>
-        <button id="btnRebal" title="Recalcule les sucres (et le lait/crème/poudre pour une glace) selon les objectifs en cours">🔁 Rééquilibrer la recette</button>
-        <button id="btnClear">Vider la recette</button>
+      <div class="toolbar" style="margin-top:14px">
+        <div class="field"><label for="potG">Poids du pot (g)</label><input type="number" id="potG" value="120" min="10" step="10"></div>
+        <div class="field"><label for="potCoeff">Coefficient sur coût matières</label><input type="number" id="potCoeff" value="5" min="1" step="0.5"></div>
       </div>
-      <p class="footnote">Compositions issues du formulaire BTM Glacier ; les teneurs en sucres des fruits non détaillées dans le formulaire sont complétées d'après la table Ciqual 2020 (ANSES) / fiches Aprifel (USDA pour airelle, raisin et noix de coco). Les valeurs marquées d'un astérisque (*) restent des estimations.</p>
+      <div class="verdict ok" id="potResult" style="margin-top:10px"></div>
+      <details class="more"><summary>Comment sont calculés ces prix ?</summary>
+        Prix indicatifs pré-remplis : modifiez-les selon vos fournisseurs, ils sont enregistrés sur cet appareil et réutilisés
+        pour toutes vos recettes. Le poids du pot correspond au poids de mix : le foisonnement ajoute du volume, pas du poids —
+        un pot de 120 g contient bien 120 g de mix.
+      </details>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet ÉTIQUETTES ==================== -->
+  <section class="panel" data-panel="etiquettes">
+    <section class="card">
+      <h2>🏷️ Traçabilité &amp; étiquettes DLC</h2>
+      <p class="hint">Une fois la production sortie de turbine, indiquez la date, le lot et le nombre de pots remplis,
+         puis imprimez la fiche de traçabilité et la planche d'étiquettes à coller sur les pots.</p>
+      <div class="toolbar">
+        <div class="field"><label for="tracDate">Date de production</label><input type="date" id="tracDate"></div>
+        <div class="field"><label for="tracDuree">Conservation (mois)</label><input type="number" id="tracDuree" value="12" min="1" max="24" step="1" style="width:90px"></div>
+        <div class="field"><label for="tracLot">N° de lot</label><input type="text" id="tracLot" style="width:150px"></div>
+        <div class="field"><label for="tracNb">Pots produits</label><input type="number" id="tracNb" min="1" step="1" style="width:90px"></div>
+        <button class="primary" id="btnEtiquettes">🖨 Imprimer fiche + étiquettes</button>
+        <button class="small" id="btnDlEtiquettes">⬇ Fichier étiquettes seules</button>
+      </div>
+      <p class="footnote" id="tracInfo" style="margin-bottom:0"></p>
+      <details class="more"><summary>Que contiennent la fiche et les étiquettes ?</summary>
+        La fiche de traçabilité reprend la production (date, lot, DDM, pots), le coût du lot et la liste des ingrédients
+        mis en œuvre avec une colonne « lot fournisseur » à compléter. Chaque étiquette porte la liste des ingrédients
+        par ordre décroissant avec les allergènes en gras, le poids net, le n° de lot, la date de production et la date
+        de durabilité minimale.
+      </details>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet MES RECETTES ==================== -->
+  <section class="panel" data-panel="recettes">
+
+    <section class="card" id="bibliCard">
+      <h2>📁 Mes recettes</h2>
+      <div class="scroll">
+        <table id="bibliTable">
+          <thead>
+            <tr><th>Recette</th><th class="num">Mix (g)</th><th>Statut</th><th style="width:1%"></th></tr>
+          </thead>
+          <tbody id="bibliBody"></tbody>
+        </table>
+      </div>
+      <p class="footnote" id="bibliVide">Aucune recette enregistrée pour l'instant : calculez une recette puis touchez
+         « 💾 Enregistrer » en haut de l'écran. Elles restent disponibles sur cet appareil, même hors connexion.</p>
     </section>
 
-    <aside class="card">
-      <h2>Équilibre du mix</h2>
-      <div id="verdict"></div>
-      <div id="meters"></div>
-      <p class="footnote" id="regleNote"></p>
-    </aside>
-  </div>
-
-  <section class="card">
-    <h2>Table analytique</h2>
-    <div class="scroll">
-      <table id="analyseTable">
-        <thead>
-          <tr>
-            <th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">% mix</th>
-            <th class="num">Eau (g)</th><th class="num">MG (g)</th><th class="num">ESDL (g)</th>
-            <th class="num">Sucres (g)</th><th class="num">PS (g éq. sacch.)</th>
-            <th class="num">Autres ES (g)</th><th class="num">EST (g)</th>
-          </tr>
-        </thead>
-        <tbody id="analyseBody"></tbody>
-      </table>
-    </div>
-    <p class="footnote">
-      MG = matière grasse (la MG non laitière — jaunes, cacao, fruits secs — est repérée par « ° » et comptée à part de la MG butyrique).
-      ESDL = extrait sec dégraissé du lait. PS = pouvoir sucrant exprimé en équivalent saccharose (poids de sucre × PSR ÷ 100 ;
-      le sucre des fruits est compté à PSR 100). EST = extrait sec total = MG + ESDL + sucres + autres extraits secs.
-    </p>
-    <div class="recipe-actions" style="margin-top:14px;align-items:center">
-      <button class="primary" id="btnPDF2">📄 Exporter la recette et la table analytique en PDF</button>
-      <span class="footnote" style="margin:0">Dans la fenêtre qui s'ouvre, choisissez « Enregistrer au format PDF » comme destination.</span>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>💰 Coût matières &amp; prix de vente</h2>
-    <div class="scroll">
-      <table id="coutTable">
-        <thead>
-          <tr><th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">Prix (€/kg)</th><th class="num">Coût (€)</th></tr>
-        </thead>
-        <tbody id="coutBody"></tbody>
-        <tfoot>
-          <tr class="total"><td>Coût matières du mix</td><td></td><td class="num" id="coutKg">—</td><td class="num" id="coutTotal">—</td></tr>
-        </tfoot>
-      </table>
-    </div>
-    <div class="toolbar" style="margin-top:14px">
-      <div class="field"><label for="potG">Poids du pot (g)</label><input type="number" id="potG" value="120" min="10" step="10"></div>
-      <div class="field"><label for="potCoeff">Coefficient sur coût matières</label><input type="number" id="potCoeff" value="5" min="1" step="0.5"></div>
-    </div>
-    <div class="verdict ok" id="potResult" style="margin-top:10px"></div>
-    <p class="footnote">Prix indicatifs pré-remplis : modifiez-les selon vos fournisseurs, ils sont enregistrés sur cet appareil et réutilisés pour toutes vos recettes.
-       Le poids du pot correspond au poids de mix : le foisonnement ajoute du volume, pas du poids — un pot de 120 g contient bien 120 g de mix.</p>
-  </section>
-
-  <section class="card">
-    <h2>🏷️ Traçabilité &amp; étiquettes DLC</h2>
-    <p class="footnote" style="margin:0 0 12px">Une fois la production sortie de turbine, indiquez la date, le lot et le nombre de pots réellement remplis :
-       imprimez la fiche de traçabilité (production, lot, DDM, ingrédients) et la planche d'étiquettes à coller sur les pots —
-       liste des ingrédients par ordre décroissant avec allergènes en gras, poids net, lot, date de production et date de durabilité minimale.</p>
-    <div class="toolbar">
-      <div class="field"><label for="tracDate">Date de production</label><input type="date" id="tracDate"></div>
-      <div class="field"><label for="tracDuree">Conservation (mois)</label><input type="number" id="tracDuree" value="12" min="1" max="24" step="1" style="width:90px"></div>
-      <div class="field"><label for="tracLot">N° de lot</label><input type="text" id="tracLot" style="width:150px"></div>
-      <div class="field"><label for="tracNb">Pots produits</label><input type="number" id="tracNb" min="1" step="1" style="width:90px"></div>
-      <button class="primary" id="btnEtiquettes">🖨 Imprimer fiche + étiquettes</button>
-      <button id="btnDlEtiquettes">⬇ Fichier étiquettes seules</button>
-    </div>
-    <p class="footnote" id="tracInfo" style="margin-bottom:0"></p>
-  </section>
-
-  <section class="card">
-    <h2>☁️ Sauvegarde Google Drive</h2>
-    <p class="footnote" style="margin:0 0 12px">Collez une seule fois l'adresse de votre script Google (voir « Première installation » ci-dessous) :
-       les fichiers <strong>recette</strong>, <strong>fiche de traçabilité</strong> et <strong>étiquettes</strong> seront envoyés automatiquement
-       dans un dossier « Glacerie » de votre Drive à chaque export ou impression.</p>
-    <div class="toolbar">
-      <div class="field" style="flex:1;min-width:260px">
-        <label for="driveUrl">Adresse du script Google (se termine par /exec)</label>
-        <input type="text" id="driveUrl" placeholder="https://script.google.com/macros/s/…/exec">
+    <section class="card">
+      <h2>☁️ Sauvegarde</h2>
+      <p class="hint">Vos recettes sont enregistrées sur cet appareil. Pour les protéger ou les transférer :</p>
+      <div class="recipe-actions" style="margin-top:0">
+        <button class="small" id="btnExportBibli">⬇ Sauvegarder le dossier (fichier)</button>
+        <button class="small" id="btnImportBibli">⬆ Restaurer un dossier</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-weight:600;padding-bottom:9px">
-        <input type="checkbox" id="driveAuto" checked> Sauvegarde automatique
-      </label>
-      <button id="btnDriveTest">Tester</button>
-      <button class="primary" id="btnDriveNow">☁️ Envoyer maintenant</button>
-    </div>
-    <p class="footnote" id="driveStatus"></p>
-    <details>
-      <summary style="cursor:pointer;font-weight:700">Première installation : créer le script Google (une seule fois, ~2 minutes)</summary>
-      <ol style="font-size:.88rem;color:var(--ink-2);line-height:1.6">
-        <li>Ouvrez <strong>script.google.com</strong> (connecté à votre compte Google) et cliquez sur <strong>Nouveau projet</strong>.</li>
-        <li>Effacez le contenu et collez le code ci-dessous, puis enregistrez (💾).</li>
-        <li>Cliquez sur <strong>Déployer → Nouveau déploiement → ⚙ Application Web</strong> ;
-            « Exécuter en tant que » : <strong>Moi</strong> ; « Qui a accès » : <strong>Tout le monde</strong> ; puis <strong>Déployer</strong> et autorisez l'accès.</li>
-        <li>Copiez l'<strong>URL de l'application Web</strong> (elle se termine par <code>/exec</code>) et collez-la dans le champ ci-dessus, puis cliquez sur « Tester ».</li>
-      </ol>
+      <details class="more"><summary>Sauvegarde automatique sur Google Drive</summary>
+        <p class="footnote" style="margin-top:6px">Collez une seule fois l'adresse de votre script Google (voir « Première installation » ci-dessous) :
+           les fichiers <strong>recette</strong>, <strong>fiche de traçabilité</strong> et <strong>étiquettes</strong> seront envoyés automatiquement
+           dans un dossier « Glacerie » de votre Drive à chaque export ou impression.</p>
+        <div class="toolbar">
+          <div class="field" style="flex:1;min-width:260px">
+            <label for="driveUrl">Adresse du script Google (se termine par /exec)</label>
+            <input type="text" id="driveUrl" placeholder="https://script.google.com/macros/s/…/exec">
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:600;padding-bottom:9px">
+            <input type="checkbox" id="driveAuto" checked> Sauvegarde automatique
+          </label>
+          <button class="small" id="btnDriveTest">Tester</button>
+          <button class="small" id="btnDriveNow">☁️ Envoyer maintenant</button>
+        </div>
+        <p class="footnote" id="driveStatus"></p>
+        <details class="more">
+          <summary>Première installation : créer le script Google (une seule fois, ~2 minutes)</summary>
+          <ol style="font-size:.88rem;color:var(--ink-2);line-height:1.6">
+            <li>Ouvrez <strong>script.google.com</strong> (connecté à votre compte Google) et cliquez sur <strong>Nouveau projet</strong>.</li>
+            <li>Effacez le contenu et collez le code ci-dessous, puis enregistrez (💾).</li>
+            <li>Cliquez sur <strong>Déployer → Nouveau déploiement → ⚙ Application Web</strong> ;
+                « Exécuter en tant que » : <strong>Moi</strong> ; « Qui a accès » : <strong>Tout le monde</strong> ; puis <strong>Déployer</strong> et autorisez l'accès.</li>
+            <li>Copiez l'<strong>URL de l'application Web</strong> (elle se termine par <code>/exec</code>) et collez-la dans le champ ci-dessus, puis cliquez sur « Tester ».</li>
+          </ol>
 <pre>function doPost(e) {
   var d = JSON.parse(e.postData.contents);
   var it = DriveApp.getFoldersByName('Glacerie');
@@ -414,9 +447,11 @@
   return ContentService.createTextOutput('{"ok":true}')
     .setMimeType(ContentService.MimeType.JSON);
 }</pre>
-      <p class="footnote">Le script tourne sur votre compte Google et écrit uniquement dans votre Drive : personne d'autre n'y a accès.
-         Si un fichier du même nom existe déjà (même jour, même recette), il est remplacé par la dernière version.</p>
-    </details>
+          <p class="footnote">Le script tourne sur votre compte Google et écrit uniquement dans votre Drive : personne d'autre n'y a accès.
+             Si un fichier du même nom existe déjà (même jour, même recette), il est remplacé par la dernière version.</p>
+        </details>
+      </details>
+    </section>
   </section>
 </div>
 
@@ -1185,8 +1220,7 @@ function majAutoUI(){
   el('autoFruitField').style.display = isSorbet ? '' : 'none';
   el('autoPoidsField').style.display = isSorbet ? 'none' : '';
   if(isSorbet){
-    el('autoNote').textContent = 'Objectifs appliqués : proportion de fruits à la fourchette conseillée de la fiche, pouvoir sucrant 29 %, extrait sec 32 %, stabilisateur 0,5 % (soit 4 à 5 g/kg, dose pro pour sorbet). '
-      + 'Sucres répartis pour une texture optimale : saccharose + glucose atomisé (extrait sec anti-cristallisant) + dextrose et sucre inverti (souplesse à la sortie du congélateur, inverti renforcé pour les fruits acides).';
+    el('autoNote').textContent = 'Objectifs : fruits à la fourchette conseillée de la fiche, pouvoir sucrant 29 %, extrait sec 32 %, stabilisateur 0,5 % — sucres répartis pour une texture optimale (inverti renforcé pour les fruits acides).';
   } else {
     const c = AUTO_CIBLES[mode];
     const split = SPLITS_GLACE[el('autoTech').value].map(([id,part])=>`${Math.round(part*100)} % ${ING_BY_ID[id].nom.toLowerCase()}`).join(', ');
@@ -1637,7 +1671,7 @@ function persistRecettes(){
 }
 function sauverRecette(){
   const t = computeTotals();
-  if(t.g<=0){ alert('La recette est vide : rien à enregistrer.'); return; }
+  if(t.g<=0){ alert('La recette est vide : rien à enregistrer.'); return false; }
   const nom = (state.nom || PRODUITS[state.type].label).trim();
   const rec = {
     id: Date.now(), nom, type: state.type,
@@ -1648,11 +1682,12 @@ function sauverRecette(){
   };
   const idx = recettes.findIndex(r=>r.nom===nom);
   if(idx>=0){
-    if(!confirm(`Une recette « ${nom} » existe déjà : la remplacer par la version actuelle ?\n(Elle repassera en statut « essai » et devra être revalidée.)`)) return;
+    if(!confirm(`Une recette « ${nom} » existe déjà : la remplacer par la version actuelle ?\n(Elle repassera en statut « essai » et devra être revalidée.)`)) return false;
     rec.id = recettes[idx].id;
     recettes[idx] = rec;
   } else recettes.push(rec);
   persistRecettes(); renderBibli();
+  return true;
 }
 function chargerRecette(id){
   const rec = recettes.find(r=>r.id===id); if(!rec) return;
@@ -1667,6 +1702,7 @@ function chargerRecette(id){
   el('produitNom').value = state.nom;
   el('rebalInfo').textContent='';
   update();
+  showTab('recette');
   window.scrollTo({top:0, behavior:'smooth'});
 }
 function renderBibli(){
@@ -1750,9 +1786,23 @@ function load(){
   }catch(e){}
 }
 
+/* =====================================================================
+   NAVIGATION PAR ONGLETS
+===================================================================== */
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===id));
+  try{ localStorage.setItem('glacerie_tab', id); }catch(e){}
+}
+
 let printMode = 'recette';
 function init(){
   load();
+  document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{ showTab(b.dataset.tab); window.scrollTo({top:0}); }));
+  let tab0 = 'recette';
+  try{ tab0 = localStorage.getItem('glacerie_tab') || 'recette'; }catch(e){}
+  if(!document.querySelector('.panel[data-panel="'+tab0+'"]')) tab0 = 'recette';
+  showTab(tab0);
   const selType = el('produitType');
   for(const [id,p] of Object.entries(PRODUITS)){
     const o = document.createElement('option'); o.value=id; o.textContent=p.label;
@@ -1834,7 +1884,6 @@ function init(){
     driveAuto([f]);
   });
   el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); driveAuto([docRecette()]); });
-  el('btnPDF2').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); driveAuto([docRecette()]); });
 
   // --- Google Drive ---
   el('driveUrl').value = driveCfg.url;
@@ -1852,7 +1901,13 @@ function init(){
   window.addEventListener('afterprint', ()=>{ printMode='recette'; });
 
   // --- mes recettes ---
-  el('btnSauverRecette').addEventListener('click', sauverRecette);
+  el('btnSauverRecette').addEventListener('click', ()=>{
+    if(sauverRecette()===true){
+      const b = el('btnSauverRecette'), avant = b.innerHTML;
+      b.innerHTML = '✓<span class="lbl"> Enregistrée</span>';
+      setTimeout(()=>{ b.innerHTML = avant; }, 1600);
+    }
+  });
   el('btnExportBibli').addEventListener('click', exporterBibli);
   el('btnImportBibli').addEventListener('click', ()=>el('importFile').click());
   el('importFile').addEventListener('change', ()=>{

@@ -194,8 +194,10 @@
           </tfoot>
         </table>
       </div>
+      <div class="footnote" id="rebalInfo" style="margin-top:8px"></div>
       <div class="recipe-actions">
         <button id="btnAdd">＋ Ajouter un ingrédient</button>
+        <button id="btnRebal" title="Recalcule les sucres (et le lait/crème/poudre pour une glace) selon les objectifs en cours">🔁 Rééquilibrer la recette</button>
         <button id="btnClear">Vider la recette</button>
       </div>
       <p class="footnote">Compositions issues du formulaire BTM Glacier ; les teneurs en sucres des fruits non détaillées dans le formulaire sont complétées d'après la table Ciqual 2020 (ANSES) / fiches Aprifel (USDA pour airelle, raisin et noix de coco). Les valeurs marquées d'un astérisque (*) restent des estimations.</p>
@@ -605,7 +607,21 @@ function renderRecette(t){
     const tr = document.createElement('tr');
     const tdIng = document.createElement('td');
     const sel = ingredientSelect(r.id);
-    sel.addEventListener('change',()=>{ r.id = sel.value; update(); });
+    sel.addEventListener('change',()=>{
+      const oldId = r.id, newId = sel.value;
+      r.id = newId;
+      const oldIng = ING_BY_ID[oldId], newIng = ING_BY_ID[newId];
+      const isSorbet = ['sorbet','sorbet_pf','glace_eau'].includes(state.type);
+      const laitiers = ['lait_entier','lait_ecreme','creme30','creme35','creme40','beurre','pdl0','pdl26'];
+      if(oldIng && newIng && oldIng.cat==='SUCRE' && newIng.cat==='SUCRE'){
+        // en glace : on préserve d'abord la masse de sucres apportée par la ligne
+        if(!isSorbet && newIng.suc>0) r.g = Math.round((r.g||0)*oldIng.suc/newIng.suc);
+        reequilibrer(); return;
+      }
+      if(!isSorbet && laitiers.includes(oldId) && laitiers.includes(newId)){ reequilibrer(); return; }
+      el('rebalInfo').textContent='';
+      update();
+    });
     tdIng.appendChild(sel);
     const hint = document.createElement('div'); hint.className='rowhint';
     hint.textContent = resumeIngredient(ing);
@@ -752,6 +768,7 @@ function validerCG(){
   if(r.stab>0) rows.push({id:'stab', g:Math.round(r.stab)});
   state.rows = rows;
   state.type = 'creme_glacee'; el('produitType').value='creme_glacee';
+  state.cibles = {mode:'glace', mg:mgP, suc:sucP, esdl:esdlP, jaune:jauneP, stab:stabP};
   if(!el('produitNom').value) { el('produitNom').value='Crème glacée'; state.nom='Crème glacée'; }
   el('dlgCG').close(); update();
 }
@@ -845,11 +862,153 @@ function validerSorbet(){
   rows.push({id:'eau', g:Math.max(0, Math.round(T) - rows.reduce((s,x)=>s+x.g,0))});
   state.rows = rows;
   state.type = fruitPct>=45 ? 'sorbet_pf' : 'sorbet';
+  state.cibles = {mode:'sorbet', ps:psP, est:estP};
   el('produitType').value = state.type;
   const nomFruit = ING_BY_ID[fruitId].nom.toLowerCase().replace(' *','');
   el('produitNom').value = 'Sorbet '+nomFruit; state.nom = el('produitNom').value;
   el('dlgSorbet').close(); update();
   if(r.note) setTimeout(()=>alert(r.note), 50);
+}
+
+/* =====================================================================
+   RÉÉQUILIBRAGE AUTOMATIQUE
+   Quand on remplace un ingrédient (un sucre par un autre, une crème 35 %
+   par une 40 %…), la recette est recalculée pour retrouver les objectifs
+   en cours (state.cibles, mémorisés par la recette automatique et les
+   assistants ; à défaut, objectifs par défaut du type de produit).
+===================================================================== */
+function ciblesCourantes(){
+  if(state.cibles) return state.cibles;
+  if(state.type==='sorbet' || state.type==='sorbet_pf' || state.type==='glace_eau')
+    return {mode:'sorbet', ps:29, est:32};
+  return {mode:'glace', mg:8, suc:18, esdl:9.5, jaune: state.type==='glace_oeufs'?7:3, stab:0.5};
+}
+const coefSucre = ing => ({ps: ing.suc*ing.psr/10000, es: (ing.mg+ing.esdl+ing.suc+ing.autres)/100});
+
+/* Sorbet : les fruits et le stabilisateur gardent leur pesée ; deux sucres
+   « pilotes » (saccharose ou le plus sucrant, + glucose atomisé ou le plus
+   riche en ES) sont résolus exactement pour le PS et l'EST ; les autres
+   sucres gardent leur pesée ; l'eau absorbe le reste à poids total constant. */
+const PRIORITE_PS = ['saccharose','fructose','miel','inverti','dextrose','sorbitol','maltose','glucose_sirop','glucose_atom','lactose'];
+const PRIORITE_ES = ['glucose_atom','glucose_sirop','maltose','lactose','dextrose','sorbitol','saccharose','miel','inverti','fructose'];
+function reequilibrerSorbet(){
+  const cib = ciblesCourantes();
+  const psP = cib.ps ?? 29, estP = cib.est ?? 32;
+  const T = state.rows.reduce((s,r)=>s+(r.g||0),0);
+  if(T<=0) return {err:'Recette vide : rien à rééquilibrer.'};
+  let eauRow = state.rows.find(r=>r.id==='eau');
+  const sucres = [];
+  const fixed = {ps:0, est:0, g:0};
+  for(const r of state.rows){
+    if(r===eauRow) continue;
+    const ing = ING_BY_ID[r.id]; if(!ing) continue;
+    if(ing.cat==='SUCRE'){ sucres.push(r); continue; }
+    const c = contribution(ing, r.g||0);
+    fixed.ps += c.ps; fixed.est += c.est; fixed.g += (r.g||0);
+  }
+  if(!sucres.length) return {err:'Aucun sucre dans la recette : ajoutez-en un pour pouvoir rééquilibrer.'};
+  const trouve = prio => { for(const id of prio){ const r=sucres.find(s=>s.id===id); if(r) return r; } return sucres[0]; };
+  const A = trouve(PRIORITE_PS);
+  let B = null;
+  for(const id of PRIORITE_ES){ const r=sucres.find(s=>s.id===id && s!==A); if(r){ B=r; break; } }
+  let psNeed = T*psP/100 - fixed.ps;
+  let estNeed = T*estP/100 - fixed.est;
+  for(const s of sucres){ if(s!==A && s!==B){ const c=coefSucre(ING_BY_ID[s.id]); psNeed -= c.ps*(s.g||0); estNeed -= c.es*(s.g||0); } }
+  if(psNeed < 0) return {err:'Les ingrédients fixes apportent déjà plus de pouvoir sucrant que l’objectif.'};
+  let note = '';
+  const cA = coefSucre(ING_BY_ID[A.id]);
+  if(!B){
+    A.g = Math.max(0, Math.round(psNeed/cA.ps));
+    note = 'un seul sucre ajustable : pouvoir sucrant résolu, contrôlez l’EST sur les jauges';
+  } else {
+    const cB = coefSucre(ING_BY_ID[B.id]);
+    const det = cA.ps*cB.es - cB.ps*cA.es;
+    let a, b;
+    if(Math.abs(det) < 0.02){
+      a = psNeed/cA.ps; b = 0;
+      note = 'sucres aux profils trop proches pour piloter l’EST : ajoutez du glucose atomisé et contrôlez l’EST sur les jauges';
+    }
+    else { a = (psNeed*cB.es - cB.ps*estNeed)/det; b = (cA.ps*estNeed - psNeed*cA.es)/det; }
+    if(b < 0){ b = 0; a = psNeed/cA.ps; note = 'EST atteint sans '+ING_BY_ID[B.id].nom+' : contrôlez l’EST sur les jauges'; }
+    if(a < 0){ a = 0; b = psNeed/cB.ps; note = 'pouvoir sucrant couvert par '+ING_BY_ID[B.id].nom+' seul : contrôlez l’EST'; }
+    if(B.id==='glucose_atom' && b > T*0.05){ b = T*0.05; a = Math.max(0,(psNeed - cB.ps*b)/cA.ps); note = 'glucose atomisé plafonné à 5 % du mix'; }
+    A.g = Math.max(0, Math.round(a)); B.g = Math.max(0, Math.round(b));
+  }
+  if(!eauRow){ eauRow = {id:'eau', g:0}; state.rows.push(eauRow); }
+  const autres = state.rows.filter(r=>r!==eauRow).reduce((s,r)=>s+(r.g||0),0);
+  eauRow.g = Math.max(0, Math.round(T) - autres);
+  if(autres > T+1) note = (note?note+' ; ':'')+'plus d’eau disponible : le poids total a légèrement augmenté';
+  const detail = note ? `pouvoir sucrant ${fmt(psP)} % rétabli (sucres pilotes : ${ING_BY_ID[A.id].nom}${B?' + '+ING_BY_ID[B.id].nom:''})`
+                      : `PS ${fmt(psP)} % / EST ${fmt(estP)} % rétablis (sucres pilotes : ${ING_BY_ID[A.id].nom} + ${ING_BY_ID[B.id].nom})`;
+  return {ok:true, note, detail};
+}
+
+/* Glace : les sucres, jaunes, stabilisateur et arômes gardent leur pesée ;
+   lait + crème + poudre de lait sont résolus EXACTEMENT (système 3×3 :
+   poids restant, MG butyrique visée, ESDL visé) avec la composition réelle
+   des produits laitiers présents dans la recette. */
+function reequilibrerGlace(){
+  const cib = ciblesCourantes();
+  if(cib.mode!=='glace') return {err:'Type de produit non laitier.'};
+  const T = state.rows.reduce((s,r)=>s+(r.g||0),0);
+  if(T<=0) return {err:'Recette vide : rien à rééquilibrer.'};
+  const lait  = state.rows.find(r=>['lait_entier','lait_ecreme'].includes(r.id));
+  const creme = state.rows.find(r=>['creme30','creme35','creme40','beurre'].includes(r.id));
+  const poudre= state.rows.find(r=>['pdl0','pdl26'].includes(r.id));
+  if(!lait || !creme) return {err:'Rééquilibrage laitier impossible : il faut au moins un lait et une crème (ou du beurre) dans la recette.'};
+  // sucres, jaunes et stabilisateur sont d'abord remis à leur pourcentage
+  // cible (en conservant la répartition entre produits choisie par l'utilisateur)
+  const remettre = (rows, cibleG, ceilFirst)=>{
+    if(!rows.length) return;
+    const somme = rows.reduce((s,r)=>s+(r.g||0),0);
+    if(somme>0) rows.forEach((r,i)=>{ const v=(r.g||0)*cibleG/somme; r.g = (ceilFirst&&i===0)?Math.ceil(v):Math.round(v); });
+    else rows[0].g = Math.ceil(cibleG);
+  };
+  remettre(state.rows.filter(r=>ING_BY_ID[r.id] && ING_BY_ID[r.id].cat==='SUCRE'), cib.suc*T/100, false);
+  remettre(state.rows.filter(r=>ING_BY_ID[r.id] && ING_BY_ID[r.id].jaune), cib.jaune*T/100, true);
+  remettre(state.rows.filter(r=>ING_BY_ID[r.id] && ING_BY_ID[r.id].stab), cib.stab*T/100, false);
+  const laitiers = new Set([lait, creme, poudre].filter(Boolean));
+  let R = T, mgAutres = 0, esdlAutres = 0;
+  for(const r of state.rows){
+    if(laitiers.has(r)) continue;
+    R -= (r.g||0);
+    const ing = ING_BY_ID[r.id]; if(!ing) continue;
+    if(ing.mgL) mgAutres += ing.mg*(r.g||0)/100;
+    esdlAutres += ing.esdl*(r.g||0)/100;
+  }
+  const mgV = cib.mg*T/100 - mgAutres;
+  const esdlV = cib.esdl*T/100 - esdlAutres;
+  const iL = ING_BY_ID[lait.id], iC = ING_BY_ID[creme.id], iP = poudre?ING_BY_ID[poudre.id]:null;
+  const aL=iL.mg/100, aC=iC.mg/100, bL=iL.esdl/100, bC=iC.esdl/100;
+  let L, C, P = 0;
+  if(iP){
+    const aP=iP.mg/100, bP=iP.esdl/100;
+    // Cramer sur : L+C+P=R ; aL·L+aC·C+aP·P=mgV ; bL·L+bC·C+bP·P=esdlV
+    const det = (aC*bP-aP*bC) - (aL*bP-aP*bL) + (aL*bC-aC*bL);
+    if(Math.abs(det) < 1e-6) return {err:'Combinaison laitière insoluble (produits trop proches).'};
+    L = ( R*(aC*bP-aP*bC) - mgV*(bP-bC) + esdlV*(aP-aC) )/det;
+    C = ( -R*(aL*bP-aP*bL) + mgV*(bP-bL) - esdlV*(aP-aL) )/det;
+    P = ( R*(aL*bC-aC*bL) - mgV*(bC-bL) + esdlV*(aC-aL) )/det;
+  } else {
+    // sans poudre : on résout poids restant + MG ; l'ESDL n'est pas piloté
+    C = (mgV - R*aL)/(aC - aL);
+    L = R - C;
+  }
+  if(C < 0) return {err:'MG visée trop basse pour ce lait : utilisez du lait écrémé ou augmentez la MG.'};
+  if(L < 0) return {err:'MG visée trop élevée pour cette crème : utilisez une crème plus grasse ou du beurre.'};
+  if(P < 0) return {err:'ESDL visé trop bas avec ces produits laitiers : retirez la poudre de lait ou baissez l’ESDL.'};
+  lait.g = Math.round(L); creme.g = Math.ceil(C); if(poudre) poudre.g = Math.round(P);
+  return {ok:true, note: iP?'' : 'pas de poudre de lait dans la recette : l’ESDL n’est pas piloté, contrôlez-le sur les jauges',
+    detail:`${iL.nom}, ${iC.nom}${iP?' et '+iP.nom:''} recalculés pour MG ${fmt(cib.mg)} % et ESDL ${fmt(cib.esdl)} % (résolution exacte)`};
+}
+
+function reequilibrer(){
+  const isSorbet = ['sorbet','sorbet_pf','glace_eau'].includes(state.type);
+  const res = isSorbet ? reequilibrerSorbet() : reequilibrerGlace();
+  const info = el('rebalInfo');
+  if(res.err) info.innerHTML = '<strong style="color:var(--bad)">✗ '+res.err+'</strong>';
+  else info.innerHTML = '♻ <strong>Recette rééquilibrée automatiquement</strong> — '+res.detail+(res.note?' ('+res.note+')':'')+'.';
+  update();
 }
 
 /* =====================================================================
@@ -952,6 +1111,7 @@ function recetteAuto(){
     rows.push({id:'eau', g:Math.max(0, Math.round(T)-autres)});
     state.rows = rows;
     state.type = p>=45 ? 'sorbet_pf' : 'sorbet';
+    state.cibles = {mode:'sorbet', ps:psUse, est:32};
     const noms = list.map(f=>ING_BY_ID[f.id].nom.toLowerCase().replace(' *','').replace(/ \(.*\)/,'').replace(/ \/.*$/,''));
     state.nom = 'Sorbet '+noms.join('-');
     el('autoNote').textContent = `Mix total : ${fmt0(T)} g pour ${fmt0(W)} g de fruits (${fmt(p)} %). Pouvoir sucrant ${fmt(psUse)} %, extrait sec 32 %, stabilisateur 0,5 %.`
@@ -981,6 +1141,7 @@ function recetteAuto(){
     ];
     state.rows = rows;
     state.type = mode;
+    state.cibles = {mode:'glace', mg:c.mg, suc:c.suc, esdl:c.esdl, jaune:c.jaune, stab:c.stab};
     state.nom = mode==='glace_oeufs' ? 'Glace aux œufs' : 'Crème glacée';
     el('autoNote').textContent = `Mix total : ${fmt0(T)} g pour ${fmt0(W)} g de lait entier (${fmt(ref.lait/10)} % du mix). Table analytique calculée par la méthode en 5 étapes.`;
   }
@@ -1091,6 +1252,7 @@ function init(){
   el('produitNom').addEventListener('input',()=>{ state.nom = el('produitNom').value; save(); });
 
   el('btnAdd').addEventListener('click',()=>{ state.rows.push({id:'saccharose', g:0}); update(); });
+  el('btnRebal').addEventListener('click', reequilibrer);
   el('btnClear').addEventListener('click',()=>{
     if(confirm('Vider entièrement la recette ?')){ state.rows=[]; update(); }
   });

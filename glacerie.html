@@ -228,15 +228,6 @@
           <label for="produitNom">Nom de la recette</label>
           <input type="text" id="produitNom" placeholder="Ex. : Sorbet fraise plein fruit">
         </div>
-        <div class="field">
-          <label for="presets">Exemples</label>
-          <select id="presets">
-            <option value="">— Charger un exemple —</option>
-            <option value="cg_vanille">Crème glacée vanille (fiche, ex. n° 1)</option>
-            <option value="sorbet_fraise">Sorbet fraise</option>
-            <option value="sorbet_citron">Sorbet citron</option>
-          </select>
-        </div>
       </div>
     </section>
 
@@ -1317,21 +1308,6 @@ function recetteAuto(){
 }
 
 /* =====================================================================
-   EXEMPLES
-===================================================================== */
-const PRESETS = {
-  cg_vanille:{type:'creme_glacee', nom:'Crème glacée vanille (exemple fiche n° 1)',
-    rows:[ {id:'lait_entier',g:1157},{id:'creme35',g:338},{id:'pdl0',g:75},
-           {id:'saccharose',g:360},{id:'jaune',g:60},{id:'stab',g:10} ]},
-  sorbet_fraise:{type:'sorbet_pf', nom:'Sorbet fraise plein fruit',
-    rows:[ {id:'fraise',g:1100},{id:'saccharose',g:445},{id:'glucose_atom',g:80},
-           {id:'stab',g:10},{id:'eau',g:365} ]},
-  sorbet_citron:{type:'sorbet', nom:'Sorbet citron',
-    rows:[ {id:'citron',g:600},{id:'saccharose',g:555},{id:'glucose_atom',g:25},
-           {id:'stab',g:10},{id:'eau',g:810} ]},
-};
-
-/* =====================================================================
    COÛT MATIÈRES & PRIX DE VENTE
    Prix indicatifs (€/kg) modifiables ; les prix personnalisés sont
    enregistrés sur l'appareil et partagés entre toutes les recettes.
@@ -1817,15 +1793,6 @@ function init(){
   el('btnRebal').addEventListener('click', reequilibrer);
   el('btnClear').addEventListener('click',()=>{
     if(confirm('Vider entièrement la recette ?')){ state.rows=[]; update(); }
-  });
-  el('presets').addEventListener('change',()=>{
-    const p = PRESETS[el('presets').value];
-    if(p){
-      state.type=p.type; state.nom=p.nom; state.rows=p.rows.map(r=>({...r}));
-      selType.value=p.type; el('produitNom').value=p.nom;
-      update();
-    }
-    el('presets').value='';
   });
   renderAutoFruits();
   el('autoAddFruit').addEventListener('click',()=>{

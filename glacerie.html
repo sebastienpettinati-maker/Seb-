@@ -193,31 +193,6 @@
 
 <div class="wrap">
 
-  <section class="card">
-    <div class="toolbar">
-      <div class="field">
-        <label for="produitType">Type de produit</label>
-        <select id="produitType"></select>
-      </div>
-      <div class="field" style="flex:1;min-width:200px">
-        <label for="produitNom">Nom de la recette</label>
-        <input type="text" id="produitNom" placeholder="Ex. : Sorbet fraise plein fruit">
-      </div>
-      <div class="field">
-        <label for="presets">Exemples</label>
-        <select id="presets">
-          <option value="">— Charger un exemple —</option>
-          <option value="cg_vanille">Crème glacée vanille (fiche, ex. n° 1)</option>
-          <option value="sorbet_fraise">Sorbet fraise</option>
-          <option value="sorbet_citron">Sorbet citron</option>
-        </select>
-      </div>
-      <button id="btnAssistantCG">Assistant crème glacée</button>
-      <button id="btnAssistantSorbet">Assistant sorbet</button>
-      <button class="primary" id="btnPDF">⬇ Exporter en PDF</button>
-    </div>
-  </section>
-
   <section class="card" id="autoCard">
     <h2>⚡ Recette automatique — un seul poids à saisir</h2>
     <p class="footnote" style="margin:0 0 12px">Indiquez uniquement le poids de votre ingrédient principal — une ou plusieurs purées de fruits
@@ -254,6 +229,29 @@
       <button class="primary" id="btnAuto">Calculer la recette complète</button>
     </div>
     <p class="footnote" id="autoNote" style="margin-bottom:0"></p>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <div class="field">
+        <label for="produitType">Type de produit</label>
+        <select id="produitType"></select>
+      </div>
+      <div class="field" style="flex:1;min-width:200px">
+        <label for="produitNom">Nom de la recette</label>
+        <input type="text" id="produitNom" placeholder="Ex. : Sorbet fraise plein fruit">
+      </div>
+      <div class="field">
+        <label for="presets">Exemples</label>
+        <select id="presets">
+          <option value="">— Charger un exemple —</option>
+          <option value="cg_vanille">Crème glacée vanille (fiche, ex. n° 1)</option>
+          <option value="sorbet_fraise">Sorbet fraise</option>
+          <option value="sorbet_citron">Sorbet citron</option>
+        </select>
+      </div>
+      <button class="primary" id="btnPDF">⬇ Exporter en PDF</button>
+    </div>
   </section>
 
   <div class="cols">
@@ -350,50 +348,6 @@
     <p class="footnote" id="tracInfo" style="margin-bottom:0"></p>
   </section>
 </div>
-
-<!-- ===================== Assistant crème glacée ===================== -->
-<dialog id="dlgCG">
-  <h3>Assistant crème glacée</h3>
-  <p class="sub">Méthode de la table analytique en 5 étapes : les objectifs en % sont convertis en pesées de lait entier, crème 35 %, poudre de lait 0 % MG, sucres, jaunes et stabilisateur.</p>
-  <div class="grid2">
-    <div class="field"><label>Poids total du mix (g)</label><input type="number" id="cgTotal" value="2000" min="100" step="100"></div>
-    <div class="field"><label>Matière grasse butyrique (%)</label><input type="number" id="cgMG" value="8" min="0" step="0.5"></div>
-    <div class="field"><label>Sucres (%)</label><input type="number" id="cgSuc" value="18" min="0" step="0.5"></div>
-    <div class="field"><label>ESDL (%)</label><input type="number" id="cgESDL" value="9.5" min="0" step="0.1"></div>
-    <div class="field"><label>Jaunes d'œufs (%)</label><input type="number" id="cgJaune" value="3" min="0" step="0.5"></div>
-    <div class="field"><label>Stabilisateur (%)</label><input type="number" id="cgStab" value="0.5" min="0" max="1" step="0.1"></div>
-    <div class="field"><label>Part de saccharose (%)</label><input type="number" id="cgSacch" value="80" min="0" max="100" step="5"></div>
-    <div class="field"><label>Part de glucose atomisé (%)</label><input type="number" id="cgGluc" value="10" min="0" max="100" step="5"></div>
-    <div class="field"><label>Part de dextrose (%)</label><input type="number" id="cgDext" value="10" min="0" max="100" step="5"></div>
-  </div>
-  <p class="dlg-note">Répartition des sucres en % du poids total de sucres (la somme des trois parts doit faire 100).
-     Repères : glucose atomisé ≤ 5 % du mix ; stabilisateur ≤ 1 %.</p>
-  <div class="err" id="cgErr"></div>
-  <div class="dlg-actions">
-    <button id="cgAnnuler">Annuler</button>
-    <button class="primary" id="cgValider">Générer la recette</button>
-  </div>
-</dialog>
-
-<!-- ===================== Assistant sorbet ===================== -->
-<dialog id="dlgSorbet">
-  <h3>Assistant sorbet</h3>
-  <p class="sub">Choisissez votre fruit : l'assistant calcule le saccharose, le glucose atomisé et l'eau pour atteindre le pouvoir sucrant et l'extrait sec visés.</p>
-  <div class="grid2">
-    <div class="field"><label>Poids total du mix (g)</label><input type="number" id="sbTotal" value="2000" min="100" step="100"></div>
-    <div class="field"><label>Fruit</label><select id="sbFruit"></select></div>
-    <div class="field"><label>Proportion de fruit (%)</label><input type="number" id="sbFruitPct" value="50" min="5" max="90" step="1"></div>
-    <div class="field"><label>Pouvoir sucrant visé (%)</label><input type="number" id="sbPS" value="29" min="20" max="35" step="0.5"></div>
-    <div class="field"><label>Extrait sec total visé (%)</label><input type="number" id="sbEST" value="32" min="25" max="38" step="0.5"></div>
-    <div class="field"><label>Stabilisateur (%)</label><input type="number" id="sbStab" value="0.5" min="0" max="1" step="0.1"></div>
-  </div>
-  <p class="dlg-note" id="sbFourchette"></p>
-  <div class="err" id="sbErr"></div>
-  <div class="dlg-actions">
-    <button id="sbAnnuler">Annuler</button>
-    <button class="primary" id="sbValider">Générer la recette</button>
-  </div>
-</dialog>
 
 <!-- ===================== Aperçu avant impression ===================== -->
 <div id="apercu" hidden>
@@ -859,7 +813,7 @@ function update(rebuildRecette=true){
 }
 
 /* =====================================================================
-   ASSISTANTS
+   MOTEURS DE CALCUL
 ===================================================================== */
 /* Crème glacée — méthode de la table analytique en 5 étapes (fiche BTM) */
 function calculCremeGlacee(T, mgP, sucP, esdlP, jauneP, stabP){
@@ -875,31 +829,6 @@ function calculCremeGlacee(T, mgP, sucP, esdlP, jauneP, stabP){
   const lait = laitCreme - creme;
   if(lait < 0) return {err:'MG visée trop élevée pour de la crème à 35 % : augmentez le taux de MG visé de la crème ou ajoutez du beurre.'};
   return {lait, creme, poudre, sucres:sucV, jaunes:jauneV, stab:stabV};
-}
-
-function openCG(){ el('cgErr').textContent=''; el('dlgCG').showModal(); }
-function validerCG(){
-  const T = +el('cgTotal').value, mgP=+el('cgMG').value, sucP=+el('cgSuc').value,
-        esdlP=+el('cgESDL').value, jauneP=+el('cgJaune').value, stabP=+el('cgStab').value;
-  const pS=+el('cgSacch').value, pG=+el('cgGluc').value, pD=+el('cgDext').value;
-  if(Math.abs(pS+pG+pD-100)>0.01){ el('cgErr').textContent='La répartition des sucres doit totaliser 100 %.'; return; }
-  const r = calculCremeGlacee(T, mgP, sucP, esdlP, jauneP, stabP);
-  if(r.err){ el('cgErr').textContent=r.err; return; }
-  const rows = [
-    {id:'lait_entier', g:Math.round(r.lait)},
-    {id:'creme35', g:Math.round(r.creme)},
-    {id:'pdl0', g:Math.round(r.poudre)},
-  ];
-  if(pS>0) rows.push({id:'saccharose', g:Math.round(r.sucres*pS/100)});
-  if(pG>0) rows.push({id:'glucose_atom', g:Math.round(r.sucres*pG/100)});
-  if(pD>0) rows.push({id:'dextrose', g:Math.round(r.sucres*pD/100)});
-  if(r.jaunes>0) rows.push({id:'jaune', g:Math.round(r.jaunes)});
-  if(r.stab>0) rows.push({id:'stab', g:Math.round(r.stab)});
-  state.rows = rows;
-  state.type = 'creme_glacee'; el('produitType').value='creme_glacee';
-  state.cibles = {mode:'glace', mg:mgP, suc:sucP, esdl:esdlP, jaune:jauneP, stab:stabP};
-  if(!el('produitNom').value) { el('produitNom').value='Crème glacée'; state.nom='Crème glacée'; }
-  el('dlgCG').close(); update();
 }
 
 /* Sorbet — mélange de sucres « texture » d'après la pratique professionnelle :
@@ -964,11 +893,6 @@ function calculSorbetMix(T, cF, psP, estP, stabP, acide, tech='reco'){
   const estPct = (cF.est + r.S*SUG.sacch.es + G*SUG.gluc.es + D*SUG.dext.es + r.I*SUG.inv.es + stabV)/T*100;
   return {F:cF.g, S:r.S, G, D, I:r.I, stabV, eau, note:r.note, estPct};
 }
-function calculSorbet(T, fruitId, fruitPct, psP, estP, stabP){
-  const ing = ING_BY_ID[fruitId];
-  const cF = contribution(ing, T*fruitPct/100);
-  return calculSorbetMix(T, cF, psP, estP, stabP, ing.fruit==='acide');
-}
 /* répartition des sucres d'une glace selon le sucre technique choisi */
 const SPLITS_GLACE = {
   reco:  [['saccharose',0.80],['glucose_atom',0.10],['dextrose',0.10]],
@@ -977,50 +901,6 @@ const SPLITS_GLACE = {
   sacch: [['saccharose',1]],
 };
 
-function openSorbet(){
-  const sel = el('sbFruit');
-  if(!sel.options.length){
-    for(const i of INGREDIENTS.filter(i=>i.cat==='FRUIT')){
-      const o=document.createElement('option'); o.value=i.id; o.textContent=i.nom; sel.appendChild(o);
-    }
-    sel.value='fraise';
-    sel.addEventListener('change', majFourchette);
-  }
-  majFourchette();
-  el('sbErr').textContent='';
-  el('dlgSorbet').showModal();
-}
-function majFourchette(){
-  const id = el('sbFruit').value;
-  const f = FOURCHETTES[id];
-  if(f){
-    el('sbFourchette').textContent = `Fourchette conseillée pour ce fruit : ${f[0]} à ${f[1]} % (fiche formulaire).`;
-    el('sbFruitPct').value = Math.round((f[0]+f[1])/2);
-  } else {
-    el('sbFourchette').textContent = 'Pas de fourchette précise pour ce fruit dans la fiche : 45 à 60 % en général.';
-    el('sbFruitPct').value = 50;
-  }
-}
-function validerSorbet(){
-  const T=+el('sbTotal').value, fruitId=el('sbFruit').value, fruitPct=+el('sbFruitPct').value,
-        psP=+el('sbPS').value, estP=+el('sbEST').value, stabP=+el('sbStab').value;
-  const r = calculSorbet(T, fruitId, fruitPct, psP, estP, stabP);
-  if(r.err){ el('sbErr').textContent=r.err; return; }
-  const rows = [ {id:fruitId, g:Math.round(r.F)}, {id:'saccharose', g:Math.round(r.S)} ];
-  if(r.G>=5) rows.push({id:'glucose_atom', g:Math.round(r.G)});
-  if(r.D>=5) rows.push({id:'dextrose', g:Math.round(r.D)});
-  if(r.I>=5) rows.push({id:'inverti', g:Math.round(r.I)});
-  if(r.stabV>0) rows.push({id:'stab', g:Math.round(r.stabV)});
-  rows.push({id:'eau', g:Math.max(0, Math.round(T) - rows.reduce((s,x)=>s+x.g,0))});
-  state.rows = rows;
-  state.type = fruitPct>=45 ? 'sorbet_pf' : 'sorbet';
-  state.cibles = {mode:'sorbet', ps:psP, est:estP};
-  el('produitType').value = state.type;
-  const nomFruit = ING_BY_ID[fruitId].nom.toLowerCase().replace(' *','');
-  el('produitNom').value = 'Sorbet '+nomFruit; state.nom = el('produitNom').value;
-  el('dlgSorbet').close(); update();
-  if(r.note) setTimeout(()=>alert(r.note), 50);
-}
 
 /* =====================================================================
    RÉÉQUILIBRAGE AUTOMATIQUE
@@ -1633,12 +1513,6 @@ function init(){
   el('btnAuto').addEventListener('click', recetteAuto);
   majAutoUI();
 
-  el('btnAssistantCG').addEventListener('click', openCG);
-  el('btnAssistantSorbet').addEventListener('click', openSorbet);
-  el('cgAnnuler').addEventListener('click',()=>el('dlgCG').close());
-  el('cgValider').addEventListener('click', validerCG);
-  el('sbAnnuler').addEventListener('click',()=>el('dlgSorbet').close());
-  el('sbValider').addEventListener('click', validerSorbet);
   state.pot = state.pot || {g:120, coeff:5};
   el('potG').value = state.pot.g; el('potCoeff').value = state.pot.coeff;
   el('potG').addEventListener('input',()=>{ state.pot.g = parseFloat(el('potG').value)||120; save(); majResultatsCouts(); });

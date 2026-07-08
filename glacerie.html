@@ -4,97 +4,131 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calculateur de glacerie — équilibre &amp; table analytique</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍨</text></svg>">
 <style>
   :root{
-    --surface-1:#fcfcfb; --page:#f9f9f7;
-    --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
-    --grid:#e1e0d9; --border:rgba(11,11,11,.10);
-    --accent:#2a78d6; --accent-soft:#e3eefc;
+    --page:#faf4ec;
+    --page-grad:linear-gradient(180deg,#ffe7dd 0%,#fdeee8 120px,#faf4ec 380px);
+    --surface-1:#ffffff;
+    --ink-1:#28211a; --ink-2:#645a4e; --ink-3:#9b8f80;
+    --grid:#ecdfd2; --border:rgba(40,33,26,.08);
+    --accent:#e8467c; --accent-2:#f2745f; --accent-soft:#fdeaf1;
+    --grad:linear-gradient(135deg,#e8467c 0%,#f2745f 100%);
+    --zebra:rgba(140,100,70,.045);
     --good:#0ca30c; --good-text:#006300; --warn:#fab219; --bad:#d03b3b;
-    --good-bg:rgba(12,163,12,.10); --warn-bg:rgba(250,178,25,.14); --bad-bg:rgba(208,59,59,.10);
+    --good-bg:rgba(12,163,12,.10); --warn-bg:rgba(250,178,25,.16); --bad-bg:rgba(208,59,59,.10);
+    --shadow:0 2px 8px rgba(120,70,40,.06),0 12px 32px rgba(120,70,40,.07);
   }
   @media (prefers-color-scheme: dark){
     :root{
-      --surface-1:#1a1a19; --page:#0d0d0d;
-      --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-3:#898781;
-      --grid:#2c2c2a; --border:rgba(255,255,255,.10);
-      --accent:#3987e5; --accent-soft:#16283e;
-      --good:#0ca30c; --good-text:#0ca30c; --warn:#fab219; --bad:#d03b3b;
-      --good-bg:rgba(12,163,12,.16); --warn-bg:rgba(250,178,25,.14); --bad-bg:rgba(208,59,59,.18);
+      --page:#171310;
+      --page-grad:linear-gradient(180deg,#2b1712 0%,#221410 120px,#171310 380px);
+      --surface-1:#211c17;
+      --ink-1:#f8f2e9; --ink-2:#cbbfb0; --ink-3:#94897a;
+      --grid:#3b332a; --border:rgba(255,255,255,.09);
+      --accent:#ff6b9d; --accent-2:#ff8a5c; --accent-soft:#3d2029;
+      --grad:linear-gradient(135deg,#e8467c 0%,#e0603f 100%);
+      --zebra:rgba(255,255,255,.03);
+      --good:#0ca30c; --good-text:#3fd43f; --warn:#fab219; --bad:#e05252;
+      --good-bg:rgba(12,163,12,.18); --warn-bg:rgba(250,178,25,.15); --bad-bg:rgba(224,82,82,.16);
+      --shadow:0 2px 8px rgba(0,0,0,.35),0 14px 34px rgba(0,0,0,.3);
     }
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--page);color:var(--ink-1);
-    font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-  header.app{padding:22px 24px 14px;max-width:1180px;margin:0 auto}
-  header.app h1{margin:0;font-size:1.45rem}
-  header.app p{margin:4px 0 0;color:var(--ink-2);font-size:.92rem}
-  .wrap{max-width:1180px;margin:0 auto;padding:0 24px 60px}
-  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:18px}
-  .card h2{margin:0 0 12px;font-size:1.05rem}
-  .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
-  .field{display:flex;flex-direction:column;gap:4px}
-  .field label{font-size:.78rem;color:var(--ink-2);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
-  select,input[type=text],input[type=number]{
-    background:var(--surface-1);color:var(--ink-1);border:1px solid var(--grid);
-    border-radius:8px;padding:8px 10px;font:inherit}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--page);background-image:var(--page-grad);background-repeat:no-repeat;
+    color:var(--ink-1);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+  header.app{padding:24px 24px 6px;max-width:1180px;margin:0 auto}
+  .hero{position:relative;overflow:hidden;background:var(--grad);border-radius:24px;
+    padding:28px 30px;color:#fff;box-shadow:var(--shadow)}
+  .hero h1{margin:0;font-size:1.85rem;letter-spacing:-.015em;text-shadow:0 1px 2px rgba(0,0,0,.15)}
+  .hero p{margin:8px 0 0;max-width:72ch;color:rgba(255,255,255,.93);font-size:.95rem}
+  .hero .deco{position:absolute;right:-6px;top:50%;transform:translateY(-50%) rotate(8deg);
+    font-size:96px;line-height:1;opacity:.28;pointer-events:none;user-select:none}
+  @media(max-width:700px){.hero .deco{display:none}}
+  .wrap{max-width:1180px;margin:0 auto;padding:14px 24px 70px}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:20px;
+    padding:22px;margin-bottom:20px;box-shadow:var(--shadow)}
+  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:1.15rem;letter-spacing:-.01em}
+  .card h2::after{content:"";flex:1;height:4px;border-radius:2px;background:var(--grad);opacity:.16;min-width:30px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:.74rem;color:var(--ink-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  select,input[type=text],input[type=number],input[type=date]{
+    background:var(--surface-1);color:var(--ink-1);border:1.5px solid var(--grid);
+    border-radius:12px;padding:9px 12px;font:inherit;transition:border-color .15s, box-shadow .15s}
+  select:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  select:hover,input:hover{border-color:var(--accent)}
   input[type=number]{width:110px;font-variant-numeric:tabular-nums}
-  button{border:1px solid var(--grid);background:var(--surface-1);color:var(--ink-1);
-    border-radius:8px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer}
-  button:hover{border-color:var(--accent);color:var(--accent)}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-  button.primary:hover{opacity:.9;color:#fff}
-  button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 8px;font-size:1.05rem}
-  button.ghost:hover{color:var(--bad)}
-  .cols{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:18px;align-items:start}
+  button{border:1.5px solid var(--grid);background:var(--surface-1);color:var(--ink-1);
+    border-radius:999px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer;
+    transition:transform .12s, box-shadow .12s, border-color .12s, color .12s, filter .12s}
+  button:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px);
+    box-shadow:0 5px 14px rgba(232,70,124,.20)}
+  button:active{transform:translateY(0)}
+  button.primary{background:var(--grad);border:none;color:#fff;padding:11px 20px;
+    box-shadow:0 4px 14px rgba(232,70,124,.35)}
+  button.primary:hover{color:#fff;filter:brightness(1.07);box-shadow:0 7px 18px rgba(232,70,124,.4)}
+  button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 9px;font-size:1.05rem;box-shadow:none}
+  button.ghost:hover{color:var(--bad);background:var(--bad-bg);transform:none;box-shadow:none}
+  .cols{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:20px;align-items:start}
   @media(max-width:920px){.cols{grid-template-columns:1fr}}
   /* --- recette --- */
   table{border-collapse:collapse;width:100%}
-  th{font-size:.75rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-3);
-     text-align:left;padding:6px 8px;border-bottom:1px solid var(--grid);font-weight:600}
-  td{padding:6px 8px;border-bottom:1px solid var(--grid);vertical-align:middle}
+  th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);
+     text-align:left;padding:8px;border-bottom:2px solid var(--grid);font-weight:700}
+  td{padding:8px;border-bottom:1px solid var(--grid);vertical-align:middle}
+  tbody tr:nth-child(even) td{background:var(--zebra)}
+  tbody tr:hover td{background:var(--accent-soft)}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-  tr.total td{font-weight:700;border-top:2px solid var(--ink-3);border-bottom:none}
-  tr.pct td{color:var(--ink-2);font-size:.85rem;border-bottom:none}
-  .rowhint{font-size:.78rem;color:var(--ink-3)}
-  .recipe-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-  .fruitrow{display:flex;gap:8px;margin-bottom:6px;align-items:center}
+  tr.total td{font-weight:800;border-top:2.5px solid var(--accent);border-bottom:none;background:none !important;font-size:1.02rem}
+  tr.pct td{color:var(--ink-2);font-size:.85rem;border-bottom:none;background:none !important}
+  .rowhint{font-size:.78rem;color:var(--ink-3);margin-top:2px}
+  #recetteTable td:first-child{width:58%}
+  #recetteTable td:first-child select{width:100%;min-width:170px}
+  #recetteTable input[type=number]{width:92px}
+  .recipe-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+  .fruitrow{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;
+    background:var(--zebra);border-radius:14px;padding:6px 8px}
   .fruitrow input{width:100px}
   /* --- jauges d'équilibre --- */
-  .meter{margin-bottom:14px}
-  .meter .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-  .meter .name{font-size:.88rem;font-weight:600}
-  .meter .val{font-variant-numeric:tabular-nums;font-weight:700}
-  .chip{display:inline-flex;align-items:center;gap:5px;font-size:.75rem;font-weight:700;
-        border-radius:20px;padding:2px 9px}
+  .meter{margin-bottom:16px}
+  .meter .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .meter .name{font-size:.9rem;font-weight:700}
+  .meter .val{font-variant-numeric:tabular-nums;font-weight:800;font-size:1.05rem}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:.74rem;font-weight:800;
+        border-radius:20px;padding:3px 10px;white-space:nowrap}
   .chip.ok{color:var(--good-text);background:var(--good-bg)}
   .chip.warn{color:#8a5c00;background:var(--warn-bg)}
   @media (prefers-color-scheme: dark){.chip.warn{color:var(--warn)}}
   .chip.bad{color:var(--bad);background:var(--bad-bg)}
-  .track{position:relative;height:10px;border-radius:5px;background:var(--grid);margin:7px 0 3px;overflow:hidden}
-  .band{position:absolute;top:0;bottom:0;background:var(--good-bg);border-left:1px solid var(--good);border-right:1px solid var(--good)}
+  .track{position:relative;height:14px;border-radius:8px;background:var(--grid);margin:8px 0 4px;overflow:hidden}
+  .band{position:absolute;top:0;bottom:0;background:var(--good-bg);
+    border-left:2px solid var(--good);border-right:2px solid var(--good)}
   .band.openmax{border-right:none}
   .band.openmin{border-left:none}
-  .marker{position:absolute;top:-1px;bottom:-1px;width:3px;border-radius:2px;background:var(--ink-1)}
+  .marker{position:absolute;top:-1px;bottom:-1px;width:5px;border-radius:3px;background:var(--ink-1);
+    box-shadow:0 0 0 2px var(--surface-1);transition:left .35s ease}
   .scale{display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
-  .advice{font-size:.8rem;color:var(--ink-2);margin-top:3px}
-  .verdict{border-radius:10px;padding:10px 14px;font-weight:700;margin-bottom:14px;display:flex;gap:8px;align-items:center}
-  .verdict.ok{background:var(--good-bg);color:var(--good-text)}
-  .verdict.warn{background:var(--warn-bg);color:#8a5c00}
+  .advice{font-size:.82rem;color:var(--ink-2);margin-top:4px;padding-left:10px;border-left:3px solid var(--grid)}
+  .verdict{border-radius:16px;padding:13px 16px;font-weight:800;margin-bottom:16px;
+    display:flex;gap:10px;align-items:center;font-size:1.02rem}
+  .verdict.ok{background:var(--good-bg);color:var(--good-text);border:1.5px solid rgba(12,163,12,.3)}
+  .verdict.warn{background:var(--warn-bg);color:#8a5c00;border:1.5px solid rgba(250,178,25,.4)}
   @media (prefers-color-scheme: dark){.verdict.warn{color:var(--warn)}}
-  .verdict.bad{background:var(--bad-bg);color:var(--bad)}
-  .footnote{font-size:.78rem;color:var(--ink-3);margin-top:10px}
+  .verdict.bad{background:var(--bad-bg);color:var(--bad);border:1.5px solid rgba(208,59,59,.35)}
+  .footnote{font-size:.8rem;color:var(--ink-3);margin-top:10px;line-height:1.5}
   .scroll{overflow-x:auto}
   /* --- dialogues --- */
   dialog{background:var(--surface-1);color:var(--ink-1);border:1px solid var(--border);
-    border-radius:14px;padding:22px;max-width:520px;width:92vw}
-  dialog::backdrop{background:rgba(0,0,0,.45)}
-  dialog h3{margin:0 0 6px}
-  dialog p.sub{margin:0 0 14px;color:var(--ink-2);font-size:.88rem}
+    border-radius:20px;padding:24px;max-width:540px;width:92vw;box-shadow:var(--shadow)}
+  dialog::backdrop{background:rgba(20,10,8,.55);backdrop-filter:blur(2px)}
+  dialog h3{margin:0 0 6px;font-size:1.2rem}
+  dialog p.sub{margin:0 0 16px;color:var(--ink-2);font-size:.88rem}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+  .dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
   .dlg-note{font-size:.8rem;color:var(--ink-2);margin-top:10px}
-  .err{color:var(--bad);font-size:.85rem;font-weight:600;margin-top:8px}
+  .err{color:var(--bad);font-size:.85rem;font-weight:700;margin-top:8px}
   /* --- aperçu avant impression --- */
   #apercu{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);overflow:auto;padding:14px}
   .apercu-bar{max-width:860px;margin:0 auto 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
@@ -149,9 +183,12 @@
 <body>
 
 <header class="app">
-  <h1>🍨 Calculateur de glacerie</h1>
-  <p>Équilibrez vos sorbets, glaces et crèmes glacées, vérifiez les repères professionnels et exportez la recette avec sa table analytique en PDF.
-     Données issues des fiches BTM Glacier (formulaire des ingrédients, repères d'équilibre, méthode de la table analytique).</p>
+  <div class="hero">
+    <span class="deco">🍨🍓</span>
+    <h1>🍨 Calculateur de glacerie</h1>
+    <p>Équilibrez vos sorbets, glaces et crèmes glacées, vérifiez les repères professionnels, chiffrez vos coûts et imprimez
+       recettes, tables analytiques et étiquettes de traçabilité. Données issues des fiches BTM Glacier.</p>
+  </div>
 </header>
 
 <div class="wrap">

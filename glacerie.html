@@ -245,6 +245,28 @@
       <span class="footnote" style="margin:0">Dans la fenêtre qui s'ouvre, choisissez « Enregistrer au format PDF » comme destination.</span>
     </div>
   </section>
+
+  <section class="card">
+    <h2>💰 Coût matières &amp; prix de vente</h2>
+    <div class="scroll">
+      <table id="coutTable">
+        <thead>
+          <tr><th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">Prix (€/kg)</th><th class="num">Coût (€)</th></tr>
+        </thead>
+        <tbody id="coutBody"></tbody>
+        <tfoot>
+          <tr class="total"><td>Coût matières du mix</td><td></td><td class="num" id="coutKg">—</td><td class="num" id="coutTotal">—</td></tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="toolbar" style="margin-top:14px">
+      <div class="field"><label for="potG">Poids du pot (g)</label><input type="number" id="potG" value="120" min="10" step="10"></div>
+      <div class="field"><label for="potCoeff">Coefficient sur coût matières</label><input type="number" id="potCoeff" value="5" min="1" step="0.5"></div>
+    </div>
+    <div class="verdict ok" id="potResult" style="margin-top:10px"></div>
+    <p class="footnote">Prix indicatifs pré-remplis : modifiez-les selon vos fournisseurs, ils sont enregistrés sur cet appareil et réutilisés pour toutes vos recettes.
+       Le poids du pot correspond au poids de mix : le foisonnement ajoute du volume, pas du poids — un pot de 120 g contient bien 120 g de mix.</p>
+  </section>
 </div>
 
 <!-- ===================== Assistant crème glacée ===================== -->
@@ -738,6 +760,7 @@ function update(rebuildRecette=true){
   renderVerdict(criteres,t);
   renderMeters(criteres);
   renderAnalyse(t);
+  renderCouts();
   el('regleNote').textContent = PRODUITS[state.type].note;
   save();
 }
@@ -1231,6 +1254,85 @@ const PRESETS = {
 };
 
 /* =====================================================================
+   COÛT MATIÈRES & PRIX DE VENTE
+   Prix indicatifs (€/kg) modifiables ; les prix personnalisés sont
+   enregistrés sur l'appareil et partagés entre toutes les recettes.
+===================================================================== */
+const PRIX_DEFAUT = {
+  lait_entier:1.1, lait_ecreme:1.0, creme30:4.2, creme35:4.5, creme40:5.0,
+  beurre:8, pdl26:10, pdl0:9,
+  jaune:8, oeuf:4.5, blanc:4,
+  saccharose:1.2, dextrose:2.5, glucose_atom:3, inverti:3.5, miel:8,
+  fructose:4, lactose:4, glucose_sirop:2.5, maltose:4, sorbitol:4.5,
+  abricot:5, airelle:8, ananas:4.5, avocat:6, banane:3.5, cassis:9,
+  cerise:6, citron:4, figue:7, fraise:6, framboise:9, passion:10,
+  grenade:8, groseille:8, goyave:6, kiwi:5, litchi:6, mandarine:5,
+  mangue:5.5, marron:8, melon:5, mure:9, myrtille:9, coco:5, orange:4,
+  pamplemousse:4, papaye:6, pasteque:3, peche:5, poire:5, pomme:3.5,
+  prune:4.5, raisin:5,
+  p_amande:18, p_noisette:22, p_pistache:35, p_noix:20, p_arachide:8, praline:12,
+  couv70:10, cacao:8, bcacao:15,
+  stab:15, e471:12, gelatine:25,
+  eau:0, jus_citron:3,
+};
+let prixPerso = {};
+try{ prixPerso = JSON.parse(localStorage.getItem('glacerie_prix')) || {}; }catch(e){}
+function getPrix(id){
+  if(prixPerso[id]!=null) return prixPerso[id];
+  if(PRIX_DEFAUT[id]!=null) return PRIX_DEFAUT[id];
+  if(id && id.startsWith('puree_')){ const base = id.split('_')[1]; if(PRIX_DEFAUT[base]!=null) return PRIX_DEFAUT[base]; }
+  return 0;
+}
+function setPrix(id, v){
+  prixPerso[id] = v;
+  try{ localStorage.setItem('glacerie_prix', JSON.stringify(prixPerso)); }catch(e){}
+}
+const fmtE = x => fmt(x,2);
+function coutMix(){ return state.rows.reduce((s,r)=> s + (r.g||0)/1000*getPrix(r.id), 0); }
+function coutsPot(total, mixG){
+  const potG = (state.pot && state.pot.g) || 120;
+  const coeff = (state.pot && state.pot.coeff) || 5;
+  return {potG, coeff, coutKg: mixG>0 ? total/mixG*1000 : 0,
+          coutPot: mixG>0 ? total/mixG*potG : 0,
+          prixVente: mixG>0 ? total/mixG*potG*coeff : 0,
+          nbPots: potG>0 ? Math.floor(mixG/potG) : 0};
+}
+function majResultatsCouts(){
+  const t = computeTotals();
+  const total = coutMix();
+  el('coutTotal').textContent = fmtE(total)+' €';
+  el('coutKg').textContent = t.g>0 ? fmtE(total/t.g*1000)+' €/kg' : '—';
+  const p = coutsPot(total, t.g);
+  el('potResult').innerHTML = t.g>0
+    ? `Pot de ${fmt0(p.potG)} g : coût matières <strong>${fmtE(p.coutPot)} €</strong> × ${fmt(p.coeff)} → <strong>prix de vente conseillé : ${fmtE(p.prixVente)} €</strong>`
+      + ` &nbsp;·&nbsp; cette recette remplit ${p.nbPots} pot${p.nbPots>1?'s':''}`
+    : 'Ajoutez des ingrédients pour calculer les coûts.';
+}
+function renderCouts(){
+  const body = el('coutBody'); body.innerHTML='';
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id]; if(!ing) continue;
+    const tr = document.createElement('tr');
+    const tdN = document.createElement('td'); tdN.textContent = ing.nom;
+    const tdG = document.createElement('td'); tdG.className='num'; tdG.textContent = fmt0(r.g||0);
+    const tdP = document.createElement('td'); tdP.className='num';
+    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='0.1';
+    inp.value = getPrix(r.id); inp.style.width='80px';
+    const tdC = document.createElement('td'); tdC.className='num';
+    tdC.textContent = fmtE((r.g||0)/1000*getPrix(r.id));
+    inp.addEventListener('input',()=>{
+      setPrix(r.id, parseFloat(inp.value)||0);
+      tdC.textContent = fmtE((r.g||0)/1000*getPrix(r.id));
+      majResultatsCouts();
+    });
+    tdP.appendChild(inp);
+    tr.append(tdN,tdG,tdP,tdC);
+    body.appendChild(tr);
+  }
+  majResultatsCouts();
+}
+
+/* =====================================================================
    EXPORT PDF (impression)
 ===================================================================== */
 function buildPrint(){
@@ -1281,6 +1383,20 @@ function buildPrint(){
           <td class="st-${c.status}">${STXT[c.status]}</td></tr>`;
   }
   h += `</tbody></table>`;
+
+  const coutTotal = coutMix();
+  if(coutTotal > 0){
+    const cp = coutsPot(coutTotal, t.g);
+    h += `<h2>Coût matières &amp; prix de vente</h2>
+    <table><thead><tr><th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">Prix (€/kg)</th><th class="num">Coût (€)</th></tr></thead><tbody>`;
+    for(const r of state.rows){
+      const ing = ING_BY_ID[r.id]; if(!ing) continue;
+      h += `<tr><td>${ing.nom}</td><td class="num">${fmt0(r.g||0)}</td><td class="num">${fmtE(getPrix(r.id))}</td><td class="num">${fmtE((r.g||0)/1000*getPrix(r.id))}</td></tr>`;
+    }
+    h += `<tr class="total"><td>Coût matières du mix</td><td class="num">${fmt0(t.g)}</td><td class="num">${fmtE(cp.coutKg)} €/kg</td><td class="num">${fmtE(coutTotal)} €</td></tr>
+    <tr class="total"><td colspan="4">Pot de ${fmt0(cp.potG)} g : coût matières ${fmtE(cp.coutPot)} € × coefficient ${fmt(cp.coeff)} = <strong>prix de vente conseillé ${fmtE(cp.prixVente)} €</strong> — cette recette remplit ${cp.nbPots} pot${cp.nbPots>1?'s':''}</td></tr>
+    </tbody></table>`;
+  }
 
   h += `<p class="foot">${prod.note}<br>
   MG = matière grasse (« ° » = MG non laitière, comptée à part de la MG butyrique) · ESDL = extrait sec dégraissé du lait ·
@@ -1351,6 +1467,11 @@ function init(){
   el('cgValider').addEventListener('click', validerCG);
   el('sbAnnuler').addEventListener('click',()=>el('dlgSorbet').close());
   el('sbValider').addEventListener('click', validerSorbet);
+  state.pot = state.pot || {g:120, coeff:5};
+  el('potG').value = state.pot.g; el('potCoeff').value = state.pot.coeff;
+  el('potG').addEventListener('input',()=>{ state.pot.g = parseFloat(el('potG').value)||120; save(); majResultatsCouts(); });
+  el('potCoeff').addEventListener('input',()=>{ state.pot.coeff = parseFloat(el('potCoeff').value)||5; save(); majResultatsCouts(); });
+
   el('btnPDF').addEventListener('click',()=>{ buildPrint(); window.print(); });
   el('btnPDF2').addEventListener('click',()=>{ buildPrint(); window.print(); });
   window.addEventListener('beforeprint', buildPrint);

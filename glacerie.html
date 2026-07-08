@@ -167,7 +167,7 @@
         <button id="btnAdd">＋ Ajouter un ingrédient</button>
         <button id="btnClear">Vider la recette</button>
       </div>
-      <p class="footnote">Les valeurs marquées d'un astérisque (*) dans la liste sont des estimations (composition non détaillée dans le formulaire).</p>
+      <p class="footnote">Compositions issues du formulaire BTM Glacier ; les teneurs en sucres des fruits non détaillées dans le formulaire sont complétées d'après la table Ciqual 2020 (ANSES) / fiches Aprifel (USDA pour airelle, raisin et noix de coco). Les valeurs marquées d'un astérisque (*) restent des estimations.</p>
     </section>
 
     <aside class="card">
@@ -289,41 +289,44 @@ const INGREDIENTS = [
   D({id:'glucose_sirop', nom:'Glucose en sirop *',     cat:'SUCRE', eau:20,  suc:80,   psr:38,  approx:true}),
   D({id:'maltose',       nom:'Maltose *',              cat:'SUCRE', eau:5,   suc:95,   psr:32,  approx:true}),
   D({id:'sorbitol',      nom:'Sorbitol *',             cat:'SUCRE', eau:0,   suc:100,  psr:30,  approx:true}),
-  // ---- Fruits (extrait sec du formulaire ; sucre moyen quand il est connu,
-  //      sinon estimé ≈ 85 % de l'extrait sec, à PSR 100) ----
+  // ---- Fruits : extrait sec du formulaire BTM ; teneur en sucres du formulaire
+  //      quand il la donne, sinon complétée d'après Ciqual 2020 (ANSES) / Aprifel
+  //      (USDA pour airelle, raisin, noix de coco). Sucres comptés à PSR 100.
+  //      Pour melon, pastèque et litchi, l'ES du formulaire a été relevé pour
+  //      rester cohérent avec la teneur en sucres mesurée. ----
   D({id:'abricot',   nom:'Abricot',              cat:'FRUIT', fruit:'std',   eau:86, suc:13.14, autres:0.86}),
-  D({id:'airelle',   nom:'Airelle',              cat:'FRUIT', fruit:'acide', eau:84, suc:13.6,  autres:2.4, approx:true}),
-  D({id:'ananas',    nom:'Ananas',               cat:'FRUIT', fruit:'acide', eau:86, suc:11.9,  autres:2.1, approx:true}),
-  D({id:'avocat',    nom:'Avocat *',             cat:'FRUIT', fruit:'std',   eau:68, suc:3,     autres:29,  approx:true}),
+  D({id:'airelle',   nom:'Airelle / canneberge', cat:'FRUIT', fruit:'acide', eau:84, suc:4.3,   autres:11.7}),
+  D({id:'ananas',    nom:'Ananas',               cat:'FRUIT', fruit:'acide', eau:86, suc:10.5,  autres:3.5}),
+  D({id:'avocat',    nom:'Avocat',               cat:'FRUIT', fruit:'std',   eau:68, mg:20.6, suc:0.4, autres:11}),
   D({id:'banane',    nom:'Banane',               cat:'FRUIT', fruit:'acide', eau:75, suc:12.13, autres:12.87}),
-  D({id:'cassis',    nom:'Cassis',               cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
+  D({id:'cassis',    nom:'Cassis',               cat:'FRUIT', fruit:'acide', eau:85, suc:9.7,   autres:5.3}),
   D({id:'cerise',    nom:'Cerise / griotte',     cat:'FRUIT', fruit:'std',   eau:81, suc:12.13, autres:6.87}),
-  D({id:'citron',    nom:'Citron',               cat:'FRUIT', fruit:'acide', eau:91, suc:2.5,   autres:6.5, approx:true}),
-  D({id:'figue',     nom:'Figue *',              cat:'FRUIT', fruit:'std',   eau:80, suc:8.9,   autres:11.1, approx:true}),
-  D({id:'fraise',    nom:'Fraise',               cat:'FRUIT', fruit:'std',   eau:89, suc:9.35,  autres:1.65, approx:true}),
+  D({id:'citron',    nom:'Citron',               cat:'FRUIT', fruit:'acide', eau:91, suc:0.8,   autres:8.2}),
+  D({id:'figue',     nom:'Figue *',              cat:'FRUIT', fruit:'std',   eau:79.4, suc:8.9, autres:11.7, approx:true}),
+  D({id:'fraise',    nom:'Fraise',               cat:'FRUIT', fruit:'std',   eau:89, suc:4.1,   autres:6.9}),
   D({id:'framboise', nom:'Framboise',            cat:'FRUIT', fruit:'std',   eau:86, suc:9.10,  autres:4.9}),
-  D({id:'passion',   nom:'Fruit de la passion',  cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
-  D({id:'grenade',   nom:'Grenade',              cat:'FRUIT', fruit:'acide', eau:80, suc:17,    autres:3,    approx:true}),
-  D({id:'groseille', nom:'Groseille',            cat:'FRUIT', fruit:'acide', eau:84, suc:13.6,  autres:2.4,  approx:true}),
-  D({id:'goyave',    nom:'Goyave',               cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
-  D({id:'kiwi',      nom:'Kiwi',                 cat:'FRUIT', fruit:'acide', eau:84, suc:13.6,  autres:2.4,  approx:true}),
-  D({id:'litchi',    nom:'Litchi',               cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
-  D({id:'mandarine', nom:'Mandarine',            cat:'FRUIT', fruit:'acide', eau:88, suc:10.2,  autres:1.8,  approx:true}),
+  D({id:'passion',   nom:'Fruit de la passion',  cat:'FRUIT', fruit:'acide', eau:85, suc:8.5,   autres:6.5}),
+  D({id:'grenade',   nom:'Grenade',              cat:'FRUIT', fruit:'acide', eau:80, suc:13.3,  autres:6.7}),
+  D({id:'groseille', nom:'Groseille',            cat:'FRUIT', fruit:'acide', eau:84, suc:6,     autres:10}),
+  D({id:'goyave',    nom:'Goyave',               cat:'FRUIT', fruit:'acide', eau:85, suc:6,     autres:9}),
+  D({id:'kiwi',      nom:'Kiwi',                 cat:'FRUIT', fruit:'acide', eau:84, suc:8.9,   autres:7.1}),
+  D({id:'litchi',    nom:'Litchi',               cat:'FRUIT', fruit:'acide', eau:83.3, suc:15.7, autres:1}),
+  D({id:'mandarine', nom:'Mandarine',            cat:'FRUIT', fruit:'acide', eau:88, suc:9,     autres:3}),
   D({id:'mangue',    nom:'Mangue',               cat:'FRUIT', fruit:'acide', eau:85, suc:13,    autres:2}),
-  D({id:'marron',    nom:'Marron frais *',       cat:'FRUIT', fruit:'coque', eau:51, suc:10,    autres:39,   approx:true}),
-  D({id:'melon',     nom:'Melon',                cat:'FRUIT', fruit:'std',   eau:92, suc:6.8,   autres:1.2,  approx:true}),
-  D({id:'mure',      nom:'Mûre',                 cat:'FRUIT', fruit:'std',   eau:84, suc:13.6,  autres:2.4,  approx:true}),
-  D({id:'myrtille',  nom:'Myrtille',             cat:'FRUIT', fruit:'std',   eau:85, suc:12.75, autres:2.25, approx:true}),
-  D({id:'coco',      nom:'Noix de coco (chair)', cat:'FRUIT', fruit:'coque', eau:43.8, mg:35.55, suc:5, autres:15.65, approx:true}),
-  D({id:'orange',    nom:'Orange',               cat:'FRUIT', fruit:'acide', eau:90, suc:8.5,   autres:1.5,  approx:true}),
-  D({id:'pamplemousse',nom:'Pamplemousse',       cat:'FRUIT', fruit:'acide', eau:90, suc:8.5,   autres:1.5,  approx:true}),
-  D({id:'papaye',    nom:'Papaye',               cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
-  D({id:'pasteque',  nom:'Pastèque',             cat:'FRUIT', fruit:'std',   eau:93, suc:5.95,  autres:1.05, approx:true}),
+  D({id:'marron',    nom:'Marron frais *',       cat:'FRUIT', fruit:'coque', eau:51, suc:5,     autres:44,   approx:true}),
+  D({id:'melon',     nom:'Melon',                cat:'FRUIT', fruit:'std',   eau:88.4, suc:10.6, autres:1}),
+  D({id:'mure',      nom:'Mûre',                 cat:'FRUIT', fruit:'std',   eau:84, suc:8.1,   autres:7.9}),
+  D({id:'myrtille',  nom:'Myrtille',             cat:'FRUIT', fruit:'std',   eau:85, suc:10,    autres:5}),
+  D({id:'coco',      nom:'Noix de coco (chair)', cat:'FRUIT', fruit:'coque', eau:43.8, mg:35.55, suc:6.2, autres:14.45}),
+  D({id:'orange',    nom:'Orange',               cat:'FRUIT', fruit:'acide', eau:90, suc:8,     autres:2}),
+  D({id:'pamplemousse',nom:'Pamplemousse',       cat:'FRUIT', fruit:'acide', eau:90, suc:6.2,   autres:3.8}),
+  D({id:'papaye',    nom:'Papaye',               cat:'FRUIT', fruit:'acide', eau:85, suc:8.1,   autres:6.9}),
+  D({id:'pasteque',  nom:'Pastèque',             cat:'FRUIT', fruit:'std',   eau:91.6, suc:7.9, autres:0.5}),
   D({id:'peche',     nom:'Pêche',                cat:'FRUIT', fruit:'std',   eau:86, suc:8.9,   autres:5.1}),
   D({id:'poire',     nom:'Poire',                cat:'FRUIT', fruit:'std',   eau:83, suc:9.10,  autres:7.9}),
   D({id:'pomme',     nom:'Pomme',                cat:'FRUIT', fruit:'std',   eau:86, suc:10.12, autres:3.88}),
   D({id:'prune',     nom:'Prune',                cat:'FRUIT', fruit:'std',   eau:81, suc:12.14, autres:6.86}),
-  D({id:'raisin',    nom:'Raisin',               cat:'FRUIT', fruit:'std',   eau:79, suc:17.85, autres:3.15, approx:true}),
+  D({id:'raisin',    nom:'Raisin',               cat:'FRUIT', fruit:'std',   eau:79, suc:16,    autres:5}),
   // ---- Fruits secs (pâtes pures 100 %) & pralinés ----
   D({id:'p_amande',   nom:'Pâte d’amande pure *',  cat:'OLEA', fruit:'coque', mg:54,   autres:46, approx:true}),
   D({id:'p_noisette', nom:'Pâte de noisette pure *',    cat:'OLEA', fruit:'coque', mg:60,   autres:40, approx:true}),
@@ -333,7 +336,7 @@ const INGREDIENTS = [
   D({id:'praline',    nom:'Praliné 50/50 *',            cat:'OLEA', mg:30, suc:50, psr:100, autres:20, approx:true}),
   // ---- Chocolat & cacao ----
   D({id:'couv70',   nom:'Couverture noire 70 % (fiche : MG 42,7 %)', cat:'CHOC', eau:0.5, mg:42.7, suc:29, psr:100, autres:27.8}),
-  D({id:'cacao',    nom:'Cacao en poudre *',            cat:'CHOC', eau:5, mg:11,  autres:84, approx:true}),
+  D({id:'cacao',    nom:'Cacao en poudre non sucré',    cat:'CHOC', eau:3, mg:21, suc:0.9, psr:100, autres:75.1}),
   D({id:'bcacao',   nom:'Beurre de cacao',              cat:'CHOC', mg:100}),
   // ---- Stabilisateurs / émulsifiants ----
   D({id:'stab',   nom:'Stabilisateur (mix pour glace/sorbet)', cat:'STAB', autres:100, stab:true}),
@@ -341,7 +344,7 @@ const INGREDIENTS = [
   D({id:'gelatine',nom:'Gélatine',                             cat:'STAB', eau:13, autres:87, stab:true}),
   // ---- Autres ----
   D({id:'eau',        nom:'Eau',                   cat:'AUTRE', eau:100}),
-  D({id:'jus_citron', nom:'Jus de citron *',       cat:'AUTRE', eau:91, suc:2.5, autres:6.5, approx:true}),
+  D({id:'jus_citron', nom:'Jus de citron',         cat:'AUTRE', eau:92, suc:1.6, autres:6.4}),
 ];
 const ING_BY_ID = Object.fromEntries(INGREDIENTS.map(i=>[i.id,i]));
 
@@ -471,8 +474,8 @@ const PRODUITS = {
 let state = {
   type:'sorbet',
   nom:'',
-  rows:[ {id:'fraise', g:550}, {id:'saccharose', g:200}, {id:'glucose_atom', g:40},
-         {id:'stab', g:5}, {id:'eau', g:205} ],
+  rows:[ {id:'fraise', g:550}, {id:'saccharose', g:230}, {id:'glucose_atom', g:30},
+         {id:'stab', g:5}, {id:'eau', g:185} ],
 };
 
 function contribution(ing, g){
@@ -857,7 +860,8 @@ function buildPrint(){
   MG = matière grasse (« ° » = MG non laitière, comptée à part de la MG butyrique) · ESDL = extrait sec dégraissé du lait ·
   PS = pouvoir sucrant en équivalent saccharose (PSR : saccharose 100, dextrose 74, glucose atomisé 47, sucre inverti 127, miel 130, fructose 173 ; sucres des fruits comptés à PSR 100) ·
   EST = extrait sec total. Maturation du mix : 4 à 12 h entre +4 et +10 °C ; congélation à cœur −18 °C en moins de 2 h.<br>
-  Sources : fiches BTM Pâtissier-Confiseur option Glacier — « Formulaire ingrédients de glacerie », « La glace et les desserts glacés », « Calculer une table analytique ». Les compositions marquées * sont des estimations.</p>`;
+  Sources : fiches BTM Pâtissier-Confiseur option Glacier — « Formulaire ingrédients de glacerie », « La glace et les desserts glacés », « Calculer une table analytique ».
+  Teneurs en sucres des fruits complétées d'après la table Ciqual 2020 (ANSES) / fiches Aprifel (USDA pour airelle, raisin et noix de coco). Les compositions marquées * sont des estimations.</p>`;
   el('printArea').innerHTML = h;
 }
 

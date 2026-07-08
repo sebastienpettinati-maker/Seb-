@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calculateur de glacerie — équilibre &amp; table analytique</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍨</text></svg>">
+<link rel="manifest" href="glacerie.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#e8467c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   :root{
     --page:#faf4ec;
@@ -250,8 +256,28 @@
           <option value="sorbet_citron">Sorbet citron</option>
         </select>
       </div>
+      <button id="btnSauverRecette">💾 Enregistrer dans mes recettes</button>
       <button class="primary" id="btnPDF">⬇ Exporter en PDF</button>
     </div>
+  </section>
+
+  <section class="card" id="bibliCard">
+    <h2>📁 Mes recettes</h2>
+    <div class="scroll">
+      <table id="bibliTable">
+        <thead>
+          <tr><th>Recette</th><th class="num">Mix (g)</th><th>Statut</th><th style="width:1%"></th></tr>
+        </thead>
+        <tbody id="bibliBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote" id="bibliVide">Aucune recette enregistrée pour l'instant : calculez une recette puis cliquez sur « 💾 Enregistrer dans mes recettes ». Elles restent disponibles sur cet appareil, même hors connexion.</p>
+    <div class="recipe-actions">
+      <button id="btnExportBibli">⬇ Sauvegarder le dossier (fichier)</button>
+      <button id="btnImportBibli">⬆ Restaurer un dossier</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+    <p class="footnote">Le fichier de sauvegarde (.json) contient toutes vos recettes : gardez-en une copie, ou utilisez-le pour transférer votre dossier sur un autre appareil.</p>
   </section>
 
   <div class="cols">
@@ -1459,6 +1485,111 @@ function buildLabels(){
 }
 
 /* =====================================================================
+   MES RECETTES — dossier de recettes enregistrées sur l'appareil
+===================================================================== */
+let recettes = [];
+try{ recettes = JSON.parse(localStorage.getItem('glacerie_recettes')) || []; }catch(e){}
+function persistRecettes(){
+  try{ localStorage.setItem('glacerie_recettes', JSON.stringify(recettes)); }catch(e){}
+}
+function sauverRecette(){
+  const t = computeTotals();
+  if(t.g<=0){ alert('La recette est vide : rien à enregistrer.'); return; }
+  const nom = (state.nom || PRODUITS[state.type].label).trim();
+  const rec = {
+    id: Date.now(), nom, type: state.type,
+    rows: state.rows.map(r=>({id:r.id, g:r.g})),
+    cibles: state.cibles || null,
+    customIngs: (state.customIngs||[]).slice(),
+    date: new Date().toISOString(), total: Math.round(t.g), valide: false,
+  };
+  const idx = recettes.findIndex(r=>r.nom===nom);
+  if(idx>=0){
+    if(!confirm(`Une recette « ${nom} » existe déjà : la remplacer par la version actuelle ?\n(Elle repassera en statut « essai » et devra être revalidée.)`)) return;
+    rec.id = recettes[idx].id;
+    recettes[idx] = rec;
+  } else recettes.push(rec);
+  persistRecettes(); renderBibli();
+}
+function chargerRecette(id){
+  const rec = recettes.find(r=>r.id===id); if(!rec) return;
+  if(!confirm(`Charger « ${rec.nom} » ? La recette en cours sera remplacée.`)) return;
+  for(const c of (rec.customIngs||[])) if(ING_BY_ID[c.fruitId]) registerPuree(c.fruitId, c.pct);
+  state.rows = rec.rows.map(r=>({id:r.id, g:r.g}));
+  state.type = PRODUITS[rec.type] ? rec.type : 'sorbet';
+  state.nom = rec.nom;
+  state.cibles = rec.cibles || null;
+  state.customIngs = (state.customIngs||[]).concat(rec.customIngs||[]);
+  el('produitType').value = state.type;
+  el('produitNom').value = state.nom;
+  el('rebalInfo').textContent='';
+  update();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function renderBibli(){
+  const body = el('bibliBody'); body.innerHTML='';
+  const tri = recettes.slice().sort((a,b)=> (b.valide?1:0)-(a.valide?1:0) || b.id-a.id);
+  el('bibliVide').style.display = tri.length ? 'none' : '';
+  el('bibliTable').style.display = tri.length ? '' : 'none';
+  for(const rec of tri){
+    const tr = document.createElement('tr');
+    const d = new Date(rec.date).toLocaleDateString('fr-FR');
+    const tdN = document.createElement('td');
+    tdN.innerHTML = `<strong>${rec.nom}</strong><div class="rowhint">${PRODUITS[rec.type]?PRODUITS[rec.type].label:rec.type} · enregistrée le ${d}</div>`;
+    const tdG = document.createElement('td'); tdG.className='num'; tdG.textContent = fmt0(rec.total);
+    const tdS = document.createElement('td');
+    tdS.innerHTML = rec.valide ? '<span class="chip ok">✓ validée</span>' : '<span class="chip warn">essai</span>';
+    const tdA = document.createElement('td'); tdA.style.whiteSpace='nowrap';
+    const mk = (txt,title,fn,primary)=>{
+      const b=document.createElement('button'); b.textContent=txt; b.title=title;
+      b.style.cssText='padding:6px 12px;font-size:.82rem;margin-left:6px'+(primary?'':'');
+      if(primary) b.className='primary';
+      b.addEventListener('click',fn); return b;
+    };
+    tdA.append(
+      mk('Charger','Recharger cette recette dans le calculateur',()=>chargerRecette(rec.id),true),
+      mk(rec.valide?'↩ Essai':'✓ Valider', rec.valide?'Repasser la recette en essai':'Marquer la recette comme validée (testée et approuvée)',
+        ()=>{ rec.valide=!rec.valide; persistRecettes(); renderBibli(); }),
+      mk('✕','Supprimer cette recette',()=>{
+        if(confirm(`Supprimer définitivement « ${rec.nom} » ?`)){
+          recettes = recettes.filter(r=>r.id!==rec.id); persistRecettes(); renderBibli();
+        }
+      })
+    );
+    tr.append(tdN,tdG,tdS,tdA);
+    body.appendChild(tr);
+  }
+}
+function exporterBibli(){
+  if(!recettes.length){ alert('Aucune recette à sauvegarder.'); return; }
+  const blob = new Blob([JSON.stringify({app:'glacerie', version:1, recettes}, null, 1)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mes-recettes-glacerie.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+function importerBibli(file){
+  const lecteur = new FileReader();
+  lecteur.onload = ()=>{
+    try{
+      const data = JSON.parse(lecteur.result);
+      const liste = Array.isArray(data) ? data : data.recettes;
+      if(!Array.isArray(liste)) throw new Error('format');
+      let ajoutees=0, majs=0;
+      for(const rec of liste){
+        if(!rec || !Array.isArray(rec.rows) || !rec.nom) continue;
+        const idx = recettes.findIndex(r=>r.nom===rec.nom);
+        if(idx>=0){ recettes[idx]=rec; majs++; } else { recettes.push(rec); ajoutees++; }
+      }
+      persistRecettes(); renderBibli();
+      alert(`Dossier restauré : ${ajoutees} recette(s) ajoutée(s), ${majs} mise(s) à jour.`);
+    }catch(e){ alert('Fichier illisible : choisissez une sauvegarde « mes-recettes-glacerie.json ».'); }
+  };
+  lecteur.readAsText(file);
+}
+
+/* =====================================================================
    PERSISTANCE + INITIALISATION
 ===================================================================== */
 function save(){
@@ -1555,6 +1686,21 @@ function init(){
   el('btnPDF2').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); });
   window.addEventListener('beforeprint', ()=>{ if(printMode==='etiquettes') buildLabels(); else buildPrint(); });
   window.addEventListener('afterprint', ()=>{ printMode='recette'; });
+
+  // --- mes recettes ---
+  el('btnSauverRecette').addEventListener('click', sauverRecette);
+  el('btnExportBibli').addEventListener('click', exporterBibli);
+  el('btnImportBibli').addEventListener('click', ()=>el('importFile').click());
+  el('importFile').addEventListener('change', ()=>{
+    if(el('importFile').files[0]) importerBibli(el('importFile').files[0]);
+    el('importFile').value='';
+  });
+  renderBibli();
+
+  // --- PWA : installation + hors-ligne (nécessite un hébergement web) ---
+  if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){
+    navigator.serviceWorker.register('glacerie-sw.js').catch(()=>{});
+  }
   update();
 }
 init();

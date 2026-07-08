@@ -175,6 +175,15 @@
         <label for="autoPoids" id="autoPoidsLabel">Poids de lait entier (g)</label>
         <input type="number" id="autoPoids" value="1000" min="50" step="50">
       </div>
+      <div class="field">
+        <label for="autoTech">Sucre technique (texture)</label>
+        <select id="autoTech">
+          <option value="reco">Glucose atomisé + dextrose + inverti (recommandé)</option>
+          <option value="gluc">Glucose atomisé seul</option>
+          <option value="dext">Dextrose seul</option>
+          <option value="sacch">Saccharose seul (basique)</option>
+        </select>
+      </div>
       <button class="primary" id="btnAuto">Calculer la recette complète</button>
     </div>
     <p class="footnote" id="autoNote" style="margin-bottom:0"></p>
@@ -231,6 +240,10 @@
       ESDL = extrait sec dégraissé du lait. PS = pouvoir sucrant exprimé en équivalent saccharose (poids de sucre × PSR ÷ 100 ;
       le sucre des fruits est compté à PSR 100). EST = extrait sec total = MG + ESDL + sucres + autres extraits secs.
     </p>
+    <div class="recipe-actions" style="margin-top:14px;align-items:center">
+      <button class="primary" id="btnPDF2">📄 Exporter la recette et la table analytique en PDF</button>
+      <span class="footnote" style="margin:0">Dans la fenêtre qui s'ouvre, choisissez « Enregistrer au format PDF » comme destination.</span>
+    </div>
   </section>
 </div>
 
@@ -787,43 +800,66 @@ const SUG = {
   dext: {ps:0.6808, es:0.92},    // suc 92 %  × PSR 74
   inv:  {ps:0.9906, es:0.78},    // suc 78 %  × PSR 127
 };
-function calculSorbetMix(T, cF, psP, estP, stabP, acide){
+function calculSorbetMix(T, cF, psP, estP, stabP, acide, tech='reco'){
   const stabV = T*stabP/100;
   const psNeed = T*psP/100 - cF.ps;
   const estNeed = T*estP/100 - cF.est - stabV;
   if(psNeed<0) return {err:'Les fruits apportent déjà plus de pouvoir sucrant que l’objectif : réduisez la proportion de fruit ou montez le PS visé.'};
+  // sucre « pilote » de l'extrait sec, au choix de l'utilisateur :
+  // glucose atomisé (≤ 5 % du mix, repère fiche), dextrose (≤ 6 % du mix,
+  // gêne le foisonnement à forte dose) ou aucun (saccharose seul)
+  const bulkKey = tech==='dext' ? 'dext' : (tech==='sacch' ? null : 'gluc');
+  const capBulk = bulkKey==='dext' ? T*0.06 : T*0.05;
   function solve(fI, fD){
-    // estimation de la masse de sucres avec saccharose + glucose seuls
-    let G0 = (estNeed - psNeed)/(SUG.gluc.es - SUG.gluc.ps);
-    G0 = Math.max(0, Math.min(G0, T*0.05));
-    const S0 = Math.max(0, (psNeed - SUG.gluc.ps*G0)/SUG.sacch.ps);
-    const Q = S0 + G0;
+    let B0 = 0;
+    if(bulkKey){
+      B0 = (estNeed - psNeed)/(SUG[bulkKey].es - SUG[bulkKey].ps);
+      B0 = Math.max(0, Math.min(B0, capBulk));
+    }
+    const S0 = Math.max(0, (psNeed - (bulkKey ? SUG[bulkKey].ps*B0 : 0))/SUG.sacch.ps);
+    const Q = S0 + B0;
     const I = Math.min(fI*Q, T*0.04);   // inverti ≤ 4 % du mix (dose pro 2–5 %)
     const D = fD*Q;
     const ps2 = psNeed - SUG.inv.ps*I - SUG.dext.ps*D;
     const est2 = estNeed - SUG.inv.es*I - SUG.dext.es*D;
-    let note = '';
-    let G = (est2 - ps2)/(SUG.gluc.es - SUG.gluc.ps);
-    if(G < 0){ G = 0; note = 'EST visé atteint sans glucose : l’EST final sera un peu supérieur à l’objectif.'; }
-    if(G > T*0.05){ G = T*0.05; note = 'Glucose atomisé plafonné à 5 % du mix (repère fiche) : l’EST final pourra s’écarter légèrement de l’objectif.'; }
-    const S = (ps2 - SUG.gluc.ps*G)/SUG.sacch.ps;
-    return {S, G, D, I, note};
+    let note = '', B = 0;
+    if(bulkKey){
+      B = (est2 - ps2)/(SUG[bulkKey].es - SUG[bulkKey].ps);
+      if(B < 0){ B = 0; note = 'EST visé atteint sans sucre technique : l’EST final sera un peu supérieur à l’objectif.'; }
+      if(B > capBulk){ B = capBulk; note = (bulkKey==='dext' ? 'Dextrose plafonné à 6 %' : 'Glucose atomisé plafonné à 5 %')+' du mix : l’EST final pourra s’écarter légèrement de l’objectif.'; }
+    } else {
+      note = 'Saccharose seul : le pouvoir sucrant est respecté mais l’EST n’est pas piloté — contrôlez les jauges.';
+    }
+    const S = (ps2 - (bulkKey ? SUG[bulkKey].ps*B : 0))/SUG.sacch.ps;
+    return {S, B, D, I, note};
   }
-  // fruits acides : plus d'inverti (souplesse, foisonnement — fiche BTM)
-  let r = solve(acide ? 0.10 : 0.07, acide ? 0.07 : 0.10);
-  if(r.S < 0) r = solve(0.04, 0.05);
-  if(r.S < 0) r = solve(0, 0);
+  let r;
+  if(tech==='reco'){
+    // fruits acides : plus d'inverti (souplesse, foisonnement — fiche BTM)
+    r = solve(acide ? 0.10 : 0.07, acide ? 0.07 : 0.10);
+    if(r.S < 0) r = solve(0.04, 0.05);
+    if(r.S < 0) r = solve(0, 0);
+  } else r = solve(0, 0);
   if(r.S < 0) return {err:'Trop d’extrait sec demandé pour ce pouvoir sucrant : baissez l’EST visé ou montez le PS.'};
-  const eau = T - cF.g - stabV - r.S - r.G - r.D - r.I;
+  const G = bulkKey==='gluc' ? r.B : 0;
+  const D = (bulkKey==='dext' ? r.B : 0) + r.D;
+  const eau = T - cF.g - stabV - r.S - G - D - r.I;
   if(eau < 0) return {err:'Le total dépasse 100 % : réduisez la proportion de fruit ou les objectifs.'};
-  const estPct = (cF.est + r.S*SUG.sacch.es + r.G*SUG.gluc.es + r.D*SUG.dext.es + r.I*SUG.inv.es + stabV)/T*100;
-  return {F:cF.g, S:r.S, G:r.G, D:r.D, I:r.I, stabV, eau, note:r.note, estPct};
+  const estPct = (cF.est + r.S*SUG.sacch.es + G*SUG.gluc.es + D*SUG.dext.es + r.I*SUG.inv.es + stabV)/T*100;
+  return {F:cF.g, S:r.S, G, D, I:r.I, stabV, eau, note:r.note, estPct};
 }
 function calculSorbet(T, fruitId, fruitPct, psP, estP, stabP){
   const ing = ING_BY_ID[fruitId];
   const cF = contribution(ing, T*fruitPct/100);
   return calculSorbetMix(T, cF, psP, estP, stabP, ing.fruit==='acide');
 }
+/* répartition des sucres d'une glace selon le sucre technique choisi */
+const SPLITS_GLACE = {
+  reco:  [['saccharose',0.80],['glucose_atom',0.10],['dextrose',0.10]],
+  gluc:  [['saccharose',0.85],['glucose_atom',0.15]],
+  dext:  [['saccharose',0.85],['dextrose',0.15]],
+  sacch: [['saccharose',1]],
+};
 
 function openSorbet(){
   const sel = el('sbFruit');
@@ -1059,7 +1095,8 @@ function majAutoUI(){
       + 'Sucres répartis pour une texture optimale : saccharose + glucose atomisé (extrait sec anti-cristallisant) + dextrose et sucre inverti (souplesse à la sortie du congélateur, inverti renforcé pour les fruits acides).';
   } else {
     const c = AUTO_CIBLES[mode];
-    el('autoNote').textContent = `Objectifs appliqués : MG butyrique ${fmt(c.mg)} %, sucres ${fmt(c.suc)} % (80 % saccharose, 10 % glucose atomisé, 10 % dextrose pour la texture), ESDL ${fmt(c.esdl)} %, jaunes ${fmt(c.jaune)} %, stabilisateur ${fmt(c.stab)} %.`;
+    const split = SPLITS_GLACE[el('autoTech').value].map(([id,part])=>`${Math.round(part*100)} % ${ING_BY_ID[id].nom.toLowerCase()}`).join(', ');
+    el('autoNote').textContent = `Objectifs appliqués : MG butyrique ${fmt(c.mg)} %, sucres ${fmt(c.suc)} % (${split}), ESDL ${fmt(c.esdl)} %, jaunes ${fmt(c.jaune)} %, stabilisateur ${fmt(c.stab)} %.`;
   }
 }
 function recetteAuto(){
@@ -1090,7 +1127,7 @@ function recetteAuto(){
     for(let pTry = pConseil; pTry >= pMin - 0.01 && !ok; pTry -= 2.5){
       const Tt = W/(pTry/100);
       for(const psTry of [29, 28, 27, 26, 25.5]){
-        const rt = calculSorbetMix(Tt, cF, psTry, 32, 0.5, acide);
+        const rt = calculSorbetMix(Tt, cF, psTry, 32, 0.5, acide, el('autoTech').value);
         if(rt.err) continue;
         r = rt; psUse = psTry; p = pTry; T = Tt;
         if(rt.estPct <= 34.9){ ok = true; break; }
@@ -1133,12 +1170,10 @@ function recetteAuto(){
       {id:'lait_entier', g:Math.round(W)},
       {id:'creme35', g:Math.ceil(r.creme)},
       {id:'pdl0', g:Math.round(r.poudre)},
-      {id:'saccharose', g:Math.round(r.sucres*0.80)},
-      {id:'glucose_atom', g:Math.round(r.sucres*0.10)},
-      {id:'dextrose', g:Math.round(r.sucres*0.10)},
-      {id:'jaune', g:Math.ceil(r.jaunes)},
-      {id:'stab', g:Math.round(r.stab)},
     ];
+    for(const [id, part] of SPLITS_GLACE[el('autoTech').value]) rows.push({id, g:Math.round(r.sucres*part)});
+    rows.push({id:'jaune', g:Math.ceil(r.jaunes)});
+    rows.push({id:'stab', g:Math.round(r.stab)});
     state.rows = rows;
     state.type = mode;
     state.cibles = {mode:'glace', mg:c.mg, suc:c.suc, esdl:c.esdl, jaune:c.jaune, stab:c.stab};
@@ -1271,6 +1306,7 @@ function init(){
     renderAutoFruits();
   });
   el('autoType').addEventListener('change', majAutoUI);
+  el('autoTech').addEventListener('change', majAutoUI);
   el('btnAuto').addEventListener('click', recetteAuto);
   majAutoUI();
 
@@ -1281,6 +1317,7 @@ function init(){
   el('sbAnnuler').addEventListener('click',()=>el('dlgSorbet').close());
   el('sbValider').addEventListener('click', validerSorbet);
   el('btnPDF').addEventListener('click',()=>{ buildPrint(); window.print(); });
+  el('btnPDF2').addEventListener('click',()=>{ buildPrint(); window.print(); });
   window.addEventListener('beforeprint', buildPrint);
   update();
 }

@@ -95,11 +95,36 @@
   .dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
   .dlg-note{font-size:.8rem;color:var(--ink-2);margin-top:10px}
   .err{color:var(--bad);font-size:.85rem;font-weight:600;margin-top:8px}
+  /* --- aperçu avant impression --- */
+  #apercu{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);overflow:auto;padding:14px}
+  .apercu-bar{max-width:860px;margin:0 auto 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:10px 14px;
+    position:sticky;top:0;z-index:101}
+  .apercu-hint{font-size:.78rem;color:var(--ink-2)}
+  .docview{max-width:860px;margin:0 auto;background:#fff;color:#000;border-radius:8px;padding:26px;
+    font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+  .docview h1{font-size:20px;margin:0 0 2px}
+  .docview .sub{color:#444;margin:0 0 14px;font-size:12px}
+  .docview h2{font-size:14px;margin:16px 0 6px;border-bottom:1.5px solid #000;padding-bottom:3px;color:#000}
+  .docview table{width:100%;border-collapse:collapse}
+  .docview th,.docview td{border:1px solid #999;padding:4px 6px;font-size:12px;color:#000}
+  .docview th{background:#eee;color:#000;text-transform:none;letter-spacing:0}
+  .docview td.num,.docview th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .docview tr.total td{font-weight:700;background:#f3f3f3;border-top:1px solid #999}
+  .docview .st-ok::before{content:"✓ "}
+  .docview .st-warn::before{content:"! "}
+  .docview .st-bad::before{content:"✗ "}
+  .docview .foot{font-size:10.5px;color:#555;margin-top:14px}
+  .docview .labelgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:12px}
+  .docview .label{border:1.5px dashed #777;border-radius:8px;padding:10px;font-size:10.5px;line-height:1.35;color:#000}
+  .docview .label h3{font-size:12px;margin:0 0 4px;border:none;padding:0}
+  .docview .label .lot{font-weight:700;margin-top:4px}
+  .docview .signature{margin-top:26px;font-size:12px}
   /* --- impression / PDF --- */
   #printArea{display:none}
   @media print{
     body{background:#fff;color:#000;font-size:12px}
-    .app,.wrap{display:none !important}
+    .app,.wrap,#apercu{display:none !important}
     #printArea{display:block;padding:0 4mm}
     #printArea h1{font-size:18px;margin:0 0 2px}
     #printArea .sub{color:#444;margin:0 0 14px;font-size:11px}
@@ -332,6 +357,16 @@
     <button class="primary" id="sbValider">Générer la recette</button>
   </div>
 </dialog>
+
+<!-- ===================== Aperçu avant impression ===================== -->
+<div id="apercu" hidden>
+  <div class="apercu-bar">
+    <button class="primary" id="apercuPrint">🖨 Imprimer / Enregistrer en PDF</button>
+    <button id="apercuClose">✕ Fermer l'aperçu</button>
+    <span class="apercu-hint">Dans la fenêtre d'impression, choisissez « Enregistrer au format PDF » comme destination.</span>
+  </div>
+  <div id="apercuContent" class="docview"></div>
+</div>
 
 <!-- ===================== Vue impression / PDF ===================== -->
 <div id="printArea"></div>
@@ -1590,10 +1625,23 @@ function init(){
     saveTrac();
   });
   for(const id of ['tracDuree','tracLot','tracNb']) el(id).addEventListener('input', saveTrac);
-  el('btnEtiquettes').addEventListener('click',()=>{ printMode='etiquettes'; buildLabels(); window.print(); });
+  // aperçu à l'écran (le document est visible même si l'impression est
+  // indisponible dans le navigateur), puis impression / enregistrement PDF
+  const ouvrirApercu = ()=>{
+    el('apercuContent').innerHTML = el('printArea').innerHTML;
+    el('apercu').hidden = false;
+    el('apercu').scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+  };
+  const fermerApercu = ()=>{ el('apercu').hidden = true; document.body.style.overflow = ''; };
+  el('apercuClose').addEventListener('click', fermerApercu);
+  el('apercu').addEventListener('click', e=>{ if(e.target===el('apercu')) fermerApercu(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !el('apercu').hidden) fermerApercu(); });
+  el('apercuPrint').addEventListener('click', ()=>{ try{ window.print(); }catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez le fichier dans Safari ou Chrome pour imprimer.'); } });
 
-  el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); window.print(); });
-  el('btnPDF2').addEventListener('click',()=>{ printMode='recette'; buildPrint(); window.print(); });
+  el('btnEtiquettes').addEventListener('click',()=>{ printMode='etiquettes'; buildLabels(); ouvrirApercu(); });
+  el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); });
+  el('btnPDF2').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); });
   window.addEventListener('beforeprint', ()=>{ if(printMode==='etiquettes') buildLabels(); else buildPrint(); });
   window.addEventListener('afterprint', ()=>{ printMode='recette'; });
   update();

@@ -135,6 +135,9 @@
   .dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
   .dlg-note{font-size:.8rem;color:var(--ink-2);margin-top:10px}
   .err{color:var(--bad);font-size:.85rem;font-weight:700;margin-top:8px}
+  .card pre{background:var(--zebra);border:1px solid var(--grid);border-radius:12px;
+    padding:12px 14px;overflow-x:auto;font-size:.78rem;line-height:1.5}
+  .card details{margin-top:6px}
   /* --- aperçu avant impression --- */
   #apercu{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);overflow:auto;padding:14px}
   .apercu-bar{max-width:860px;margin:0 auto 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
@@ -370,8 +373,50 @@
       <div class="field"><label for="tracLot">N° de lot</label><input type="text" id="tracLot" style="width:150px"></div>
       <div class="field"><label for="tracNb">Pots produits</label><input type="number" id="tracNb" min="1" step="1" style="width:90px"></div>
       <button class="primary" id="btnEtiquettes">🖨 Imprimer fiche + étiquettes</button>
+      <button id="btnDlEtiquettes">⬇ Fichier étiquettes seules</button>
     </div>
     <p class="footnote" id="tracInfo" style="margin-bottom:0"></p>
+  </section>
+
+  <section class="card">
+    <h2>☁️ Sauvegarde Google Drive</h2>
+    <p class="footnote" style="margin:0 0 12px">Collez une seule fois l'adresse de votre script Google (voir « Première installation » ci-dessous) :
+       les fichiers <strong>recette</strong>, <strong>fiche de traçabilité</strong> et <strong>étiquettes</strong> seront envoyés automatiquement
+       dans un dossier « Glacerie » de votre Drive à chaque export ou impression.</p>
+    <div class="toolbar">
+      <div class="field" style="flex:1;min-width:260px">
+        <label for="driveUrl">Adresse du script Google (se termine par /exec)</label>
+        <input type="text" id="driveUrl" placeholder="https://script.google.com/macros/s/…/exec">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;padding-bottom:9px">
+        <input type="checkbox" id="driveAuto" checked> Sauvegarde automatique
+      </label>
+      <button id="btnDriveTest">Tester</button>
+      <button class="primary" id="btnDriveNow">☁️ Envoyer maintenant</button>
+    </div>
+    <p class="footnote" id="driveStatus"></p>
+    <details>
+      <summary style="cursor:pointer;font-weight:700">Première installation : créer le script Google (une seule fois, ~2 minutes)</summary>
+      <ol style="font-size:.88rem;color:var(--ink-2);line-height:1.6">
+        <li>Ouvrez <strong>script.google.com</strong> (connecté à votre compte Google) et cliquez sur <strong>Nouveau projet</strong>.</li>
+        <li>Effacez le contenu et collez le code ci-dessous, puis enregistrez (💾).</li>
+        <li>Cliquez sur <strong>Déployer → Nouveau déploiement → ⚙ Application Web</strong> ;
+            « Exécuter en tant que » : <strong>Moi</strong> ; « Qui a accès » : <strong>Tout le monde</strong> ; puis <strong>Déployer</strong> et autorisez l'accès.</li>
+        <li>Copiez l'<strong>URL de l'application Web</strong> (elle se termine par <code>/exec</code>) et collez-la dans le champ ci-dessus, puis cliquez sur « Tester ».</li>
+      </ol>
+<pre>function doPost(e) {
+  var d = JSON.parse(e.postData.contents);
+  var it = DriveApp.getFoldersByName('Glacerie');
+  var dossier = it.hasNext() ? it.next() : DriveApp.createFolder('Glacerie');
+  var anciens = dossier.getFilesByName(d.nom);
+  while (anciens.hasNext()) anciens.next().setTrashed(true);
+  dossier.createFile(d.nom, d.contenu, 'text/html');
+  return ContentService.createTextOutput('{"ok":true}')
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+      <p class="footnote">Le script tourne sur votre compte Google et écrit uniquement dans votre Drive : personne d'autre n'y a accès.
+         Si un fichier du même nom existe déjà (même jour, même recette), il est remplacé par la dernière version.</p>
+    </details>
   </section>
 </div>
 
@@ -1437,31 +1482,36 @@ function listeIngredientsEtiquette(t){
       return allergene ? '<b>'+n+'</b>' : n;
     }).join(', ');
 }
-function buildLabels(){
+function donneesTrac(){
   const t = computeTotals();
   const potG = (state.pot && state.pot.g) || 120;
   const nb = Math.min(300, parseInt(el('tracNb').value) || Math.max(1, Math.floor(t.g/potG)));
   const duree = parseFloat(el('tracDuree').value)||12;
   const dateP = el('tracDate').value ? new Date(el('tracDate').value+'T00:00') : new Date();
   const ddm = new Date(dateP); ddm.setMonth(ddm.getMonth()+duree);
-  const lot = el('tracLot').value || lotAuto();
-  const nom = state.nom || PRODUITS[state.type].label;
-  const ingListe = listeIngredientsEtiquette(t);
-  const dP = dateP.toLocaleDateString('fr-FR'), dD = ddm.toLocaleDateString('fr-FR');
+  return {
+    t, potG, nb, duree,
+    lot: el('tracLot').value || lotAuto(),
+    nom: state.nom || PRODUITS[state.type].label,
+    ingListe: listeIngredientsEtiquette(t),
+    dP: dateP.toLocaleDateString('fr-FR'), dD: ddm.toLocaleDateString('fr-FR'),
+    dateISO: el('tracDate').value || new Date().toISOString().slice(0,10),
+  };
+}
+function htmlFicheTrac(d){
   const coutTotal = coutMix();
-  const cp = coutsPot(coutTotal, t.g);
-
-  let h = `<h1>Fiche de traçabilité — ${nom}</h1>
+  const cp = coutsPot(coutTotal, d.t.g);
+  let h = `<h1>Fiche de traçabilité — ${d.nom}</h1>
   <p class="sub">${PRODUITS[state.type].label} · éditée le ${new Date().toLocaleDateString('fr-FR')}</p>
   <h2>Production</h2>
   <table><tbody>
-    <tr><td>Produit</td><td><strong>${nom}</strong></td><td>N° de lot</td><td><strong>${lot}</strong></td></tr>
-    <tr><td>Date de production</td><td>${dP}</td><td>DDM (à conserver à −18 °C)</td><td><strong>${dD}</strong> (${fmt0(duree)} mois)</td></tr>
-    <tr><td>Poids de mix produit</td><td>${fmt0(t.g)} g</td><td>Pots produits</td><td><strong>${nb}</strong> × ${fmt0(potG)} g net</td></tr>
+    <tr><td>Produit</td><td><strong>${d.nom}</strong></td><td>N° de lot</td><td><strong>${d.lot}</strong></td></tr>
+    <tr><td>Date de production</td><td>${d.dP}</td><td>DDM (à conserver à −18 °C)</td><td><strong>${d.dD}</strong> (${fmt0(d.duree)} mois)</td></tr>
+    <tr><td>Poids de mix produit</td><td>${fmt0(d.t.g)} g</td><td>Pots produits</td><td><strong>${d.nb}</strong> × ${fmt0(d.potG)} g net</td></tr>
     <tr><td>Coût matières du lot</td><td>${coutTotal>0?fmtE(coutTotal)+' €':'—'}</td><td>Prix de vente conseillé / pot</td><td>${coutTotal>0?fmtE(cp.prixVente)+' € (coef. '+fmt(cp.coeff)+')':'—'}</td></tr>
   </tbody></table>
   <h2>Ingrédients mis en œuvre (ordre décroissant, allergènes en gras)</h2>
-  <p style="font-size:11px">${ingListe}.</p>
+  <p style="font-size:11px">${d.ingListe}.</p>
   <table><thead><tr><th>Ingrédient</th><th class="num">Poids (g)</th><th>Lot fournisseur (à compléter)</th></tr></thead><tbody>`;
   for(const r of state.rows){
     const ing = ING_BY_ID[r.id]; if(!ing || !(r.g>0)) continue;
@@ -1469,19 +1519,112 @@ function buildLabels(){
   }
   h += `</tbody></table>
   <p class="signature">Maturation : 4 à 12 h entre +4 et +10 °C · Congélation à cœur −18 °C en moins de 2 h · Ne jamais recongeler un produit décongelé.<br><br>
-  Réalisé par : ______________________&nbsp;&nbsp;&nbsp;&nbsp;Visa : ______________</p>
-  <div style="break-before:page"></div>
-  <h2>Étiquettes (${nb} pot${nb>1?'s':''} de ${fmt0(potG)} g)</h2>
-  <div class="labelgrid">`;
-  const label = `<div class="label"><h3>${nom}</h3>
-    <div>Ingrédients : ${ingListe}.</div>
-    <div class="lot">Lot ${lot} · Poids net : ${fmt0(potG)} g</div>
-    <div>Produit le ${dP} · À consommer de préférence avant le : <b>${dD}</b></div>
+  Réalisé par : ______________________&nbsp;&nbsp;&nbsp;&nbsp;Visa : ______________</p>`;
+  return h;
+}
+function htmlPlanche(d){
+  const label = `<div class="label"><h3>${d.nom}</h3>
+    <div>Ingrédients : ${d.ingListe}.</div>
+    <div class="lot">Lot ${d.lot} · Poids net : ${fmt0(d.potG)} g</div>
+    <div>Produit le ${d.dP} · À consommer de préférence avant le : <b>${d.dD}</b></div>
     <div>À conserver à −18 °C. Ne jamais recongeler un produit décongelé.</div>
   </div>`;
-  h += label.repeat(nb);
-  h += `</div>`;
-  el('printArea').innerHTML = h;
+  return `<h2>Étiquettes (${d.nb} pot${d.nb>1?'s':''} de ${fmt0(d.potG)} g) — lot ${d.lot}</h2>
+  <div class="labelgrid">`+label.repeat(d.nb)+`</div>`;
+}
+function buildLabels(){
+  const d = donneesTrac();
+  el('printArea').innerHTML = htmlFicheTrac(d) + '<div style="break-before:page"></div>' + htmlPlanche(d);
+}
+
+/* ---- fichiers autonomes (téléchargement & envoi Drive) ---- */
+const DOC_CSS = `
+  body{font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:#000;background:#fff;
+       max-width:860px;margin:0 auto;padding:20px}
+  h1{font-size:20px;margin:0 0 2px} .sub{color:#444;margin:0 0 14px;font-size:12px}
+  h2{font-size:14px;margin:16px 0 6px;border-bottom:1.5px solid #000;padding-bottom:3px}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid #999;padding:4px 6px;font-size:12px;text-align:left}
+  th{background:#eee} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.total td{font-weight:700;background:#f3f3f3}
+  .st-ok::before{content:"✓ "} .st-warn::before{content:"! "} .st-bad::before{content:"✗ "}
+  .foot{font-size:10.5px;color:#555;margin-top:14px}
+  .labelgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:5mm}
+  .label{border:1.2px dashed #777;border-radius:2mm;padding:2.5mm;font-size:8.5px;line-height:1.3;break-inside:avoid}
+  .label h3{font-size:10.5px;margin:0 0 1mm;border:none;padding:0}
+  .label .lot{font-weight:700;margin-top:1mm}
+  .signature{margin-top:10mm;font-size:11px}
+  .noprint{margin:0 0 14px}
+  .noprint button{font:inherit;font-weight:700;padding:9px 16px;border-radius:999px;border:none;
+    background:linear-gradient(135deg,#e8467c,#f2745f);color:#fff;cursor:pointer}
+  @media print{.noprint{display:none}body{padding:0}}`;
+function docAutonome(titre, corps){
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${titre}</title><style>${DOC_CSS}</style></head><body><div class="noprint"><button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button></div>${corps}</body></html>`;
+}
+function slugFichier(s){
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+function telechargerFichier(nomFichier, contenu){
+  const blob = new Blob([contenu], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nomFichier;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+function docEtiquettes(){
+  const d = donneesTrac();
+  return {nom:`${d.dateISO}_${slugFichier(d.nom)}_etiquettes.html`,
+          contenu: docAutonome(`Étiquettes — ${d.nom} — lot ${d.lot}`, htmlPlanche(d))};
+}
+function docTracabilite(){
+  const d = donneesTrac();
+  return {nom:`${d.dateISO}_${slugFichier(d.nom)}_tracabilite.html`,
+          contenu: docAutonome(`Traçabilité — ${d.nom} — lot ${d.lot}`, htmlFicheTrac(d))};
+}
+function docRecette(){
+  buildPrint();
+  const d = donneesTrac();
+  return {nom:`${d.dateISO}_${slugFichier(d.nom)}_recette.html`,
+          contenu: docAutonome(`Recette — ${d.nom}`, el('printArea').innerHTML)};
+}
+
+/* =====================================================================
+   SAUVEGARDE GOOGLE DRIVE (via un script Google Apps Script personnel,
+   même principe que la synchronisation Google Sheets de l'appli
+   d'évaluation : l'URL /exec est collée une seule fois)
+===================================================================== */
+let driveCfg = {url:'', auto:true};
+try{ driveCfg = Object.assign(driveCfg, JSON.parse(localStorage.getItem('glacerie_drive'))||{}); }catch(e){}
+function persistDrive(){ try{ localStorage.setItem('glacerie_drive', JSON.stringify(driveCfg)); }catch(e){} }
+function driveStatus(msg, erreur){
+  const s = el('driveStatus');
+  s.innerHTML = erreur ? `<strong style="color:var(--bad)">✗ ${msg}</strong>` : `✓ ${msg}`;
+}
+async function envoyerDrive(fichiers){
+  if(!driveCfg.url || !driveCfg.url.includes('script.google')){
+    driveStatus('Adresse du script Google non configurée (voir « Première installation » ci-dessous).', true);
+    return false;
+  }
+  driveStatus('Envoi en cours…');
+  try{
+    for(const f of fichiers){
+      const r = await fetch(driveCfg.url, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({app:'glacerie', nom:f.nom, contenu:f.contenu}),
+      });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+    }
+    driveStatus(`${fichiers.length} fichier${fichiers.length>1?'s':''} envoyé${fichiers.length>1?'s':''} sur votre Drive (dossier « Glacerie ») à ${new Date().toLocaleTimeString('fr-FR')}.`);
+    return true;
+  }catch(e){
+    driveStatus('Envoi impossible : vérifiez l’adresse du script et votre connexion internet.', true);
+    return false;
+  }
+}
+function driveAuto(fichiers){
+  if(driveCfg.auto && driveCfg.url) envoyerDrive(fichiers);
 }
 
 /* =====================================================================
@@ -1681,9 +1824,30 @@ function init(){
   document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !el('apercu').hidden) fermerApercu(); });
   el('apercuPrint').addEventListener('click', ()=>{ try{ window.print(); }catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez le fichier dans Safari ou Chrome pour imprimer.'); } });
 
-  el('btnEtiquettes').addEventListener('click',()=>{ printMode='etiquettes'; buildLabels(); ouvrirApercu(); });
-  el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); });
-  el('btnPDF2').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); });
+  el('btnEtiquettes').addEventListener('click',()=>{
+    printMode='etiquettes'; buildLabels(); ouvrirApercu();
+    driveAuto([docTracabilite(), docEtiquettes()]);
+  });
+  el('btnDlEtiquettes').addEventListener('click',()=>{
+    const f = docEtiquettes();
+    telechargerFichier(f.nom, f.contenu);
+    driveAuto([f]);
+  });
+  el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); driveAuto([docRecette()]); });
+  el('btnPDF2').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); driveAuto([docRecette()]); });
+
+  // --- Google Drive ---
+  el('driveUrl').value = driveCfg.url;
+  el('driveAuto').checked = driveCfg.auto !== false;
+  el('driveUrl').addEventListener('input',()=>{ driveCfg.url = el('driveUrl').value.trim(); persistDrive(); });
+  el('driveAuto').addEventListener('change',()=>{ driveCfg.auto = el('driveAuto').checked; persistDrive(); });
+  el('btnDriveTest').addEventListener('click',()=>{
+    envoyerDrive([{nom:'test-connexion-glacerie.html',
+      contenu:docAutonome('Test de connexion','<h1>Connexion réussie 🍨</h1><p>Votre calculateur de glacerie peut enregistrer ses documents dans ce Drive.</p>')}]);
+  });
+  el('btnDriveNow').addEventListener('click',()=>{
+    envoyerDrive([docRecette(), docTracabilite(), docEtiquettes()]);
+  });
   window.addEventListener('beforeprint', ()=>{ if(printMode==='etiquettes') buildLabels(); else buildPrint(); });
   window.addEventListener('afterprint', ()=>{ printMode='recette'; });
 

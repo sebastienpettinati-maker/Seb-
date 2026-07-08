@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculateur de glacerie — équilibre &amp; table analytique</title>
+<style>
+  :root{
+    --surface-1:#fcfcfb; --page:#f9f9f7;
+    --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+    --grid:#e1e0d9; --border:rgba(11,11,11,.10);
+    --accent:#2a78d6; --accent-soft:#e3eefc;
+    --good:#0ca30c; --good-text:#006300; --warn:#fab219; --bad:#d03b3b;
+    --good-bg:rgba(12,163,12,.10); --warn-bg:rgba(250,178,25,.14); --bad-bg:rgba(208,59,59,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --surface-1:#1a1a19; --page:#0d0d0d;
+      --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-3:#898781;
+      --grid:#2c2c2a; --border:rgba(255,255,255,.10);
+      --accent:#3987e5; --accent-soft:#16283e;
+      --good:#0ca30c; --good-text:#0ca30c; --warn:#fab219; --bad:#d03b3b;
+      --good-bg:rgba(12,163,12,.16); --warn-bg:rgba(250,178,25,.14); --bad-bg:rgba(208,59,59,.18);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink-1);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  header.app{padding:22px 24px 14px;max-width:1180px;margin:0 auto}
+  header.app h1{margin:0;font-size:1.45rem}
+  header.app p{margin:4px 0 0;color:var(--ink-2);font-size:.92rem}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px 60px}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:18px}
+  .card h2{margin:0 0 12px;font-size:1.05rem}
+  .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:.78rem;color:var(--ink-2);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  select,input[type=text],input[type=number]{
+    background:var(--surface-1);color:var(--ink-1);border:1px solid var(--grid);
+    border-radius:8px;padding:8px 10px;font:inherit}
+  input[type=number]{width:110px;font-variant-numeric:tabular-nums}
+  button{border:1px solid var(--grid);background:var(--surface-1);color:var(--ink-1);
+    border-radius:8px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{opacity:.9;color:#fff}
+  button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 8px;font-size:1.05rem}
+  button.ghost:hover{color:var(--bad)}
+  .cols{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:18px;align-items:start}
+  @media(max-width:920px){.cols{grid-template-columns:1fr}}
+  /* --- recette --- */
+  table{border-collapse:collapse;width:100%}
+  th{font-size:.75rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-3);
+     text-align:left;padding:6px 8px;border-bottom:1px solid var(--grid);font-weight:600}
+  td{padding:6px 8px;border-bottom:1px solid var(--grid);vertical-align:middle}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.total td{font-weight:700;border-top:2px solid var(--ink-3);border-bottom:none}
+  tr.pct td{color:var(--ink-2);font-size:.85rem;border-bottom:none}
+  .rowhint{font-size:.78rem;color:var(--ink-3)}
+  .recipe-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  /* --- jauges d'équilibre --- */
+  .meter{margin-bottom:14px}
+  .meter .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .meter .name{font-size:.88rem;font-weight:600}
+  .meter .val{font-variant-numeric:tabular-nums;font-weight:700}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:.75rem;font-weight:700;
+        border-radius:20px;padding:2px 9px}
+  .chip.ok{color:var(--good-text);background:var(--good-bg)}
+  .chip.warn{color:#8a5c00;background:var(--warn-bg)}
+  @media (prefers-color-scheme: dark){.chip.warn{color:var(--warn)}}
+  .chip.bad{color:var(--bad);background:var(--bad-bg)}
+  .track{position:relative;height:10px;border-radius:5px;background:var(--grid);margin:7px 0 3px;overflow:hidden}
+  .band{position:absolute;top:0;bottom:0;background:var(--good-bg);border-left:1px solid var(--good);border-right:1px solid var(--good)}
+  .band.openmax{border-right:none}
+  .band.openmin{border-left:none}
+  .marker{position:absolute;top:-1px;bottom:-1px;width:3px;border-radius:2px;background:var(--ink-1)}
+  .scale{display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .advice{font-size:.8rem;color:var(--ink-2);margin-top:3px}
+  .verdict{border-radius:10px;padding:10px 14px;font-weight:700;margin-bottom:14px;display:flex;gap:8px;align-items:center}
+  .verdict.ok{background:var(--good-bg);color:var(--good-text)}
+  .verdict.warn{background:var(--warn-bg);color:#8a5c00}
+  @media (prefers-color-scheme: dark){.verdict.warn{color:var(--warn)}}
+  .verdict.bad{background:var(--bad-bg);color:var(--bad)}
+  .footnote{font-size:.78rem;color:var(--ink-3);margin-top:10px}
+  .scroll{overflow-x:auto}
+  /* --- dialogues --- */
+  dialog{background:var(--surface-1);color:var(--ink-1);border:1px solid var(--border);
+    border-radius:14px;padding:22px;max-width:520px;width:92vw}
+  dialog::backdrop{background:rgba(0,0,0,.45)}
+  dialog h3{margin:0 0 6px}
+  dialog p.sub{margin:0 0 14px;color:var(--ink-2);font-size:.88rem}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+  .dlg-note{font-size:.8rem;color:var(--ink-2);margin-top:10px}
+  .err{color:var(--bad);font-size:.85rem;font-weight:600;margin-top:8px}
+  /* --- impression / PDF --- */
+  #printArea{display:none}
+  @media print{
+    body{background:#fff;color:#000;font-size:12px}
+    .app,.wrap{display:none !important}
+    #printArea{display:block;padding:0 4mm}
+    #printArea h1{font-size:18px;margin:0 0 2px}
+    #printArea .sub{color:#444;margin:0 0 14px;font-size:11px}
+    #printArea h2{font-size:13px;margin:16px 0 6px;border-bottom:1.5px solid #000;padding-bottom:3px}
+    #printArea table{width:100%;border-collapse:collapse}
+    #printArea th,#printArea td{border:1px solid #999;padding:4px 6px;font-size:11px}
+    #printArea th{background:#eee;color:#000;text-transform:none;letter-spacing:0}
+    #printArea td.num,#printArea th.num{text-align:right;font-variant-numeric:tabular-nums}
+    #printArea tr.total td{font-weight:700;background:#f3f3f3}
+    #printArea .st-ok::before{content:"✓ "}
+    #printArea .st-warn::before{content:"! "}
+    #printArea .st-bad::before{content:"✗ "}
+    #printArea .foot{font-size:9.5px;color:#555;margin-top:14px}
+  }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <h1>🍨 Calculateur de glacerie</h1>
+  <p>Équilibrez vos sorbets, glaces et crèmes glacées, vérifiez les repères professionnels et exportez la recette avec sa table analytique en PDF.
+     Données issues des fiches BTM Glacier (formulaire des ingrédients, repères d'équilibre, méthode de la table analytique).</p>
+</header>
+
+<div class="wrap">
+
+  <section class="card">
+    <div class="toolbar">
+      <div class="field">
+        <label for="produitType">Type de produit</label>
+        <select id="produitType"></select>
+      </div>
+      <div class="field" style="flex:1;min-width:200px">
+        <label for="produitNom">Nom de la recette</label>
+        <input type="text" id="produitNom" placeholder="Ex. : Sorbet fraise plein fruit">
+      </div>
+      <div class="field">
+        <label for="presets">Exemples</label>
+        <select id="presets">
+          <option value="">— Charger un exemple —</option>
+          <option value="cg_vanille">Crème glacée vanille (fiche, ex. n° 1)</option>
+          <option value="sorbet_fraise">Sorbet fraise</option>
+          <option value="sorbet_citron">Sorbet citron</option>
+        </select>
+      </div>
+      <button id="btnAssistantCG">Assistant crème glacée</button>
+      <button id="btnAssistantSorbet">Assistant sorbet</button>
+      <button class="primary" id="btnPDF">⬇ Exporter en PDF</button>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <h2>Recette (pesées)</h2>
+      <div class="scroll">
+        <table id="recetteTable">
+          <thead>
+            <tr><th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">% du mix</th><th></th></tr>
+          </thead>
+          <tbody id="recetteBody"></tbody>
+          <tfoot>
+            <tr class="total"><td>TOTAL</td><td class="num" id="totalG">0 g</td><td class="num">100 %</td><td></td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="recipe-actions">
+        <button id="btnAdd">＋ Ajouter un ingrédient</button>
+        <button id="btnClear">Vider la recette</button>
+      </div>
+      <p class="footnote">Les valeurs marquées d'un astérisque (*) dans la liste sont des estimations (composition non détaillée dans le formulaire).</p>
+    </section>
+
+    <aside class="card">
+      <h2>Équilibre du mix</h2>
+      <div id="verdict"></div>
+      <div id="meters"></div>
+      <p class="footnote" id="regleNote"></p>
+    </aside>
+  </div>
+
+  <section class="card">
+    <h2>Table analytique</h2>
+    <div class="scroll">
+      <table id="analyseTable">
+        <thead>
+          <tr>
+            <th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">% mix</th>
+            <th class="num">Eau (g)</th><th class="num">MG (g)</th><th class="num">ESDL (g)</th>
+            <th class="num">Sucres (g)</th><th class="num">PS (g éq. sacch.)</th>
+            <th class="num">Autres ES (g)</th><th class="num">EST (g)</th>
+          </tr>
+        </thead>
+        <tbody id="analyseBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">
+      MG = matière grasse (la MG non laitière — jaunes, cacao, fruits secs — est repérée par « ° » et comptée à part de la MG butyrique).
+      ESDL = extrait sec dégraissé du lait. PS = pouvoir sucrant exprimé en équivalent saccharose (poids de sucre × PSR ÷ 100 ;
+      le sucre des fruits est compté à PSR 100). EST = extrait sec total = MG + ESDL + sucres + autres extraits secs.
+    </p>
+  </section>
+</div>
+
+<!-- ===================== Assistant crème glacée ===================== -->
+<dialog id="dlgCG">
+  <h3>Assistant crème glacée</h3>
+  <p class="sub">Méthode de la table analytique en 5 étapes : les objectifs en % sont convertis en pesées de lait entier, crème 35 %, poudre de lait 0 % MG, sucres, jaunes et stabilisateur.</p>
+  <div class="grid2">
+    <div class="field"><label>Poids total du mix (g)</label><input type="number" id="cgTotal" value="2000" min="100" step="100"></div>
+    <div class="field"><label>Matière grasse butyrique (%)</label><input type="number" id="cgMG" value="8" min="0" step="0.5"></div>
+    <div class="field"><label>Sucres (%)</label><input type="number" id="cgSuc" value="18" min="0" step="0.5"></div>
+    <div class="field"><label>ESDL (%)</label><input type="number" id="cgESDL" value="9.5" min="0" step="0.1"></div>
+    <div class="field"><label>Jaunes d'œufs (%)</label><input type="number" id="cgJaune" value="3" min="0" step="0.5"></div>
+    <div class="field"><label>Stabilisateur (%)</label><input type="number" id="cgStab" value="0.5" min="0" max="1" step="0.1"></div>
+    <div class="field"><label>Part de saccharose (%)</label><input type="number" id="cgSacch" value="80" min="0" max="100" step="5"></div>
+    <div class="field"><label>Part de glucose atomisé (%)</label><input type="number" id="cgGluc" value="10" min="0" max="100" step="5"></div>
+    <div class="field"><label>Part de dextrose (%)</label><input type="number" id="cgDext" value="10" min="0" max="100" step="5"></div>
+  </div>
+  <p class="dlg-note">Répartition des sucres en % du poids total de sucres (la somme des trois parts doit faire 100).
+     Repères : glucose atomisé ≤ 5 % du mix ; stabilisateur ≤ 1 %.</p>
+  <div class="err" id="cgErr"></div>
+  <div class="dlg-actions">
+    <button id="cgAnnuler">Annuler</button>
+    <button class="primary" id="cgValider">Générer la recette</button>
+  </div>
+</dialog>
+
+<!-- ===================== Assistant sorbet ===================== -->
+<dialog id="dlgSorbet">
+  <h3>Assistant sorbet</h3>
+  <p class="sub">Choisissez votre fruit : l'assistant calcule le saccharose, le glucose atomisé et l'eau pour atteindre le pouvoir sucrant et l'extrait sec visés.</p>
+  <div class="grid2">
+    <div class="field"><label>Poids total du mix (g)</label><input type="number" id="sbTotal" value="2000" min="100" step="100"></div>
+    <div class="field"><label>Fruit</label><select id="sbFruit"></select></div>
+    <div class="field"><label>Proportion de fruit (%)</label><input type="number" id="sbFruitPct" value="50" min="5" max="90" step="1"></div>
+    <div class="field"><label>Pouvoir sucrant visé (%)</label><input type="number" id="sbPS" value="29" min="20" max="35" step="0.5"></div>
+    <div class="field"><label>Extrait sec total visé (%)</label><input type="number" id="sbEST" value="32" min="25" max="38" step="0.5"></div>
+    <div class="field"><label>Stabilisateur (%)</label><input type="number" id="sbStab" value="0.5" min="0" max="1" step="0.1"></div>
+  </div>
+  <p class="dlg-note" id="sbFourchette"></p>
+  <div class="err" id="sbErr"></div>
+  <div class="dlg-actions">
+    <button id="sbAnnuler">Annuler</button>
+    <button class="primary" id="sbValider">Générer la recette</button>
+  </div>
+</dialog>
+
+<!-- ===================== Vue impression / PDF ===================== -->
+<div id="printArea"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   BASE D'INGRÉDIENTS — composition pour 100 g
+   eau, mg (matière grasse), mgL (true = MG laitière/butyrique),
+   esdl, suc (sucres), psr (pouvoir sucrant relatif du sucre),
+   autres (autres extraits secs), cat, fruit ('std'|'acide'|'coque'),
+   jaune / stab (marqueurs), approx (valeur estimée)
+   Sources : Fiche formulaire — Ingrédients de glacerie (BTM Glacier).
+===================================================================== */
+const CATS = {
+  LAIT:'Produits laitiers', OEUF:'Œufs', SUCRE:'Sucres',
+  FRUIT:'Fruits', OLEA:'Fruits secs & pralinés', CHOC:'Chocolat & cacao',
+  STAB:'Stabilisateurs & émulsifiants', AUTRE:'Autres'
+};
+const D = (o)=>Object.assign({eau:0,mg:0,mgL:false,esdl:0,suc:0,psr:100,autres:0,approx:false},o);
+const INGREDIENTS = [
+  // ---- Produits laitiers (MG butyrique) ----
+  D({id:'lait_entier',   nom:'Lait entier',            cat:'LAIT', eau:88,   mg:3.6,  mgL:true, esdl:8.4}),
+  D({id:'lait_ecreme',   nom:'Lait écrémé',            cat:'LAIT', eau:91,   mg:0.06, mgL:true, esdl:9.24}),
+  D({id:'creme30',       nom:'Crème 30 % MG',          cat:'LAIT', eau:63.5, mg:30,   mgL:true, esdl:6.44}),
+  D({id:'creme35',       nom:'Crème 35 % MG',          cat:'LAIT', eau:59.02,mg:35,   mgL:true, esdl:5.98}),
+  D({id:'creme40',       nom:'Crème 40 % MG',          cat:'LAIT', eau:54.48,mg:40,   mgL:true, esdl:5.52}),
+  D({id:'beurre',        nom:'Beurre laitier',         cat:'LAIT', eau:16,   mg:82,   mgL:true, esdl:2}),
+  D({id:'pdl26',         nom:'Poudre de lait 26 % MG', cat:'LAIT', eau:3,    mg:26,   mgL:true, esdl:71}),
+  D({id:'pdl0',          nom:'Poudre de lait 0 % MG',  cat:'LAIT', eau:3.3,  mg:0.88, mgL:true, esdl:95.85}),
+  // ---- Œufs ----
+  D({id:'jaune',         nom:'Jaune d’œuf',       cat:'OEUF', eau:50, mg:33, autres:17, jaune:true}),
+  D({id:'oeuf',          nom:'Œuf entier',             cat:'OEUF', eau:60, autres:40}),
+  D({id:'blanc',         nom:'Blanc d’œuf',       cat:'OEUF', eau:85, autres:14}),
+  // ---- Sucres ----
+  D({id:'saccharose',    nom:'Saccharose',             cat:'SUCRE', eau:0.1, suc:99.9, psr:100}),
+  D({id:'dextrose',      nom:'Dextrose',               cat:'SUCRE', eau:8,   suc:92,   psr:74}),
+  D({id:'glucose_atom',  nom:'Glucose atomisé',        cat:'SUCRE', eau:5,   suc:95,   psr:47}),
+  D({id:'inverti',       nom:'Sucre inverti (trimoline)',cat:'SUCRE', eau:22, suc:78,  psr:127}),
+  D({id:'miel',          nom:'Miel',                   cat:'SUCRE', eau:15,  suc:85,   psr:130}),
+  D({id:'fructose',      nom:'Fructose',               cat:'SUCRE', eau:0,   suc:100,  psr:173}),
+  D({id:'lactose',       nom:'Lactose (poudre)',       cat:'SUCRE', eau:0,   suc:100,  psr:16}),
+  D({id:'glucose_sirop', nom:'Glucose en sirop *',     cat:'SUCRE', eau:20,  suc:80,   psr:38,  approx:true}),
+  D({id:'maltose',       nom:'Maltose *',              cat:'SUCRE', eau:5,   suc:95,   psr:32,  approx:true}),
+  D({id:'sorbitol',      nom:'Sorbitol *',             cat:'SUCRE', eau:0,   suc:100,  psr:30,  approx:true}),
+  // ---- Fruits (extrait sec du formulaire ; sucre moyen quand il est connu,
+  //      sinon estimé ≈ 85 % de l'extrait sec, à PSR 100) ----
+  D({id:'abricot',   nom:'Abricot',              cat:'FRUIT', fruit:'std',   eau:86, suc:13.14, autres:0.86}),
+  D({id:'airelle',   nom:'Airelle',              cat:'FRUIT', fruit:'acide', eau:84, suc:13.6,  autres:2.4, approx:true}),
+  D({id:'ananas',    nom:'Ananas',               cat:'FRUIT', fruit:'acide', eau:86, suc:11.9,  autres:2.1, approx:true}),
+  D({id:'avocat',    nom:'Avocat *',             cat:'FRUIT', fruit:'std',   eau:68, suc:3,     autres:29,  approx:true}),
+  D({id:'banane',    nom:'Banane',               cat:'FRUIT', fruit:'acide', eau:75, suc:12.13, autres:12.87}),
+  D({id:'cassis',    nom:'Cassis',               cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
+  D({id:'cerise',    nom:'Cerise / griotte',     cat:'FRUIT', fruit:'std',   eau:81, suc:12.13, autres:6.87}),
+  D({id:'citron',    nom:'Citron',               cat:'FRUIT', fruit:'acide', eau:91, suc:2.5,   autres:6.5, approx:true}),
+  D({id:'figue',     nom:'Figue *',              cat:'FRUIT', fruit:'std',   eau:80, suc:8.9,   autres:11.1, approx:true}),
+  D({id:'fraise',    nom:'Fraise',               cat:'FRUIT', fruit:'std',   eau:89, suc:9.35,  autres:1.65, approx:true}),
+  D({id:'framboise', nom:'Framboise',            cat:'FRUIT', fruit:'std',   eau:86, suc:9.10,  autres:4.9}),
+  D({id:'passion',   nom:'Fruit de la passion',  cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
+  D({id:'grenade',   nom:'Grenade',              cat:'FRUIT', fruit:'acide', eau:80, suc:17,    autres:3,    approx:true}),
+  D({id:'groseille', nom:'Groseille',            cat:'FRUIT', fruit:'acide', eau:84, suc:13.6,  autres:2.4,  approx:true}),
+  D({id:'goyave',    nom:'Goyave',               cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
+  D({id:'kiwi',      nom:'Kiwi',                 cat:'FRUIT', fruit:'acide', eau:84, suc:13.6,  autres:2.4,  approx:true}),
+  D({id:'litchi',    nom:'Litchi',               cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
+  D({id:'mandarine', nom:'Mandarine',            cat:'FRUIT', fruit:'acide', eau:88, suc:10.2,  autres:1.8,  approx:true}),
+  D({id:'mangue',    nom:'Mangue',               cat:'FRUIT', fruit:'acide', eau:85, suc:13,    autres:2}),
+  D({id:'marron',    nom:'Marron frais *',       cat:'FRUIT', fruit:'coque', eau:51, suc:10,    autres:39,   approx:true}),
+  D({id:'melon',     nom:'Melon',                cat:'FRUIT', fruit:'std',   eau:92, suc:6.8,   autres:1.2,  approx:true}),
+  D({id:'mure',      nom:'Mûre',                 cat:'FRUIT', fruit:'std',   eau:84, suc:13.6,  autres:2.4,  approx:true}),
+  D({id:'myrtille',  nom:'Myrtille',             cat:'FRUIT', fruit:'std',   eau:85, suc:12.75, autres:2.25, approx:true}),
+  D({id:'coco',      nom:'Noix de coco (chair)', cat:'FRUIT', fruit:'coque', eau:43.8, mg:35.55, suc:5, autres:15.65, approx:true}),
+  D({id:'orange',    nom:'Orange',               cat:'FRUIT', fruit:'acide', eau:90, suc:8.5,   autres:1.5,  approx:true}),
+  D({id:'pamplemousse',nom:'Pamplemousse',       cat:'FRUIT', fruit:'acide', eau:90, suc:8.5,   autres:1.5,  approx:true}),
+  D({id:'papaye',    nom:'Papaye',               cat:'FRUIT', fruit:'acide', eau:85, suc:12.75, autres:2.25, approx:true}),
+  D({id:'pasteque',  nom:'Pastèque',             cat:'FRUIT', fruit:'std',   eau:93, suc:5.95,  autres:1.05, approx:true}),
+  D({id:'peche',     nom:'Pêche',                cat:'FRUIT', fruit:'std',   eau:86, suc:8.9,   autres:5.1}),
+  D({id:'poire',     nom:'Poire',                cat:'FRUIT', fruit:'std',   eau:83, suc:9.10,  autres:7.9}),
+  D({id:'pomme',     nom:'Pomme',                cat:'FRUIT', fruit:'std',   eau:86, suc:10.12, autres:3.88}),
+  D({id:'prune',     nom:'Prune',                cat:'FRUIT', fruit:'std',   eau:81, suc:12.14, autres:6.86}),
+  D({id:'raisin',    nom:'Raisin',               cat:'FRUIT', fruit:'std',   eau:79, suc:17.85, autres:3.15, approx:true}),
+  // ---- Fruits secs (pâtes pures 100 %) & pralinés ----
+  D({id:'p_amande',   nom:'Pâte d’amande pure *',  cat:'OLEA', fruit:'coque', mg:54,   autres:46, approx:true}),
+  D({id:'p_noisette', nom:'Pâte de noisette pure *',    cat:'OLEA', fruit:'coque', mg:60,   autres:40, approx:true}),
+  D({id:'p_pistache', nom:'Pâte de pistache pure *',    cat:'OLEA', fruit:'coque', mg:54.5, autres:45.5, approx:true}),
+  D({id:'p_noix',     nom:'Pâte de noix pure *',        cat:'OLEA', fruit:'coque', mg:55,   autres:45, approx:true}),
+  D({id:'p_arachide', nom:'Pâte d’arachide pure *',cat:'OLEA', fruit:'coque', mg:48.7, autres:51.3, approx:true}),
+  D({id:'praline',    nom:'Praliné 50/50 *',            cat:'OLEA', mg:30, suc:50, psr:100, autres:20, approx:true}),
+  // ---- Chocolat & cacao ----
+  D({id:'couv70',   nom:'Couverture noire 70 % (fiche : MG 42,7 %)', cat:'CHOC', eau:0.5, mg:42.7, suc:29, psr:100, autres:27.8}),
+  D({id:'cacao',    nom:'Cacao en poudre *',            cat:'CHOC', eau:5, mg:11,  autres:84, approx:true}),
+  D({id:'bcacao',   nom:'Beurre de cacao',              cat:'CHOC', mg:100}),
+  // ---- Stabilisateurs / émulsifiants ----
+  D({id:'stab',   nom:'Stabilisateur (mix pour glace/sorbet)', cat:'STAB', autres:100, stab:true}),
+  D({id:'e471',   nom:'Émulsifiant E471 (mono/diglycérides)',  cat:'STAB', autres:100, stab:true}),
+  D({id:'gelatine',nom:'Gélatine',                             cat:'STAB', eau:13, autres:87, stab:true}),
+  // ---- Autres ----
+  D({id:'eau',        nom:'Eau',                   cat:'AUTRE', eau:100}),
+  D({id:'jus_citron', nom:'Jus de citron *',       cat:'AUTRE', eau:91, suc:2.5, autres:6.5, approx:true}),
+];
+const ING_BY_ID = Object.fromEntries(INGREDIENTS.map(i=>[i.id,i]));
+
+/* Fourchettes de fruit conseillées dans un sorbet (fiche formulaire, § 6) */
+const FOURCHETTES = {
+  citron:[25,35], passion:[30,45], cassis:[40,50], groseille:[35,45],
+  framboise:[45,55], fraise:[45,70], ananas:[45,60], orange:[55,70],
+  mandarine:[45,55], mure:[45,55], abricot:[50,60], peche:[50,70], poire:[50,70],
+  banane:[50,60], kiwi:[50,60], mangue:[50,60], cerise:[40,50], prune:[50,60],
+  pamplemousse:[35,50], melon:[60,80], myrtille:[45,55]
+};
+
+/* =====================================================================
+   TYPES DE PRODUITS ET REPÈRES D'ÉQUILIBRE
+   (Code des pratiques loyales + repères des fiches BTM)
+   Chaque critère : k (mesure), label, min/max (%), scale (borne de jauge)
+===================================================================== */
+const CRIT_LIB = {
+  est:    v=>({label:'Extrait sec total (EST)', scale:50,
+               low:'EST trop bas : risque de glace dure et cristallisée. Ajoutez de l’extrait sec (poudre de lait 0 %, glucose atomisé, sucres).',
+               high:'EST trop élevé : mix lourd, pâteux. Ajoutez de l’eau ou du lait.'}),
+  ps:     v=>({label:'Pouvoir sucrant (PS)', scale:40,
+               low:'Pas assez sucré (et point de congélation trop haut) : ajoutez du saccharose ou du sucre inverti.',
+               high:'Trop sucré : remplacez une partie du saccharose par du glucose atomisé (PSR 47), qui apporte de l’extrait sec sans sucrer.'}),
+  mgLait: v=>({label:'MG laitière (butyrique)', scale:15,
+               low:'Pas assez de matière grasse laitière : ajoutez de la crème ou du beurre.',
+               high:'Trop de matière grasse : la glace devient lourde et le foisonnement chute. Remplacez de la crème par du lait.'}),
+  mgTot:  v=>({label:'MG totale', scale:15,
+               low:'Pas assez de matière grasse : ajoutez de la crème, du beurre ou une pâte de fruits secs.',
+               high:'Éviter de dépasser 10 % de MG totale (fiche BTM).'}),
+  esdl:   v=>({label:'ESDL', scale:15,
+               low:'ESDL insuffisant : ajoutez de la poudre de lait 0 % MG (émulsion, foisonnement, onctuosité).',
+               high:'ESDL > 10 % : risque de cristallisation du lactose (glace « sableuse »). Réduisez la poudre de lait.'}),
+  mgEsdl: v=>({label:'MG totale + ESDL', scale:30,
+               low:'MG + ESDL < 16 % : le mix manque de corps. Montez la crème et/ou la poudre de lait.',
+               high:'MG + ESDL > 22 % : mix surchargé. Réduisez crème et/ou poudre de lait.'}),
+  fruits: v=>({label:'Fruits', scale:100,
+               low:'Proportion de fruits insuffisante pour l’appellation visée : augmentez la part de fruits.',
+               high:'Beaucoup de fruits : vérifiez que l’EST et le PS restent dans les repères.'}),
+  jaunes: v=>({label:'Jaunes d’œufs', scale:15,
+               low:'Une glace aux œufs exige au minimum 7 % de jaunes d’œufs.',
+               high:'Beaucoup de jaunes : goût d’œuf marqué, texture très riche.'}),
+  stab:   v=>({label:'Stabilisateur', scale:2,
+               low:'Un peu de stabilisateur (0,3 à 0,5 %) améliore texture et conservation.',
+               high:'Dosage maximum : 1 % de stabilisateur (ou 0,7 % + 0,3 % d’émulsifiant).'}),
+};
+const PRODUITS = {
+  sorbet: {
+    label:'Sorbet aux fruits',
+    note:'Repères sorbet : EST 30–35 % (idéal 31–33), pouvoir sucrant 25–33 %, fruits ≥ 25 % (10 % agrumes/fruits acides ou exotiques, 5 % fruits à coque, 3 % pistache/noisette), stabilisateur ≤ 1 %.',
+    criteres:[
+      {k:'est', min:30, max:35},
+      {k:'ps',  min:25, max:33},
+      {k:'fruits', dynMin:'fruit', max:null},
+      {k:'stab', min:null, max:1},
+    ]
+  },
+  sorbet_pf: {
+    label:'Sorbet plein fruit',
+    note:'Sorbet plein fruit : fruits ≥ 45 % (20 % pour les fruits acides). Mêmes repères d’EST (30–35 %) et de pouvoir sucrant (25–33 %) que le sorbet.',
+    criteres:[
+      {k:'est', min:30, max:35},
+      {k:'ps',  min:25, max:33},
+      {k:'fruits', dynMin:'fruitPF', max:null},
+      {k:'stab', min:null, max:1},
+    ]
+  },
+  creme_glacee: {
+    label:'Crème glacée',
+    note:'Crème glacée : MG exclusivement laitière ≥ 8 % (appellation), EST 37–42 %, pouvoir sucrant 15–22 % (15 % pour les glaces à l’alcool), ESDL ≤ 10 %, MG totale + ESDL entre 16 et 22 %, stabilisateur ≤ 1 %.',
+    criteres:[
+      {k:'mgLait', min:8, max:10},
+      {k:'est', min:37, max:42},
+      {k:'ps',  min:15, max:22},
+      {k:'esdl', min:null, max:10},
+      {k:'mgEsdl', min:16, max:22},
+      {k:'stab', min:null, max:1},
+    ]
+  },
+  glace: {
+    label:'Glace (MG ≥ 5 %)',
+    note:'Glace : matière grasse alimentaire ≥ 5 % (appellation), EST 37–42 %, pouvoir sucrant 15–22 %, ESDL ≤ 10 %, MG totale ≤ 10 %, stabilisateur ≤ 1 %.',
+    criteres:[
+      {k:'mgTot', min:5, max:10},
+      {k:'est', min:37, max:42},
+      {k:'ps',  min:15, max:22},
+      {k:'esdl', min:null, max:10},
+      {k:'stab', min:null, max:1},
+    ]
+  },
+  glace_lait: {
+    label:'Glace au lait',
+    note:'Glace au lait : MG exclusivement laitière ≥ 2,5 % et ESDL ≥ 6 % (appellation). EST 37–42 % et pouvoir sucrant 15–22 % en repères généraux. Au-delà de 8 % de MG laitière, le produit relève de la crème glacée.',
+    criteres:[
+      {k:'mgLait', min:2.5, max:8},
+      {k:'esdl', min:6, max:10},
+      {k:'est', min:37, max:42},
+      {k:'ps',  min:15, max:22},
+      {k:'stab', min:null, max:1},
+    ]
+  },
+  glace_oeufs: {
+    label:'Glace aux œufs',
+    note:'Glace aux œufs : jaunes d’œufs ≥ 7 % et matière grasse exclusivement laitière (appellation). EST 37–42 %, pouvoir sucrant 15–22 %, ESDL ≤ 10 %, stabilisateur ≤ 1 %.',
+    criteres:[
+      {k:'jaunes', min:7, max:null},
+      {k:'est', min:37, max:42},
+      {k:'ps',  min:15, max:22},
+      {k:'esdl', min:null, max:10},
+      {k:'stab', min:null, max:1},
+    ]
+  },
+  glace_eau: {
+    label:'Glace à l’eau',
+    note:'Glace à l’eau : extrait sec total ≥ 12 % (appellation). Le pouvoir sucrant est affiché à titre de repère (fourchette sorbet).',
+    criteres:[
+      {k:'est', min:12, max:null},
+      {k:'ps',  min:15, max:33},
+      {k:'stab', min:null, max:1},
+    ]
+  },
+};
+
+/* =====================================================================
+   ÉTAT + CALCULS
+===================================================================== */
+let state = {
+  type:'sorbet',
+  nom:'',
+  rows:[ {id:'fraise', g:550}, {id:'saccharose', g:200}, {id:'glucose_atom', g:40},
+         {id:'stab', g:5}, {id:'eau', g:205} ],
+};
+
+function contribution(ing, g){
+  const f = g/100;
+  const mg = ing.mg*f, esdl = ing.esdl*f, suc = ing.suc*f, autres = ing.autres*f;
+  return {
+    g, eau: ing.eau*f, mg, mgLait: ing.mgL ? mg : 0,
+    esdl, suc, ps: suc*ing.psr/100, autres,
+    est: mg+esdl+suc+autres,
+    fruits: (ing.cat==='FRUIT' || (ing.cat==='OLEA' && ing.fruit==='coque')) ? g : 0,
+    fruitType: ing.fruit || null,
+    jaunes: ing.jaune ? g : 0,
+    stab: ing.stab ? g : 0,
+  };
+}
+function computeTotals(){
+  const t = {g:0,eau:0,mg:0,mgLait:0,esdl:0,suc:0,ps:0,autres:0,est:0,fruits:0,jaunes:0,stab:0,
+             fruitsAcide:0, fruitsCoque:0, fruitsCoqueFin:0, fruitsStd:0};
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id]; if(!ing || !(r.g>0)) continue;
+    const c = contribution(ing, r.g);
+    for(const k of ['g','eau','mg','mgLait','esdl','suc','ps','autres','est','fruits','jaunes','stab']) t[k]+=c[k];
+    if(c.fruits>0){
+      if(c.fruitType==='acide') t.fruitsAcide+=c.fruits;
+      else if(c.fruitType==='coque'){
+        t.fruitsCoque+=c.fruits;
+        if(r.id==='p_pistache'||r.id==='p_noisette') t.fruitsCoqueFin+=c.fruits;
+      } else t.fruitsStd+=c.fruits;
+    }
+  }
+  t.mgNonLait = t.mg - t.mgLait;
+  return t;
+}
+function pct(part, total){ return total>0 ? part/total*100 : 0; }
+
+/* minimum de fruits requis, pondéré selon la nature des fruits utilisés */
+function minFruits(t, pleinFruit){
+  if(t.fruits<=0) return pleinFruit?45:25;
+  const mStd = pleinFruit?45:25, mAcide = pleinFruit?20:10;
+  const mCoque = 5, mCoqueFin = 3;
+  const coqueStd = t.fruitsCoque - t.fruitsCoqueFin;
+  return (t.fruitsStd*mStd + t.fruitsAcide*mAcide + coqueStd*(pleinFruit?mCoque:mCoque) + t.fruitsCoqueFin*mCoqueFin) / t.fruits;
+}
+
+function evalCriteres(t){
+  const prod = PRODUITS[state.type];
+  const total = t.g;
+  const mesures = {
+    est: pct(t.est,total), ps: pct(t.ps,total), mgLait: pct(t.mgLait,total),
+    mgTot: pct(t.mg,total), esdl: pct(t.esdl,total),
+    mgEsdl: pct(t.mg+t.esdl,total), fruits: pct(t.fruits,total),
+    jaunes: pct(t.jaunes,total), stab: pct(t.stab,total),
+  };
+  return prod.criteres.map(c=>{
+    const lib = CRIT_LIB[c.k]();
+    let min = c.min, max = c.max;
+    if(c.dynMin==='fruit')   min = minFruits(t,false);
+    if(c.dynMin==='fruitPF') min = minFruits(t,true);
+    const v = mesures[c.k];
+    const tol = c.k==='fruits' ? 3 : (c.k==='stab' ? 0.1 : 1);
+    let status='ok', advice='';
+    if(min!=null && v < min){ status = (min-v)<=tol ? 'warn':'bad'; advice = lib.low; }
+    else if(max!=null && v > max){ status = (v-max)<=tol ? 'warn':'bad'; advice = lib.high; }
+    return {k:c.k, label:lib.label, scale:lib.scale, v, min, max, status, advice};
+  });
+}
+
+/* =====================================================================
+   RENDU
+===================================================================== */
+const fmt = (x,d=1)=> new Intl.NumberFormat('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(x);
+const fmt0 = x=> fmt(x,0);
+const el = id=>document.getElementById(id);
+
+function ingredientSelect(selectedId){
+  const sel = document.createElement('select');
+  for(const [cat,label] of Object.entries(CATS)){
+    const items = INGREDIENTS.filter(i=>i.cat===cat);
+    if(!items.length) continue;
+    const og = document.createElement('optgroup'); og.label = label;
+    for(const i of items){
+      const o = document.createElement('option');
+      o.value = i.id; o.textContent = i.nom;
+      if(i.id===selectedId) o.selected = true;
+      og.appendChild(o);
+    }
+    sel.appendChild(og);
+  }
+  return sel;
+}
+
+function renderRecette(t){
+  const body = el('recetteBody'); body.innerHTML='';
+  state.rows.forEach((r,idx)=>{
+    const ing = ING_BY_ID[r.id];
+    const tr = document.createElement('tr');
+    const tdIng = document.createElement('td');
+    const sel = ingredientSelect(r.id);
+    sel.addEventListener('change',()=>{ r.id = sel.value; update(); });
+    tdIng.appendChild(sel);
+    const hint = document.createElement('div'); hint.className='rowhint';
+    hint.textContent = resumeIngredient(ing);
+    tdIng.appendChild(hint);
+    const tdG = document.createElement('td'); tdG.className='num';
+    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='5'; inp.value=r.g;
+    inp.addEventListener('input',()=>{ r.g = parseFloat(inp.value)||0; update(false); });
+    tdG.appendChild(inp);
+    const tdPct = document.createElement('td'); tdPct.className='num';
+    tdPct.textContent = t.g>0 ? fmt(pct(r.g,t.g))+' %' : '—';
+    const tdDel = document.createElement('td');
+    const del = document.createElement('button'); del.className='ghost'; del.title='Supprimer'; del.textContent='✕';
+    del.addEventListener('click',()=>{ state.rows.splice(idx,1); update(); });
+    tdDel.appendChild(del);
+    tr.append(tdIng,tdG,tdPct,tdDel);
+    body.appendChild(tr);
+  });
+  el('totalG').textContent = fmt0(t.g)+' g';
+}
+function resumeIngredient(ing){
+  const p=[];
+  if(ing.mg) p.push('MG '+fmt(ing.mg)+' %'+(ing.mgL?'':' °'));
+  if(ing.esdl) p.push('ESDL '+fmt(ing.esdl)+' %');
+  if(ing.suc) p.push('sucres '+fmt(ing.suc)+' % (PSR '+ing.psr+')');
+  if(ing.autres) p.push('autres ES '+fmt(ing.autres)+' %');
+  if(!p.length) p.push('eau '+fmt(ing.eau)+' %');
+  return p.join(' · ');
+}
+
+function renderAnalyse(t){
+  const body = el('analyseBody'); body.innerHTML='';
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id]; if(!ing) continue;
+    const c = contribution(ing, r.g||0);
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${ing.nom}${ing.mgL||!ing.mg?'':' °'}</td>`+
+      `<td class="num">${fmt0(c.g)}</td><td class="num">${t.g>0?fmt(pct(c.g,t.g)):'—'}</td>`+
+      `<td class="num">${fmt(c.eau)}</td><td class="num">${fmt(c.mg)}</td>`+
+      `<td class="num">${fmt(c.esdl)}</td><td class="num">${fmt(c.suc)}</td>`+
+      `<td class="num">${fmt(c.ps)}</td><td class="num">${fmt(c.autres)}</td>`+
+      `<td class="num">${fmt(c.est)}</td>`;
+    body.appendChild(tr);
+  }
+  const totalTr = document.createElement('tr'); totalTr.className='total';
+  totalTr.innerHTML =
+    `<td>TOTAL (g)</td><td class="num">${fmt0(t.g)}</td><td class="num">100</td>`+
+    `<td class="num">${fmt(t.eau)}</td><td class="num">${fmt(t.mg)}</td>`+
+    `<td class="num">${fmt(t.esdl)}</td><td class="num">${fmt(t.suc)}</td>`+
+    `<td class="num">${fmt(t.ps)}</td><td class="num">${fmt(t.autres)}</td><td class="num">${fmt(t.est)}</td>`;
+  body.appendChild(totalTr);
+  const pctTr = document.createElement('tr'); pctTr.className='pct';
+  pctTr.innerHTML =
+    `<td>% du mix</td><td class="num">—</td><td class="num">—</td>`+
+    `<td class="num">${fmt(pct(t.eau,t.g))} %</td><td class="num">${fmt(pct(t.mg,t.g))} %</td>`+
+    `<td class="num">${fmt(pct(t.esdl,t.g))} %</td><td class="num">${fmt(pct(t.suc,t.g))} %</td>`+
+    `<td class="num">${fmt(pct(t.ps,t.g))} %</td><td class="num">${fmt(pct(t.autres,t.g))} %</td>`+
+    `<td class="num">${fmt(pct(t.est,t.g))} %</td>`;
+  body.appendChild(pctTr);
+}
+
+const STATUS_TXT = {ok:'✓ dans la cible', warn:'! limite', bad:'✗ hors cible'};
+function renderMeters(criteres){
+  const box = el('meters'); box.innerHTML='';
+  for(const c of criteres){
+    const scale = Math.max(c.scale, (c.max||0)*1.15, c.v*1.05);
+    const div = document.createElement('div'); div.className='meter';
+    const lo = c.min!=null ? c.min/scale*100 : 0;
+    const hi = c.max!=null ? c.max/scale*100 : 100;
+    const cible = c.min!=null && c.max!=null ? `${fmt(c.min)} à ${fmt(c.max)} %`
+                : c.min!=null ? `≥ ${fmt(c.min)} %` : `≤ ${fmt(c.max)} %`;
+    div.innerHTML =
+      `<div class="head"><span class="name">${c.label}</span>`+
+      `<span><span class="val">${fmt(c.v)} %</span> <span class="chip ${c.status}">${STATUS_TXT[c.status]}</span></span></div>`+
+      `<div class="track"><div class="band ${c.max==null?'openmax':''} ${c.min==null?'openmin':''}" style="left:${lo}%;right:${100-hi}%"></div>`+
+      `<div class="marker" style="left:calc(${Math.min(99,c.v/scale*100)}% - 1px)"></div></div>`+
+      `<div class="scale"><span>0</span><span>cible : ${cible}</span><span>${fmt0(scale)} %</span></div>`+
+      (c.advice?`<div class="advice">${c.advice}</div>`:'');
+    box.appendChild(div);
+  }
+}
+function renderVerdict(criteres, t){
+  const v = el('verdict');
+  if(t.g<=0){ v.innerHTML='<div class="verdict warn">⚠ Ajoutez des ingrédients pour analyser le mix.</div>'; return; }
+  const bads = criteres.filter(c=>c.status==='bad').length;
+  const warns = criteres.filter(c=>c.status==='warn').length;
+  if(bads) v.innerHTML = `<div class="verdict bad">✗ Mix déséquilibré : ${bads} repère${bads>1?'s':''} hors cible.</div>`;
+  else if(warns) v.innerHTML = `<div class="verdict warn">! Presque : ${warns} repère${warns>1?'s':''} en limite de cible.</div>`;
+  else v.innerHTML = `<div class="verdict ok">✓ Mix bien équilibré — tous les repères sont respectés.</div>`;
+}
+
+function update(rebuildRecette=true){
+  const t = computeTotals();
+  if(rebuildRecette) renderRecette(t); else {
+    // ne pas reconstruire les inputs pendant la saisie : rafraîchir total et %
+    el('totalG').textContent = fmt0(t.g)+' g';
+    const rows = el('recetteBody').querySelectorAll('tr');
+    rows.forEach((tr,i)=>{ const r=state.rows[i]; if(r) tr.children[2].textContent = t.g>0? fmt(pct(r.g,t.g))+' %':'—'; });
+  }
+  const criteres = evalCriteres(t);
+  renderVerdict(criteres,t);
+  renderMeters(criteres);
+  renderAnalyse(t);
+  el('regleNote').textContent = PRODUITS[state.type].note;
+  save();
+}
+
+/* =====================================================================
+   ASSISTANTS
+===================================================================== */
+/* Crème glacée — méthode de la table analytique en 5 étapes (fiche BTM) */
+function calculCremeGlacee(T, mgP, sucP, esdlP, jauneP, stabP){
+  const mgV = T*mgP/100, sucV = T*sucP/100, esdlV = T*esdlP/100,
+        jauneV = T*jauneP/100, stabV = T*stabP/100;
+  const serum = T - (mgV + sucV + jauneV + stabV);
+  if(serum<=0) return {err:'Objectifs trop élevés : il ne reste plus de place pour le lait et la crème.'};
+  const poudre = (esdlV - serum*0.088) / (0.970 - 0.088);
+  if(poudre < 0) return {err:'ESDL visé trop bas pour ce sérum : diminuez la MG ou augmentez l’ESDL.'};
+  const laitCreme = T - (sucV + jauneV + stabV + poudre);
+  const creme = (mgV - laitCreme*0.036) / (0.35 - 0.036);
+  if(creme < 0) return {err:'MG visée trop basse : le lait entier apporte déjà plus de matière grasse que l’objectif. Utilisez du lait écrémé ou augmentez la MG.'};
+  const lait = laitCreme - creme;
+  if(lait < 0) return {err:'MG visée trop élevée pour de la crème à 35 % : augmentez le taux de MG visé de la crème ou ajoutez du beurre.'};
+  return {lait, creme, poudre, sucres:sucV, jaunes:jauneV, stab:stabV};
+}
+
+function openCG(){ el('cgErr').textContent=''; el('dlgCG').showModal(); }
+function validerCG(){
+  const T = +el('cgTotal').value, mgP=+el('cgMG').value, sucP=+el('cgSuc').value,
+        esdlP=+el('cgESDL').value, jauneP=+el('cgJaune').value, stabP=+el('cgStab').value;
+  const pS=+el('cgSacch').value, pG=+el('cgGluc').value, pD=+el('cgDext').value;
+  if(Math.abs(pS+pG+pD-100)>0.01){ el('cgErr').textContent='La répartition des sucres doit totaliser 100 %.'; return; }
+  const r = calculCremeGlacee(T, mgP, sucP, esdlP, jauneP, stabP);
+  if(r.err){ el('cgErr').textContent=r.err; return; }
+  const rows = [
+    {id:'lait_entier', g:Math.round(r.lait)},
+    {id:'creme35', g:Math.round(r.creme)},
+    {id:'pdl0', g:Math.round(r.poudre)},
+  ];
+  if(pS>0) rows.push({id:'saccharose', g:Math.round(r.sucres*pS/100)});
+  if(pG>0) rows.push({id:'glucose_atom', g:Math.round(r.sucres*pG/100)});
+  if(pD>0) rows.push({id:'dextrose', g:Math.round(r.sucres*pD/100)});
+  if(r.jaunes>0) rows.push({id:'jaune', g:Math.round(r.jaunes)});
+  if(r.stab>0) rows.push({id:'stab', g:Math.round(r.stab)});
+  state.rows = rows;
+  state.type = 'creme_glacee'; el('produitType').value='creme_glacee';
+  if(!el('produitNom').value) { el('produitNom').value='Crème glacée'; state.nom='Crème glacée'; }
+  el('dlgCG').close(); update();
+}
+
+/* Sorbet — résolution saccharose / glucose atomisé pour PS et EST visés */
+function calculSorbet(T, fruitId, fruitPct, psP, estP, stabP){
+  const fruit = ING_BY_ID[fruitId];
+  const F = T*fruitPct/100, stabV = T*stabP/100;
+  const cF = contribution(fruit, F);
+  const psNeed = T*psP/100 - cF.ps;
+  const estNeed = T*estP/100 - cF.est - stabV;
+  if(psNeed<0) return {err:'Le fruit apporte déjà plus de pouvoir sucrant que l’objectif : réduisez la proportion de fruit ou montez le PS visé.'};
+  // saccharose S (suc 99,9 %, PSR 100) et glucose atomisé G (suc 95 %, PSR 47)
+  // PS  : 0,999·S + 0,4465·G = psNeed
+  // EST : 0,999·S + 0,95·G  = estNeed
+  let G = (estNeed - psNeed) / (0.95 - 0.4465);
+  let note = '';
+  if(G < 0){ G = 0; note = 'EST visé atteint sans glucose : l’EST final sera un peu supérieur à l’objectif (sucres seuls).'; }
+  if(G > T*0.05){ G = T*0.05; note = 'Glucose atomisé plafonné à 5 % du mix (repère fiche) : l’EST final pourra s’écarter légèrement de l’objectif.'; }
+  const S = (psNeed - 0.4465*G) / 0.999;
+  if(S < 0) return {err:'Trop d’extrait sec demandé pour ce pouvoir sucrant : baissez l’EST visé ou montez le PS.'};
+  const eau = T - F - stabV - S - G;
+  if(eau < 0) return {err:'Le total dépasse 100 % : réduisez la proportion de fruit ou les objectifs.'};
+  return {F, S, G, stabV, eau, note};
+}
+
+function openSorbet(){
+  const sel = el('sbFruit');
+  if(!sel.options.length){
+    for(const i of INGREDIENTS.filter(i=>i.cat==='FRUIT')){
+      const o=document.createElement('option'); o.value=i.id; o.textContent=i.nom; sel.appendChild(o);
+    }
+    sel.value='fraise';
+    sel.addEventListener('change', majFourchette);
+  }
+  majFourchette();
+  el('sbErr').textContent='';
+  el('dlgSorbet').showModal();
+}
+function majFourchette(){
+  const id = el('sbFruit').value;
+  const f = FOURCHETTES[id];
+  if(f){
+    el('sbFourchette').textContent = `Fourchette conseillée pour ce fruit : ${f[0]} à ${f[1]} % (fiche formulaire).`;
+    el('sbFruitPct').value = Math.round((f[0]+f[1])/2);
+  } else {
+    el('sbFourchette').textContent = 'Pas de fourchette précise pour ce fruit dans la fiche : 45 à 60 % en général.';
+    el('sbFruitPct').value = 50;
+  }
+}
+function validerSorbet(){
+  const T=+el('sbTotal').value, fruitId=el('sbFruit').value, fruitPct=+el('sbFruitPct').value,
+        psP=+el('sbPS').value, estP=+el('sbEST').value, stabP=+el('sbStab').value;
+  const r = calculSorbet(T, fruitId, fruitPct, psP, estP, stabP);
+  if(r.err){ el('sbErr').textContent=r.err; return; }
+  const rows = [ {id:fruitId, g:Math.round(r.F)}, {id:'saccharose', g:Math.round(r.S)} ];
+  if(r.G>0.5) rows.push({id:'glucose_atom', g:Math.round(r.G)});
+  if(r.stabV>0) rows.push({id:'stab', g:Math.round(r.stabV)});
+  rows.push({id:'eau', g:Math.round(r.eau)});
+  state.rows = rows;
+  state.type = fruitPct>=45 ? 'sorbet_pf' : 'sorbet';
+  el('produitType').value = state.type;
+  const nomFruit = ING_BY_ID[fruitId].nom.toLowerCase().replace(' *','');
+  el('produitNom').value = 'Sorbet '+nomFruit; state.nom = el('produitNom').value;
+  el('dlgSorbet').close(); update();
+  if(r.note) setTimeout(()=>alert(r.note), 50);
+}
+
+/* =====================================================================
+   EXEMPLES
+===================================================================== */
+const PRESETS = {
+  cg_vanille:{type:'creme_glacee', nom:'Crème glacée vanille (exemple fiche n° 1)',
+    rows:[ {id:'lait_entier',g:1157},{id:'creme35',g:338},{id:'pdl0',g:75},
+           {id:'saccharose',g:360},{id:'jaune',g:60},{id:'stab',g:10} ]},
+  sorbet_fraise:{type:'sorbet_pf', nom:'Sorbet fraise plein fruit',
+    rows:[ {id:'fraise',g:1100},{id:'saccharose',g:445},{id:'glucose_atom',g:80},
+           {id:'stab',g:10},{id:'eau',g:365} ]},
+  sorbet_citron:{type:'sorbet', nom:'Sorbet citron',
+    rows:[ {id:'citron',g:600},{id:'saccharose',g:555},{id:'glucose_atom',g:25},
+           {id:'stab',g:10},{id:'eau',g:810} ]},
+};
+
+/* =====================================================================
+   EXPORT PDF (impression)
+===================================================================== */
+function buildPrint(){
+  const t = computeTotals();
+  const criteres = evalCriteres(t);
+  const prod = PRODUITS[state.type];
+  const date = new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+  const nom = state.nom || prod.label;
+  let h = `<h1>${nom}</h1>
+  <p class="sub">${prod.label} — mix de ${fmt0(t.g)} g — édité le ${date} · Calculateur de glacerie (repères BTM Glacier)</p>`;
+
+  h += `<h2>Recette</h2><table><thead><tr><th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">% du mix</th></tr></thead><tbody>`;
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id]; if(!ing) continue;
+    h += `<tr><td>${ing.nom}</td><td class="num">${fmt0(r.g)}</td><td class="num">${fmt(pct(r.g,t.g))} %</td></tr>`;
+  }
+  h += `<tr class="total"><td>TOTAL</td><td class="num">${fmt0(t.g)}</td><td class="num">100 %</td></tr></tbody></table>`;
+
+  h += `<h2>Table analytique</h2><table><thead><tr>
+    <th>Ingrédient</th><th class="num">Poids (g)</th><th class="num">Eau (g)</th><th class="num">MG (g)</th>
+    <th class="num">ESDL (g)</th><th class="num">Sucres (g)</th><th class="num">PS (g éq.)</th>
+    <th class="num">Autres ES (g)</th><th class="num">EST (g)</th></tr></thead><tbody>`;
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id]; if(!ing) continue;
+    const c = contribution(ing, r.g||0);
+    h += `<tr><td>${ing.nom}${ing.mgL||!ing.mg?'':' °'}</td><td class="num">${fmt0(c.g)}</td>
+      <td class="num">${fmt(c.eau)}</td><td class="num">${fmt(c.mg)}</td><td class="num">${fmt(c.esdl)}</td>
+      <td class="num">${fmt(c.suc)}</td><td class="num">${fmt(c.ps)}</td><td class="num">${fmt(c.autres)}</td>
+      <td class="num">${fmt(c.est)}</td></tr>`;
+  }
+  h += `<tr class="total"><td>TOTAL (g)</td><td class="num">${fmt0(t.g)}</td>
+    <td class="num">${fmt(t.eau)}</td><td class="num">${fmt(t.mg)}</td><td class="num">${fmt(t.esdl)}</td>
+    <td class="num">${fmt(t.suc)}</td><td class="num">${fmt(t.ps)}</td><td class="num">${fmt(t.autres)}</td>
+    <td class="num">${fmt(t.est)}</td></tr>
+    <tr class="total"><td>% du mix</td><td class="num">100</td>
+    <td class="num">${fmt(pct(t.eau,t.g))}</td><td class="num">${fmt(pct(t.mg,t.g))}</td>
+    <td class="num">${fmt(pct(t.esdl,t.g))}</td><td class="num">${fmt(pct(t.suc,t.g))}</td>
+    <td class="num">${fmt(pct(t.ps,t.g))}</td><td class="num">${fmt(pct(t.autres,t.g))}</td>
+    <td class="num">${fmt(pct(t.est,t.g))}</td></tr></tbody></table>`;
+
+  h += `<h2>Contrôle de l'équilibre — ${prod.label}</h2>
+  <table><thead><tr><th>Paramètre</th><th class="num">Valeur</th><th>Cible</th><th>Statut</th></tr></thead><tbody>`;
+  const STXT = {ok:'dans la cible', warn:'en limite', bad:'hors cible'};
+  for(const c of criteres){
+    const cible = c.min!=null && c.max!=null ? `${fmt(c.min)} à ${fmt(c.max)} %`
+                : c.min!=null ? `≥ ${fmt(c.min)} %` : `≤ ${fmt(c.max)} %`;
+    h += `<tr><td>${c.label}</td><td class="num">${fmt(c.v)} %</td><td>${cible}</td>
+          <td class="st-${c.status}">${STXT[c.status]}</td></tr>`;
+  }
+  h += `</tbody></table>`;
+
+  h += `<p class="foot">${prod.note}<br>
+  MG = matière grasse (« ° » = MG non laitière, comptée à part de la MG butyrique) · ESDL = extrait sec dégraissé du lait ·
+  PS = pouvoir sucrant en équivalent saccharose (PSR : saccharose 100, dextrose 74, glucose atomisé 47, sucre inverti 127, miel 130, fructose 173 ; sucres des fruits comptés à PSR 100) ·
+  EST = extrait sec total. Maturation du mix : 4 à 12 h entre +4 et +10 °C ; congélation à cœur −18 °C en moins de 2 h.<br>
+  Sources : fiches BTM Pâtissier-Confiseur option Glacier — « Formulaire ingrédients de glacerie », « La glace et les desserts glacés », « Calculer une table analytique ». Les compositions marquées * sont des estimations.</p>`;
+  el('printArea').innerHTML = h;
+}
+
+/* =====================================================================
+   PERSISTANCE + INITIALISATION
+===================================================================== */
+function save(){
+  try{ localStorage.setItem('glacerie_state', JSON.stringify(state)); }catch(e){}
+}
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem('glacerie_state'));
+    if(s && Array.isArray(s.rows) && PRODUITS[s.type]) state = s;
+  }catch(e){}
+}
+
+function init(){
+  load();
+  const selType = el('produitType');
+  for(const [id,p] of Object.entries(PRODUITS)){
+    const o = document.createElement('option'); o.value=id; o.textContent=p.label;
+    selType.appendChild(o);
+  }
+  selType.value = state.type;
+  selType.addEventListener('change',()=>{ state.type = selType.value; update(); });
+  el('produitNom').value = state.nom||'';
+  el('produitNom').addEventListener('input',()=>{ state.nom = el('produitNom').value; save(); });
+
+  el('btnAdd').addEventListener('click',()=>{ state.rows.push({id:'saccharose', g:0}); update(); });
+  el('btnClear').addEventListener('click',()=>{
+    if(confirm('Vider entièrement la recette ?')){ state.rows=[]; update(); }
+  });
+  el('presets').addEventListener('change',()=>{
+    const p = PRESETS[el('presets').value];
+    if(p){
+      state.type=p.type; state.nom=p.nom; state.rows=p.rows.map(r=>({...r}));
+      selType.value=p.type; el('produitNom').value=p.nom;
+      update();
+    }
+    el('presets').value='';
+  });
+  el('btnAssistantCG').addEventListener('click', openCG);
+  el('btnAssistantSorbet').addEventListener('click', openSorbet);
+  el('cgAnnuler').addEventListener('click',()=>el('dlgCG').close());
+  el('cgValider').addEventListener('click', validerCG);
+  el('sbAnnuler').addEventListener('click',()=>el('dlgSorbet').close());
+  el('sbValider').addEventListener('click', validerSorbet);
+  el('btnPDF').addEventListener('click',()=>{ buildPrint(); window.print(); });
+  window.addEventListener('beforeprint', buildPrint);
+  update();
+}
+init();
+</script>
+</body>
+</html>

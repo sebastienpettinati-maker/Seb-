@@ -58,6 +58,8 @@
   tr.pct td{color:var(--ink-2);font-size:.85rem;border-bottom:none}
   .rowhint{font-size:.78rem;color:var(--ink-3)}
   .recipe-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .fruitrow{display:flex;gap:8px;margin-bottom:6px;align-items:center}
+  .fruitrow input{width:100px}
   /* --- jauges d'équilibre --- */
   .meter{margin-bottom:14px}
   .meter .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -151,9 +153,10 @@
 
   <section class="card" id="autoCard">
     <h2>⚡ Recette automatique — un seul poids à saisir</h2>
-    <p class="footnote" style="margin:0 0 12px">Indiquez uniquement le poids de votre ingrédient principal (purée de fruits, lait entier…) :
-       l'application calcule tout le reste — sucres, glucose, poudre de lait, crème, jaunes, stabilisateur, eau — pour un mix équilibré,
-       conforme aux appellations légales et aux repères de qualité des fiches BTM.</p>
+    <p class="footnote" style="margin:0 0 12px">Indiquez uniquement le poids de votre ingrédient principal — une ou plusieurs purées de fruits
+       pour un sorbet (même multi-fruits), ou le lait entier pour une glace : l'application calcule tout le reste — mélange de sucres
+       (saccharose, glucose atomisé, dextrose, sucre inverti), poudre de lait, crème, jaunes, stabilisateur, eau — pour un mix équilibré,
+       conforme aux appellations légales, avec une texture optimale.</p>
     <div class="toolbar">
       <div class="field">
         <label for="autoType">Produit</label>
@@ -163,12 +166,13 @@
           <option value="glace_oeufs">Glace aux œufs (lait entier)</option>
         </select>
       </div>
-      <div class="field" id="autoFruitField">
-        <label for="autoFruit">Fruit</label>
-        <select id="autoFruit"></select>
+      <div class="field" id="autoFruitField" style="min-width:320px">
+        <label>Purées de fruits — un ou plusieurs, avec leur poids (g)</label>
+        <div id="autoFruitRows"></div>
+        <button id="autoAddFruit" type="button" style="margin-top:6px">＋ Ajouter un fruit</button>
       </div>
-      <div class="field">
-        <label for="autoPoids" id="autoPoidsLabel">Poids de purée de fruits (g)</label>
+      <div class="field" id="autoPoidsField">
+        <label for="autoPoids" id="autoPoidsLabel">Poids de lait entier (g)</label>
         <input type="number" id="autoPoids" value="1000" min="50" step="50">
       </div>
       <button class="primary" id="btnAuto">Calculer la recette complète</button>
@@ -752,26 +756,56 @@ function validerCG(){
   el('dlgCG').close(); update();
 }
 
-/* Sorbet — résolution saccharose / glucose atomisé pour PS et EST visés */
-function calculSorbet(T, fruitId, fruitPct, psP, estP, stabP){
-  const fruit = ING_BY_ID[fruitId];
-  const F = T*fruitPct/100, stabV = T*stabP/100;
-  const cF = contribution(fruit, F);
+/* Sorbet — mélange de sucres « texture » d'après la pratique professionnelle :
+   - saccharose : sucre de corps (référence PS 100) ;
+   - glucose atomisé : extrait sec anti-cristallisant, peu sucrant, ≤ 5 % du mix ;
+   - dextrose : abaisse le point de congélation ≈ 2× le saccharose → sorbet
+     plus souple au service, sensation de fraîcheur (≈ 10 % des sucres) ;
+   - sucre inverti : souplesse à la sortie du congélateur, dose conseillée
+     2 à 5 % du mix, part augmentée pour les fruits acides (fiche BTM).
+   PS et EST restent résolus exactement (saccharose et glucose en variables). */
+const SUG = {
+  sacch:{ps:0.999,  es:0.999},   // suc 99,9 % × PSR 100
+  gluc: {ps:0.4465, es:0.95},    // suc 95 %  × PSR 47
+  dext: {ps:0.6808, es:0.92},    // suc 92 %  × PSR 74
+  inv:  {ps:0.9906, es:0.78},    // suc 78 %  × PSR 127
+};
+function calculSorbetMix(T, cF, psP, estP, stabP, acide){
+  const stabV = T*stabP/100;
   const psNeed = T*psP/100 - cF.ps;
   const estNeed = T*estP/100 - cF.est - stabV;
-  if(psNeed<0) return {err:'Le fruit apporte déjà plus de pouvoir sucrant que l’objectif : réduisez la proportion de fruit ou montez le PS visé.'};
-  // saccharose S (suc 99,9 %, PSR 100) et glucose atomisé G (suc 95 %, PSR 47)
-  // PS  : 0,999·S + 0,4465·G = psNeed
-  // EST : 0,999·S + 0,95·G  = estNeed
-  let G = (estNeed - psNeed) / (0.95 - 0.4465);
-  let note = '';
-  if(G < 0){ G = 0; note = 'EST visé atteint sans glucose : l’EST final sera un peu supérieur à l’objectif (sucres seuls).'; }
-  if(G > T*0.05){ G = T*0.05; note = 'Glucose atomisé plafonné à 5 % du mix (repère fiche) : l’EST final pourra s’écarter légèrement de l’objectif.'; }
-  const S = (psNeed - 0.4465*G) / 0.999;
-  if(S < 0) return {err:'Trop d’extrait sec demandé pour ce pouvoir sucrant : baissez l’EST visé ou montez le PS.'};
-  const eau = T - F - stabV - S - G;
+  if(psNeed<0) return {err:'Les fruits apportent déjà plus de pouvoir sucrant que l’objectif : réduisez la proportion de fruit ou montez le PS visé.'};
+  function solve(fI, fD){
+    // estimation de la masse de sucres avec saccharose + glucose seuls
+    let G0 = (estNeed - psNeed)/(SUG.gluc.es - SUG.gluc.ps);
+    G0 = Math.max(0, Math.min(G0, T*0.05));
+    const S0 = Math.max(0, (psNeed - SUG.gluc.ps*G0)/SUG.sacch.ps);
+    const Q = S0 + G0;
+    const I = Math.min(fI*Q, T*0.04);   // inverti ≤ 4 % du mix (dose pro 2–5 %)
+    const D = fD*Q;
+    const ps2 = psNeed - SUG.inv.ps*I - SUG.dext.ps*D;
+    const est2 = estNeed - SUG.inv.es*I - SUG.dext.es*D;
+    let note = '';
+    let G = (est2 - ps2)/(SUG.gluc.es - SUG.gluc.ps);
+    if(G < 0){ G = 0; note = 'EST visé atteint sans glucose : l’EST final sera un peu supérieur à l’objectif.'; }
+    if(G > T*0.05){ G = T*0.05; note = 'Glucose atomisé plafonné à 5 % du mix (repère fiche) : l’EST final pourra s’écarter légèrement de l’objectif.'; }
+    const S = (ps2 - SUG.gluc.ps*G)/SUG.sacch.ps;
+    return {S, G, D, I, note};
+  }
+  // fruits acides : plus d'inverti (souplesse, foisonnement — fiche BTM)
+  let r = solve(acide ? 0.10 : 0.07, acide ? 0.07 : 0.10);
+  if(r.S < 0) r = solve(0.04, 0.05);
+  if(r.S < 0) r = solve(0, 0);
+  if(r.S < 0) return {err:'Trop d’extrait sec demandé pour ce pouvoir sucrant : baissez l’EST visé ou montez le PS.'};
+  const eau = T - cF.g - stabV - r.S - r.G - r.D - r.I;
   if(eau < 0) return {err:'Le total dépasse 100 % : réduisez la proportion de fruit ou les objectifs.'};
-  return {F, S, G, stabV, eau, note};
+  const estPct = (cF.est + r.S*SUG.sacch.es + r.G*SUG.gluc.es + r.D*SUG.dext.es + r.I*SUG.inv.es + stabV)/T*100;
+  return {F:cF.g, S:r.S, G:r.G, D:r.D, I:r.I, stabV, eau, note:r.note, estPct};
+}
+function calculSorbet(T, fruitId, fruitPct, psP, estP, stabP){
+  const ing = ING_BY_ID[fruitId];
+  const cF = contribution(ing, T*fruitPct/100);
+  return calculSorbetMix(T, cF, psP, estP, stabP, ing.fruit==='acide');
 }
 
 function openSorbet(){
@@ -805,8 +839,10 @@ function validerSorbet(){
   if(r.err){ el('sbErr').textContent=r.err; return; }
   const rows = [ {id:fruitId, g:Math.round(r.F)}, {id:'saccharose', g:Math.round(r.S)} ];
   if(r.G>=5) rows.push({id:'glucose_atom', g:Math.round(r.G)});
+  if(r.D>=5) rows.push({id:'dextrose', g:Math.round(r.D)});
+  if(r.I>=5) rows.push({id:'inverti', g:Math.round(r.I)});
   if(r.stabV>0) rows.push({id:'stab', g:Math.round(r.stabV)});
-  rows.push({id:'eau', g:Math.round(r.eau)});
+  rows.push({id:'eau', g:Math.max(0, Math.round(T) - rows.reduce((s,x)=>s+x.g,0))});
   state.rows = rows;
   state.type = fruitPct>=45 ? 'sorbet_pf' : 'sorbet';
   el('produitType').value = state.type;
@@ -831,62 +867,98 @@ function fruitPctConseille(fruitId){
   const f = FOURCHETTES[fruitId];
   return f ? (f[0]+f[1])/2 : 50;
 }
+let autoFruits = [{id:'fraise', g:1000}];
+function renderAutoFruits(){
+  const box = el('autoFruitRows'); box.innerHTML='';
+  autoFruits.forEach((f,idx)=>{
+    const row = document.createElement('div'); row.className='fruitrow';
+    const sel = document.createElement('select');
+    for(const i of INGREDIENTS.filter(i=>i.cat==='FRUIT')){
+      const o=document.createElement('option'); o.value=i.id; o.textContent=i.nom;
+      if(i.id===f.id) o.selected=true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change',()=>{ f.id = sel.value; });
+    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='50'; inp.value=f.g;
+    inp.addEventListener('input',()=>{ f.g = parseFloat(inp.value)||0; });
+    const del = document.createElement('button'); del.className='ghost'; del.title='Retirer ce fruit'; del.textContent='✕';
+    del.addEventListener('click',()=>{
+      autoFruits.splice(idx,1);
+      if(!autoFruits.length) autoFruits.push({id:'fraise', g:500});
+      renderAutoFruits();
+    });
+    row.append(sel,inp,del); box.appendChild(row);
+  });
+}
 function majAutoUI(){
   const mode = el('autoType').value;
   const isSorbet = mode==='sorbet';
   el('autoFruitField').style.display = isSorbet ? '' : 'none';
-  el('autoPoidsLabel').textContent = isSorbet ? 'Poids de purée de fruits (g)' : 'Poids de lait entier (g)';
+  el('autoPoidsField').style.display = isSorbet ? 'none' : '';
   if(isSorbet){
-    const id = el('autoFruit').value;
-    const p = fruitPctConseille(id);
-    el('autoNote').textContent = `Objectifs appliqués : ${fmt(p)} % de fruit (fourchette de la fiche), pouvoir sucrant 29 %, extrait sec 32 %, stabilisateur 0,5 %.`;
+    el('autoNote').textContent = 'Objectifs appliqués : proportion de fruits à la fourchette conseillée de la fiche, pouvoir sucrant 29 %, extrait sec 32 %, stabilisateur 0,5 % (soit 4 à 5 g/kg, dose pro pour sorbet). '
+      + 'Sucres répartis pour une texture optimale : saccharose + glucose atomisé (extrait sec anti-cristallisant) + dextrose et sucre inverti (souplesse à la sortie du congélateur, inverti renforcé pour les fruits acides).';
   } else {
     const c = AUTO_CIBLES[mode];
-    el('autoNote').textContent = `Objectifs appliqués : MG butyrique ${fmt(c.mg)} %, sucres ${fmt(c.suc)} % (80 % saccharose, 10 % glucose atomisé, 10 % dextrose), ESDL ${fmt(c.esdl)} %, jaunes ${fmt(c.jaune)} %, stabilisateur ${fmt(c.stab)} %.`;
+    el('autoNote').textContent = `Objectifs appliqués : MG butyrique ${fmt(c.mg)} %, sucres ${fmt(c.suc)} % (80 % saccharose, 10 % glucose atomisé, 10 % dextrose pour la texture), ESDL ${fmt(c.esdl)} %, jaunes ${fmt(c.jaune)} %, stabilisateur ${fmt(c.stab)} %.`;
   }
 }
 function recetteAuto(){
   const mode = el('autoType').value;
-  const W = +el('autoPoids').value;
-  if(!(W>0)){ alert('Indiquez un poids valide.'); return; }
   if(mode==='sorbet'){
-    const fruitId = el('autoFruit').value;
-    const ing = ING_BY_ID[fruitId];
-    const pConseil = fruitPctConseille(fruitId);
-    const pMin = ing.fruit==='coque' ? 5 : ing.fruit==='acide' ? 10 : 25;
-    const cF = contribution(ing, W);
+    const list = autoFruits.filter(f=>ING_BY_ID[f.id] && f.g>0);
+    if(!list.length){ alert('Ajoutez au moins un fruit avec un poids valide.'); return; }
+    const W = list.reduce((s,f)=>s+f.g,0);
+    // contributions cumulées des fruits + moyennes pondérées (fourchette
+    // conseillée et minimum légal) sur l'ensemble des purées
+    const cF = {g:0, ps:0, est:0};
+    let pConseil = 0, pMin = 0, acideW = 0;
+    for(const f of list){
+      const ing = ING_BY_ID[f.id];
+      const c = contribution(ing, f.g);
+      cF.g += c.g; cF.ps += c.ps; cF.est += c.est;
+      pConseil += f.g * fruitPctConseille(f.id);
+      pMin += f.g * (ing.fruit==='coque' ? 5 : ing.fruit==='acide' ? 10 : 25);
+      if(ing.fruit==='acide') acideW += f.g;
+    }
+    pConseil /= W; pMin /= W;
+    const acide = acideW > W/2;
     // PS visé 29 % ; pour les fruits riches en extrait sec ou en gras
     // (banane, marron, coco, avocat…), on abaisse d'abord le PS dans la
-    // fourchette 25–33 %, puis la proportion de fruit (sans passer sous le
+    // fourchette 25–33 %, puis la proportion de fruits (sans passer sous le
     // minimum légal), jusqu'à ce que l'EST tienne sous 35 %
     let r = null, psUse = 29, p = pConseil, T = 0, ok = false;
     for(let pTry = pConseil; pTry >= pMin - 0.01 && !ok; pTry -= 2.5){
       const Tt = W/(pTry/100);
       for(const psTry of [29, 28, 27, 26, 25.5]){
-        const rt = calculSorbet(Tt, fruitId, pTry, psTry, 32, 0.5);
+        const rt = calculSorbetMix(Tt, cF, psTry, 32, 0.5, acide);
         if(rt.err) continue;
         r = rt; psUse = psTry; p = pTry; T = Tt;
-        const estPct = (cF.est + rt.S*0.999 + rt.G*0.95 + rt.stabV)/Tt*100;
-        if(estPct <= 34.9){ ok = true; break; }
+        if(rt.estPct <= 34.9){ ok = true; break; }
       }
     }
-    if(!r){ alert('Impossible d’équilibrer un sorbet avec ce fruit : essayez le mode manuel.'); return; }
+    if(!r){ alert('Impossible d’équilibrer un sorbet avec ces fruits : essayez le mode manuel.'); return; }
     if(psUse !== 29) r.note = (r.note?r.note+' ':'') +
       `Pouvoir sucrant ajusté à ${fmt(psUse)} % pour maintenir l'extrait sec sous 35 %.`;
     if(p !== pConseil) r.note = (r.note?r.note+' ':'') +
-      `Proportion de fruit réduite à ${fmt(p)} % (fruit très riche en extrait sec ou en matière grasse).`;
-    const rows = [ {id:fruitId, g:Math.round(W)}, {id:'saccharose', g:Math.round(r.S)} ];
+      `Proportion de fruits réduite à ${fmt(p)} % (fruits très riches en extrait sec ou en matière grasse).`;
+    const rows = list.map(f=>({id:f.id, g:Math.round(f.g)}));
+    rows.push({id:'saccharose', g:Math.round(r.S)});
     if(r.G>=5) rows.push({id:'glucose_atom', g:Math.round(r.G)});
+    if(r.D>=5) rows.push({id:'dextrose', g:Math.round(r.D)});
+    if(r.I>=5) rows.push({id:'inverti', g:Math.round(r.I)});
     if(r.stabV>0) rows.push({id:'stab', g:Math.round(r.stabV)});
     const autres = rows.reduce((s,x)=>s+x.g,0);
     rows.push({id:'eau', g:Math.max(0, Math.round(T)-autres)});
     state.rows = rows;
     state.type = p>=45 ? 'sorbet_pf' : 'sorbet';
-    const nomFruit = ING_BY_ID[fruitId].nom.toLowerCase().replace(' *','');
-    state.nom = 'Sorbet '+nomFruit;
-    el('autoNote').textContent = `Mix total : ${fmt0(T)} g pour ${fmt0(W)} g de fruit (${fmt(p)} %). Pouvoir sucrant ${fmt(psUse)} %, extrait sec 32 %, stabilisateur 0,5 %.`
+    const noms = list.map(f=>ING_BY_ID[f.id].nom.toLowerCase().replace(' *','').replace(/ \(.*\)/,'').replace(/ \/.*$/,''));
+    state.nom = 'Sorbet '+noms.join('-');
+    el('autoNote').textContent = `Mix total : ${fmt0(T)} g pour ${fmt0(W)} g de fruits (${fmt(p)} %). Pouvoir sucrant ${fmt(psUse)} %, extrait sec 32 %, stabilisateur 0,5 %.`
       + (r.note ? ' '+r.note : '');
   } else {
+    const W = +el('autoPoids').value;
+    if(!(W>0)){ alert('Indiquez un poids valide.'); return; }
     const c = AUTO_CIBLES[mode];
     // la méthode en 5 étapes est linéaire : on calcule la part de lait entier
     // sur 1000 g, puis on remonte au poids total qui donne exactement W de lait
@@ -1031,12 +1103,11 @@ function init(){
     }
     el('presets').value='';
   });
-  const autoFruit = el('autoFruit');
-  for(const i of INGREDIENTS.filter(i=>i.cat==='FRUIT')){
-    const o=document.createElement('option'); o.value=i.id; o.textContent=i.nom; autoFruit.appendChild(o);
-  }
-  autoFruit.value='fraise';
-  autoFruit.addEventListener('change', majAutoUI);
+  renderAutoFruits();
+  el('autoAddFruit').addEventListener('click',()=>{
+    autoFruits.push({id:'framboise', g:500});
+    renderAutoFruits();
+  });
   el('autoType').addEventListener('change', majAutoUI);
   el('btnAuto').addEventListener('click', recetteAuto);
   majAutoUI();

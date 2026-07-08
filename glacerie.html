@@ -167,7 +167,7 @@
         </select>
       </div>
       <div class="field" id="autoFruitField" style="min-width:320px">
-        <label>Purées de fruits — un ou plusieurs, avec leur poids (g)</label>
+        <label>Purées de fruits — poids (g) et % de sucre ajouté (0 si purée non sucrée)</label>
         <div id="autoFruitRows"></div>
         <button id="autoAddFruit" type="button" style="margin-top:6px">＋ Ajouter un fruit</button>
       </div>
@@ -309,7 +309,7 @@ const CATS = {
   FRUIT:'Fruits', OLEA:'Fruits secs & pralinés', CHOC:'Chocolat & cacao',
   STAB:'Stabilisateurs & émulsifiants', AUTRE:'Autres'
 };
-const D = (o)=>Object.assign({eau:0,mg:0,mgL:false,esdl:0,suc:0,psr:100,autres:0,approx:false},o);
+const D = (o)=>Object.assign({eau:0,mg:0,mgL:false,esdl:0,suc:0,psr:100,autres:0,approx:false,fruitFrac:1},o);
 const INGREDIENTS = [
   // ---- Produits laitiers (MG butyrique) ----
   D({id:'lait_entier',   nom:'Lait entier',            cat:'LAIT', eau:88,   mg:3.6,  mgL:true, esdl:8.4}),
@@ -531,7 +531,7 @@ function contribution(ing, g){
     g, eau: ing.eau*f, mg, mgLait: ing.mgL ? mg : 0,
     esdl, suc, ps: suc*ing.psr/100, autres,
     est: mg+esdl+suc+autres,
-    fruits: (ing.cat==='FRUIT' || (ing.cat==='OLEA' && ing.fruit==='coque')) ? g : 0,
+    fruits: (ing.cat==='FRUIT' || (ing.cat==='OLEA' && ing.fruit==='coque')) ? g*(ing.fruitFrac||1) : 0,
     fruitType: ing.fruit || null,
     jaunes: ing.jaune ? g : 0,
     stab: ing.stab ? g : 0,
@@ -1062,27 +1062,54 @@ function fruitPctConseille(fruitId){
   const f = FOURCHETTES[fruitId];
   return f ? (f[0]+f[1])/2 : 50;
 }
-let autoFruits = [{id:'fraise', g:1000}];
+let autoFruits = [{id:'fraise', g:1000, sucre:0}];
+/* purée sucrée du commerce : on enregistre un ingrédient dédié dont la
+   composition est le mélange fruit × (100−s) % + saccharose × s %.
+   Le sucre ajouté compte dans les sucres/PS/EST, mais pas dans le % de
+   fruits (fruitFrac) pour les minima d'appellation. */
+function nomFruitCourt(ing){ return ing.nom.toLowerCase().replace(' *','').replace(/ \(.*\)/,'').replace(/ \/.*$/,''); }
+function registerPuree(fruitId, pct){
+  pct = Math.max(1, Math.min(50, Math.round(pct)));
+  const id = 'puree_'+fruitId+'_'+pct;
+  if(!ING_BY_ID[id]){
+    const f = ING_BY_ID[fruitId], s = pct/100;
+    const suc = f.suc*(1-s) + 100*s;
+    const psr = suc>0 ? Math.round((f.suc*(1-s)*f.psr + 100*s*100)/suc*10)/10 : 100;
+    const ing = D({id, nom:'Purée de '+nomFruitCourt(f)+' ('+pct+' % sucre)', cat:'FRUIT', fruit:f.fruit,
+      eau:f.eau*(1-s), mg:f.mg*(1-s), mgL:f.mgL, esdl:f.esdl*(1-s), suc, psr,
+      autres:f.autres*(1-s), fruitFrac:1-s, approx:f.approx});
+    INGREDIENTS.push(ing); ING_BY_ID[id] = ing;
+  }
+  state.customIngs = state.customIngs || [];
+  if(!state.customIngs.find(c=>c.fruitId===fruitId && c.pct===pct)) state.customIngs.push({fruitId, pct});
+  return id;
+}
 function renderAutoFruits(){
   const box = el('autoFruitRows'); box.innerHTML='';
   autoFruits.forEach((f,idx)=>{
     const row = document.createElement('div'); row.className='fruitrow';
     const sel = document.createElement('select');
-    for(const i of INGREDIENTS.filter(i=>i.cat==='FRUIT')){
+    for(const i of INGREDIENTS.filter(i=>i.cat==='FRUIT' && !i.id.startsWith('puree_'))){
       const o=document.createElement('option'); o.value=i.id; o.textContent=i.nom;
       if(i.id===f.id) o.selected=true;
       sel.appendChild(o);
     }
     sel.addEventListener('change',()=>{ f.id = sel.value; });
     const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='50'; inp.value=f.g;
+    inp.title='Poids de purée (g)';
     inp.addEventListener('input',()=>{ f.g = parseFloat(inp.value)||0; });
+    const suc = document.createElement('input'); suc.type='number'; suc.min='0'; suc.max='50'; suc.step='1';
+    suc.value = f.sucre||0; suc.style.width='72px';
+    suc.title='% de sucre ajouté dans la purée (0 = purée non sucrée, souvent 10 % pour les purées du commerce)';
+    suc.addEventListener('input',()=>{ f.sucre = Math.max(0, Math.min(50, parseFloat(suc.value)||0)); });
+    const sucLbl = document.createElement('span'); sucLbl.className='rowhint'; sucLbl.textContent='% sucre';
     const del = document.createElement('button'); del.className='ghost'; del.title='Retirer ce fruit'; del.textContent='✕';
     del.addEventListener('click',()=>{
       autoFruits.splice(idx,1);
-      if(!autoFruits.length) autoFruits.push({id:'fraise', g:500});
+      if(!autoFruits.length) autoFruits.push({id:'fraise', g:500, sucre:0});
       renderAutoFruits();
     });
-    row.append(sel,inp,del); box.appendChild(row);
+    row.append(sel,inp,suc,sucLbl,del); box.appendChild(row);
   });
 }
 function majAutoUI(){
@@ -1105,17 +1132,19 @@ function recetteAuto(){
     const list = autoFruits.filter(f=>ING_BY_ID[f.id] && f.g>0);
     if(!list.length){ alert('Ajoutez au moins un fruit avec un poids valide.'); return; }
     const W = list.reduce((s,f)=>s+f.g,0);
-    // contributions cumulées des fruits + moyennes pondérées (fourchette
-    // conseillée et minimum légal) sur l'ensemble des purées
+    // contributions cumulées des purées (sucrées ou non) + moyennes pondérées
+    // (fourchette conseillée et minimum légal) sur l'ensemble
     const cF = {g:0, ps:0, est:0};
-    let pConseil = 0, pMin = 0, acideW = 0;
+    let pConseil = 0, pMin = 0, acideW = 0, sucrees = false;
     for(const f of list){
-      const ing = ING_BY_ID[f.id];
-      const c = contribution(ing, f.g);
+      f.useId = (f.sucre>0) ? registerPuree(f.id, f.sucre) : f.id;
+      if(f.sucre>0) sucrees = true;
+      const base = ING_BY_ID[f.id];
+      const c = contribution(ING_BY_ID[f.useId], f.g);
       cF.g += c.g; cF.ps += c.ps; cF.est += c.est;
       pConseil += f.g * fruitPctConseille(f.id);
-      pMin += f.g * (ing.fruit==='coque' ? 5 : ing.fruit==='acide' ? 10 : 25);
-      if(ing.fruit==='acide') acideW += f.g;
+      pMin += f.g * (base.fruit==='coque' ? 5 : base.fruit==='acide' ? 10 : 25);
+      if(base.fruit==='acide') acideW += f.g;
     }
     pConseil /= W; pMin /= W;
     const acide = acideW > W/2;
@@ -1138,7 +1167,7 @@ function recetteAuto(){
       `Pouvoir sucrant ajusté à ${fmt(psUse)} % pour maintenir l'extrait sec sous 35 %.`;
     if(p !== pConseil) r.note = (r.note?r.note+' ':'') +
       `Proportion de fruits réduite à ${fmt(p)} % (fruits très riches en extrait sec ou en matière grasse).`;
-    const rows = list.map(f=>({id:f.id, g:Math.round(f.g)}));
+    const rows = list.map(f=>({id:f.useId, g:Math.round(f.g)}));
     rows.push({id:'saccharose', g:Math.round(r.S)});
     if(r.G>=5) rows.push({id:'glucose_atom', g:Math.round(r.G)});
     if(r.D>=5) rows.push({id:'dextrose', g:Math.round(r.D)});
@@ -1151,7 +1180,8 @@ function recetteAuto(){
     state.cibles = {mode:'sorbet', ps:psUse, est:32};
     const noms = list.map(f=>ING_BY_ID[f.id].nom.toLowerCase().replace(' *','').replace(/ \(.*\)/,'').replace(/ \/.*$/,''));
     state.nom = 'Sorbet '+noms.join('-');
-    el('autoNote').textContent = `Mix total : ${fmt0(T)} g pour ${fmt0(W)} g de fruits (${fmt(p)} %). Pouvoir sucrant ${fmt(psUse)} %, extrait sec 32 %, stabilisateur 0,5 %.`
+    el('autoNote').textContent = `Mix total : ${fmt0(T)} g pour ${fmt0(W)} g de purées (${fmt(p)} %). Pouvoir sucrant ${fmt(psUse)} %, extrait sec 32 %, stabilisateur 0,5 %.`
+      + (sucrees ? ' Le sucre ajouté de vos purées est déduit des sucres de la recette.' : '')
       + (r.note ? ' '+r.note : '');
   } else {
     const W = +el('autoPoids').value;
@@ -1270,7 +1300,12 @@ function save(){
 function load(){
   try{
     const s = JSON.parse(localStorage.getItem('glacerie_state'));
-    if(s && Array.isArray(s.rows) && PRODUITS[s.type]) state = s;
+    if(s && Array.isArray(s.rows) && PRODUITS[s.type]){
+      state = s;
+      // ré-enregistrer les purées sucrées créées lors de sessions précédentes
+      if(Array.isArray(state.customIngs))
+        for(const c of state.customIngs.slice()) if(ING_BY_ID[c.fruitId]) registerPuree(c.fruitId, c.pct);
+    }
   }catch(e){}
 }
 

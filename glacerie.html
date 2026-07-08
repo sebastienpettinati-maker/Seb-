@@ -113,6 +113,11 @@
     #printArea .st-warn::before{content:"! "}
     #printArea .st-bad::before{content:"✗ "}
     #printArea .foot{font-size:9.5px;color:#555;margin-top:14px}
+    #printArea .labelgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:5mm}
+    #printArea .label{border:1.2px dashed #777;border-radius:2mm;padding:2.5mm;font-size:8.5px;line-height:1.3;break-inside:avoid}
+    #printArea .label h3{font-size:10.5px;margin:0 0 1mm;border:none;padding:0}
+    #printArea .label .lot{font-weight:700;margin-top:1mm}
+    #printArea .signature{margin-top:10mm;font-size:11px}
   }
 </style>
 </head>
@@ -266,6 +271,21 @@
     <div class="verdict ok" id="potResult" style="margin-top:10px"></div>
     <p class="footnote">Prix indicatifs pré-remplis : modifiez-les selon vos fournisseurs, ils sont enregistrés sur cet appareil et réutilisés pour toutes vos recettes.
        Le poids du pot correspond au poids de mix : le foisonnement ajoute du volume, pas du poids — un pot de 120 g contient bien 120 g de mix.</p>
+  </section>
+
+  <section class="card">
+    <h2>🏷️ Traçabilité &amp; étiquettes DLC</h2>
+    <p class="footnote" style="margin:0 0 12px">Une fois la production sortie de turbine, indiquez la date, le lot et le nombre de pots réellement remplis :
+       imprimez la fiche de traçabilité (production, lot, DDM, ingrédients) et la planche d'étiquettes à coller sur les pots —
+       liste des ingrédients par ordre décroissant avec allergènes en gras, poids net, lot, date de production et date de durabilité minimale.</p>
+    <div class="toolbar">
+      <div class="field"><label for="tracDate">Date de production</label><input type="date" id="tracDate"></div>
+      <div class="field"><label for="tracDuree">Conservation (mois)</label><input type="number" id="tracDuree" value="12" min="1" max="24" step="1" style="width:90px"></div>
+      <div class="field"><label for="tracLot">N° de lot</label><input type="text" id="tracLot" style="width:150px"></div>
+      <div class="field"><label for="tracNb">Pots produits</label><input type="number" id="tracNb" min="1" step="1" style="width:90px"></div>
+      <button class="primary" id="btnEtiquettes">🖨 Imprimer fiche + étiquettes</button>
+    </div>
+    <p class="footnote" id="tracInfo" style="margin-bottom:0"></p>
   </section>
 </div>
 
@@ -761,6 +781,7 @@ function update(rebuildRecette=true){
   renderMeters(criteres);
   renderAnalyse(t);
   renderCouts();
+  majTracInfo();
   el('regleNote').textContent = PRODUITS[state.type].note;
   save();
 }
@@ -1408,6 +1429,84 @@ function buildPrint(){
 }
 
 /* =====================================================================
+   TRAÇABILITÉ & ÉTIQUETTES DLC
+===================================================================== */
+function lotAuto(){
+  const d = (state.trac && state.trac.date) ? new Date(state.trac.date+'T00:00') : new Date();
+  const ymd = d.getFullYear().toString().slice(2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  const ini = (state.nom || PRODUITS[state.type].label).split(/[\s-]+/).map(m=>m.charAt(0)).join('').toUpperCase().slice(0,4);
+  return 'L'+ymd+'-'+(ini||'GL');
+}
+function majTracInfo(){
+  const t = computeTotals();
+  const potG = (state.pot && state.pot.g) || 120;
+  const auto = Math.max(1, Math.floor(t.g/potG));
+  if(!el('tracNb').value) el('tracNb').placeholder = auto;
+  const duree = parseFloat(el('tracDuree').value)||12;
+  const d = el('tracDate').value ? new Date(el('tracDate').value+'T00:00') : new Date();
+  const ddm = new Date(d); ddm.setMonth(ddm.getMonth()+duree);
+  el('tracInfo').textContent = `Pots de ${fmt0(potG)} g (réglable dans la section coûts) — la recette permet environ ${auto} pots. `
+    + `DDM calculée : ${ddm.toLocaleDateString('fr-FR')} (à conserver à −18 °C).`;
+}
+function listeIngredientsEtiquette(t){
+  return state.rows.filter(r=>(r.g||0)>0 && ING_BY_ID[r.id])
+    .slice().sort((a,b)=>(b.g||0)-(a.g||0))
+    .map(r=>{
+      const ing = ING_BY_ID[r.id];
+      let n = ing.nom.toLowerCase().replace(' *','');
+      if(ing.cat==='FRUIT') n += ' '+fmt(pct(r.g*(ing.fruitFrac||1), t.g),0)+' %';
+      const allergene = ing.cat==='LAIT' || ing.cat==='OEUF' || ing.cat==='OLEA' || r.id==='coco';
+      return allergene ? '<b>'+n+'</b>' : n;
+    }).join(', ');
+}
+function buildLabels(){
+  const t = computeTotals();
+  const potG = (state.pot && state.pot.g) || 120;
+  const nb = Math.min(300, parseInt(el('tracNb').value) || Math.max(1, Math.floor(t.g/potG)));
+  const duree = parseFloat(el('tracDuree').value)||12;
+  const dateP = el('tracDate').value ? new Date(el('tracDate').value+'T00:00') : new Date();
+  const ddm = new Date(dateP); ddm.setMonth(ddm.getMonth()+duree);
+  const lot = el('tracLot').value || lotAuto();
+  const nom = state.nom || PRODUITS[state.type].label;
+  const ingListe = listeIngredientsEtiquette(t);
+  const dP = dateP.toLocaleDateString('fr-FR'), dD = ddm.toLocaleDateString('fr-FR');
+  const coutTotal = coutMix();
+  const cp = coutsPot(coutTotal, t.g);
+
+  let h = `<h1>Fiche de traçabilité — ${nom}</h1>
+  <p class="sub">${PRODUITS[state.type].label} · éditée le ${new Date().toLocaleDateString('fr-FR')}</p>
+  <h2>Production</h2>
+  <table><tbody>
+    <tr><td>Produit</td><td><strong>${nom}</strong></td><td>N° de lot</td><td><strong>${lot}</strong></td></tr>
+    <tr><td>Date de production</td><td>${dP}</td><td>DDM (à conserver à −18 °C)</td><td><strong>${dD}</strong> (${fmt0(duree)} mois)</td></tr>
+    <tr><td>Poids de mix produit</td><td>${fmt0(t.g)} g</td><td>Pots produits</td><td><strong>${nb}</strong> × ${fmt0(potG)} g net</td></tr>
+    <tr><td>Coût matières du lot</td><td>${coutTotal>0?fmtE(coutTotal)+' €':'—'}</td><td>Prix de vente conseillé / pot</td><td>${coutTotal>0?fmtE(cp.prixVente)+' € (coef. '+fmt(cp.coeff)+')':'—'}</td></tr>
+  </tbody></table>
+  <h2>Ingrédients mis en œuvre (ordre décroissant, allergènes en gras)</h2>
+  <p style="font-size:11px">${ingListe}.</p>
+  <table><thead><tr><th>Ingrédient</th><th class="num">Poids (g)</th><th>Lot fournisseur (à compléter)</th></tr></thead><tbody>`;
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id]; if(!ing || !(r.g>0)) continue;
+    h += `<tr><td>${ing.nom}</td><td class="num">${fmt0(r.g)}</td><td style="width:45%">&nbsp;</td></tr>`;
+  }
+  h += `</tbody></table>
+  <p class="signature">Maturation : 4 à 12 h entre +4 et +10 °C · Congélation à cœur −18 °C en moins de 2 h · Ne jamais recongeler un produit décongelé.<br><br>
+  Réalisé par : ______________________&nbsp;&nbsp;&nbsp;&nbsp;Visa : ______________</p>
+  <div style="break-before:page"></div>
+  <h2>Étiquettes (${nb} pot${nb>1?'s':''} de ${fmt0(potG)} g)</h2>
+  <div class="labelgrid">`;
+  const label = `<div class="label"><h3>${nom}</h3>
+    <div>Ingrédients : ${ingListe}.</div>
+    <div class="lot">Lot ${lot} · Poids net : ${fmt0(potG)} g</div>
+    <div>Produit le ${dP} · À consommer de préférence avant le : <b>${dD}</b></div>
+    <div>À conserver à −18 °C. Ne jamais recongeler un produit décongelé.</div>
+  </div>`;
+  h += label.repeat(nb);
+  h += `</div>`;
+  el('printArea').innerHTML = h;
+}
+
+/* =====================================================================
    PERSISTANCE + INITIALISATION
 ===================================================================== */
 function save(){
@@ -1425,6 +1524,7 @@ function load(){
   }catch(e){}
 }
 
+let printMode = 'recette';
 function init(){
   load();
   const selType = el('produitType');
@@ -1472,9 +1572,30 @@ function init(){
   el('potG').addEventListener('input',()=>{ state.pot.g = parseFloat(el('potG').value)||120; save(); majResultatsCouts(); });
   el('potCoeff').addEventListener('input',()=>{ state.pot.coeff = parseFloat(el('potCoeff').value)||5; save(); majResultatsCouts(); });
 
-  el('btnPDF').addEventListener('click',()=>{ buildPrint(); window.print(); });
-  el('btnPDF2').addEventListener('click',()=>{ buildPrint(); window.print(); });
-  window.addEventListener('beforeprint', buildPrint);
+  // --- traçabilité ---
+  state.trac = state.trac || {};
+  const today = new Date(); const iso = today.toISOString().slice(0,10);
+  el('tracDate').value = state.trac.date || iso;
+  el('tracDuree').value = state.trac.duree || 12;
+  el('tracLot').value = state.trac.lot || lotAuto();
+  if(state.trac.nbPots) el('tracNb').value = state.trac.nbPots;
+  const saveTrac = ()=>{
+    state.trac = {date:el('tracDate').value, duree:parseFloat(el('tracDuree').value)||12,
+                  lot:el('tracLot').value, nbPots:parseInt(el('tracNb').value)||null};
+    save(); majTracInfo();
+  };
+  el('tracDate').addEventListener('input',()=>{
+    // régénère le lot automatiquement s'il n'a pas été personnalisé
+    if(/^L\d{6}-/.test(el('tracLot').value||'')){ state.trac.date = el('tracDate').value; el('tracLot').value = lotAuto(); }
+    saveTrac();
+  });
+  for(const id of ['tracDuree','tracLot','tracNb']) el(id).addEventListener('input', saveTrac);
+  el('btnEtiquettes').addEventListener('click',()=>{ printMode='etiquettes'; buildLabels(); window.print(); });
+
+  el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); window.print(); });
+  el('btnPDF2').addEventListener('click',()=>{ printMode='recette'; buildPrint(); window.print(); });
+  window.addEventListener('beforeprint', ()=>{ if(printMode==='etiquettes') buildLabels(); else buildPrint(); });
+  window.addEventListener('afterprint', ()=>{ printMode='recette'; });
   update();
 }
 init();

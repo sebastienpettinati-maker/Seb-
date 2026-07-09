@@ -143,6 +143,21 @@
   details.more{margin-top:12px;font-size:.82rem;color:var(--ink-2);line-height:1.5}
   details.more summary{cursor:pointer;font-weight:700;color:var(--ink-3)}
   details.more[open] summary{margin-bottom:6px}
+  /* --- photos des lots fournisseurs --- */
+  .lotrow{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--grid);flex-wrap:wrap}
+  .lotrow:last-child{border-bottom:none}
+  .lotthumb{width:64px;height:64px;border-radius:12px;object-fit:cover;border:1.5px solid var(--grid);cursor:zoom-in;flex:none}
+  .lotthumb.vide{display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+    color:var(--ink-3);background:var(--zebra);cursor:default;border-style:dashed}
+  .lotname{flex:1;min-width:140px}
+  .lotname .rowhint{margin-top:0}
+  .lotrow input[type=text]{width:150px}
+  .lotchips{flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .lotchips button{padding:5px 12px;font-size:.8rem}
+  #photoView{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.8);
+    display:flex;align-items:center;justify-content:center;cursor:zoom-out}
+  #photoView[hidden]{display:none}
+  #photoView img{max-width:94%;max-height:94%;border-radius:8px}
   .card pre{background:var(--zebra);border:1px solid var(--grid);border-radius:12px;
     padding:12px 14px;overflow-x:auto;font-size:.78rem;line-height:1.5}
   /* --- aperçu avant impression --- */
@@ -171,6 +186,9 @@
   .docview .label h3{font-size:12px;margin:0 0 4px;border:none;padding:0}
   .docview .label .lot{font-weight:700;margin-top:4px}
   .docview .signature{margin-top:26px;font-size:12px}
+  .docview .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+  .docview .photocell{border:1px solid #999;border-radius:6px;padding:6px;font-size:10.5px;color:#000}
+  .docview .photocell img{width:100%;border-radius:4px}
   /* --- impression / PDF --- */
   #printArea{display:none}
   @media print{
@@ -194,6 +212,9 @@
     #printArea .label h3{font-size:10.5px;margin:0 0 1mm;border:none;padding:0}
     #printArea .label .lot{font-weight:700;margin-top:1mm}
     #printArea .signature{margin-top:10mm;font-size:11px}
+    #printArea .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:4mm;margin-top:4mm}
+    #printArea .photocell{border:1px solid #999;border-radius:2mm;padding:2mm;font-size:9px;break-inside:avoid}
+    #printArea .photocell img{width:100%}
   }
 </style>
 </head>
@@ -203,7 +224,8 @@
   <div class="brand">🍨 Glacerie</div>
   <nav class="tabs">
     <button class="tab" data-tab="recette" type="button"><span class="ico">🧮</span><span class="lbl">Recette</span></button>
-    <button class="tab" data-tab="analyse" type="button"><span class="ico">📊</span><span class="lbl">Analyse &amp; coûts</span></button>
+    <button class="tab" data-tab="analyse" type="button"><span class="ico">📊</span><span class="lbl">Analyse</span></button>
+    <button class="tab" data-tab="lots" type="button"><span class="ico">📷</span><span class="lbl">Lots</span></button>
     <button class="tab" data-tab="etiquettes" type="button"><span class="ico">🏷️</span><span class="lbl">Étiquettes</span></button>
     <button class="tab" data-tab="recettes" type="button"><span class="ico">📁</span><span class="lbl">Mes recettes</span></button>
   </nav>
@@ -354,6 +376,29 @@
     </section>
   </section>
 
+  <!-- ==================== Onglet LOTS FOURNISSEURS ==================== -->
+  <section class="panel" data-panel="lots">
+    <section class="card">
+      <h2>📷 Lots fournisseurs</h2>
+      <p class="hint">Photographiez l'étiquette de chaque produit utilisé : le numéro de lot est extrait de la photo
+         (vous pouvez aussi le saisir à la main) puis reporté sur la feuille de fabrication, à imprimer et archiver.</p>
+      <div id="lotsList"></div>
+      <div class="recipe-actions">
+        <button class="primary" id="btnFiche">🖨 Imprimer la feuille de fabrication</button>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600">
+          <input type="checkbox" id="fichePhotos" checked> Joindre les photos à la feuille
+        </label>
+      </div>
+      <details class="more"><summary>Que contient la feuille de fabrication ?</summary>
+        La feuille reprend la production du jour (produit, date, n° de lot, DDM, pots, coût), la recette complète avec
+        le numéro de lot fournisseur de chaque ingrédient et, si la case est cochée, les photos des étiquettes en annexe.
+        L'extraction du numéro depuis la photo nécessite une connexion internet (au moins la première fois) ;
+        la saisie à la main fonctionne toujours, même hors connexion.
+      </details>
+      <input type="file" id="lotPhotoInput" accept="image/*" hidden>
+    </section>
+  </section>
+
   <!-- ==================== Onglet ÉTIQUETTES ==================== -->
   <section class="panel" data-panel="etiquettes">
     <section class="card">
@@ -455,6 +500,9 @@
   </div>
   <div id="apercuContent" class="docview"></div>
 </div>
+
+<!-- ===================== Agrandissement d'une photo ===================== -->
+<div id="photoView" hidden><img id="photoViewImg" alt="Photo de l'étiquette du produit"></div>
 
 <!-- ===================== Vue impression / PDF ===================== -->
 <div id="printArea"></div>
@@ -904,6 +952,7 @@ function update(rebuildRecette=true){
   renderMeters(criteres);
   renderAnalyse(t);
   renderCouts();
+  renderLots();
   majTracInfo();
   el('regleNote').textContent = PRODUITS[state.type].note;
   save();
@@ -1522,12 +1571,13 @@ function htmlFicheTrac(d){
   </tbody></table>
   <h2>Ingrédients mis en œuvre (ordre décroissant, allergènes en gras)</h2>
   <p style="font-size:11px">${d.ingListe}.</p>
-  <table><thead><tr><th>Ingrédient</th><th class="num">Poids (g)</th><th>Lot fournisseur (à compléter)</th></tr></thead><tbody>`;
+  <table><thead><tr><th>Ingrédient</th><th class="num">Poids (g)</th><th>Lot fournisseur</th></tr></thead><tbody>`;
   for(const r of state.rows){
     const ing = ING_BY_ID[r.id]; if(!ing || !(r.g>0)) continue;
-    h += `<tr><td>${ing.nom}</td><td class="num">${fmt0(r.g)}</td><td style="width:45%">&nbsp;</td></tr>`;
+    const lf = state.lots && state.lots[r.id] && state.lots[r.id].lot;
+    h += `<tr><td>${ing.nom}</td><td class="num">${fmt0(r.g)}</td><td style="width:45%">${lf?'<strong>'+esc(lf)+'</strong>':'&nbsp;'}</td></tr>`;
   }
-  h += `</tbody></table>
+  h += `</tbody></table>` + htmlAnnexePhotos() + `
   <p class="signature">Maturation : 4 à 12 h entre +4 et +10 °C · Congélation à cœur −18 °C en moins de 2 h · Ne jamais recongeler un produit décongelé.<br><br>
   Réalisé par : ______________________&nbsp;&nbsp;&nbsp;&nbsp;Visa : ______________</p>`;
   return h;
@@ -1547,6 +1597,222 @@ function buildLabels(){
   el('printArea').innerHTML = htmlFicheTrac(d) + '<div style="break-before:page"></div>' + htmlPlanche(d);
 }
 
+/* =====================================================================
+   PHOTOS & LOTS FOURNISSEURS
+   Photo de l'étiquette de chaque produit ; le numéro de lot est extrait
+   par reconnaissance de texte (Tesseract.js chargé à la demande) ou
+   saisi à la main, puis reporté sur la feuille de fabrication.
+   Les photos sont conservées sur l'appareil (IndexedDB).
+===================================================================== */
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let photoCache = {};   // id -> dataURL (photos de la recette en cours)
+let idbP = null;
+function idb(){
+  if(!idbP) idbP = new Promise((res, rej)=>{
+    const r = indexedDB.open('glacerie', 1);
+    r.onupgradeneeded = ()=>r.result.createObjectStore('photos');
+    r.onsuccess = ()=>res(r.result);
+    r.onerror = ()=>rej(r.error);
+  });
+  return idbP;
+}
+async function photoPut(id, dataUrl){
+  const db = await idb();
+  return new Promise((res, rej)=>{
+    const tx = db.transaction('photos', 'readwrite');
+    tx.objectStore('photos').put(dataUrl, id);
+    tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
+  });
+}
+async function photoGet(id){
+  const db = await idb();
+  return new Promise((res, rej)=>{
+    const q = db.transaction('photos').objectStore('photos').get(id);
+    q.onsuccess = ()=>res(q.result || null); q.onerror = ()=>rej(q.error);
+  });
+}
+async function photoDel(id){
+  try{
+    const db = await idb();
+    return new Promise(res=>{
+      const tx = db.transaction('photos', 'readwrite');
+      tx.objectStore('photos').delete(id);
+      tx.oncomplete = res; tx.onerror = res;
+    });
+  }catch(e){}
+}
+/* lecture d'une photo, redressée par le navigateur puis réduite (≤ 1400 px, JPEG) */
+function lirePhoto(file){
+  return new Promise((res, rej)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const max = 1400, k = Math.min(1, max/Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width*k); cv.height = Math.round(img.height*k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(img.src);
+      res(cv.toDataURL('image/jpeg', .8));
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(img.src); rej(new Error('image illisible')); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+/* lots de la recette en cours : purge les ingrédients qui n'y sont plus */
+function lotsCourants(){
+  state.lots = state.lots || {};
+  const ids = new Set(state.rows.map(r=>r.id));
+  for(const id of Object.keys(state.lots)){
+    if(!ids.has(id)){
+      if(state.lots[id].photo){ photoDel(state.lots[id].photo); delete photoCache[state.lots[id].photo]; }
+      delete state.lots[id];
+    }
+  }
+  return state.lots;
+}
+let pendingLotId = null;
+function renderLots(){
+  const box = el('lotsList'); if(!box) return;
+  const lots = lotsCourants();
+  box.innerHTML = '';
+  let nb = 0;
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id];
+    if(!ing || r.id==='eau' || !(r.g>0)) continue;
+    nb++;
+    const l = lots[r.id] || (lots[r.id] = {lot:'', photo:null});
+    const row = document.createElement('div'); row.className = 'lotrow';
+    if(l.photo && photoCache[l.photo]){
+      const im = document.createElement('img'); im.className = 'lotthumb';
+      im.src = photoCache[l.photo]; im.alt = 'Étiquette '+ing.nom; im.title = 'Agrandir la photo';
+      im.addEventListener('click', ()=>{ el('photoViewImg').src = photoCache[l.photo]; el('photoView').hidden = false; });
+      row.appendChild(im);
+    } else {
+      const ph = document.createElement('div'); ph.className = 'lotthumb vide'; ph.textContent = '📦';
+      row.appendChild(ph);
+    }
+    const nom = document.createElement('div'); nom.className = 'lotname';
+    nom.innerHTML = `<strong>${ing.nom}</strong><div class="rowhint">${fmt0(r.g)} g</div>`;
+    row.appendChild(nom);
+    const inp = document.createElement('input'); inp.type = 'text'; inp.placeholder = 'N° de lot';
+    inp.value = l.lot || '';
+    inp.addEventListener('input', ()=>{ l.lot = inp.value; save(); });
+    row.appendChild(inp);
+    const bPhoto = document.createElement('button'); bPhoto.className = 'small'; bPhoto.type = 'button';
+    bPhoto.textContent = l.photo ? '📷 Reprendre' : '📷 Photo';
+    bPhoto.addEventListener('click', ()=>{ pendingLotId = r.id; el('lotPhotoInput').click(); });
+    row.appendChild(bPhoto);
+    if(l.photo){
+      const bOcr = document.createElement('button'); bOcr.className = 'small'; bOcr.type = 'button';
+      bOcr.textContent = '🔍 Extraire le n°';
+      bOcr.addEventListener('click', ()=>extraireLot(r.id, row, bOcr));
+      row.appendChild(bOcr);
+      const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
+      bDel.title = 'Supprimer la photo'; bDel.textContent = '✕';
+      bDel.addEventListener('click', ()=>{
+        photoDel(l.photo); delete photoCache[l.photo]; l.photo = null; save(); renderLots();
+      });
+      row.appendChild(bDel);
+    }
+    box.appendChild(row);
+  }
+  if(!nb) box.innerHTML = '<p class="footnote" style="margin:0">La recette est vide : composez d\'abord une recette dans l\'onglet 🧮 Recette.</p>';
+}
+/* --- reconnaissance de texte (chargée uniquement à la demande) --- */
+let tessPromise = null;
+function chargerTesseract(){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(!tessPromise) tessPromise = new Promise((res, rej)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = ()=>res(window.Tesseract);
+    s.onerror = ()=>{ tessPromise = null; s.remove(); rej(new Error('chargement impossible')); };
+    document.head.appendChild(s);
+  });
+  return tessPromise;
+}
+/* candidats « numéro de lot » dans le texte reconnu */
+function candidatsLot(txt){
+  const t = (txt || '').toUpperCase();
+  const out = [], vu = new Set();
+  const ajouter = c=>{
+    c = c.replace(/[^A-Z0-9\-\/\.]/g, '').replace(/^[\-\/\.]+|[\-\/\.]+$/g, '');
+    if(c.length>=3 && c.length<=16 && !vu.has(c)){ vu.add(c); out.push(c); }
+  };
+  // précédé de « LOT », « BATCH », « CHARGE », « N° »…
+  const re = /(?:LOT|L0T|BATCH|CHARGE)\s*(?:N[°O0]?\s*)?[:.\-]?\s*([A-Z0-9][A-Z0-9\-\/\.]{2,15})/g;
+  let m; while((m = re.exec(t))) ajouter(m[1]);
+  // codes isolés plausibles : chiffres présents, 5 à 14 caractères, ni date ni prix
+  for(const w of t.split(/[\s,;()]+/)){
+    const c = w.replace(/[^A-Z0-9\-\/\.]/g, '');
+    if(c.length>=5 && c.length<=14 && /\d/.test(c)
+       && !/^\d{1,2}[\/\.\-]\d{1,2}([\/\.\-]\d{2,4})?$/.test(c)
+       && !/^\d{1,2}[\/\.\-]\d{4}$/.test(c)
+       && !/^\d+[\.,]\d{1,2}$/.test(c)) ajouter(c);
+  }
+  return out.slice(0, 6);
+}
+async function extraireLot(ingId, row, btn){
+  const l = state.lots && state.lots[ingId];
+  if(!l || !l.photo || !photoCache[l.photo]) return;
+  const ancien = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Analyse…';
+  try{
+    const T = await chargerTesseract();
+    const worker = await T.createWorker('eng');
+    const { data } = await worker.recognize(photoCache[l.photo]);
+    await worker.terminate();
+    const cands = candidatsLot(data.text);
+    row.querySelectorAll('.lotchips').forEach(x=>x.remove());
+    const chips = document.createElement('div'); chips.className = 'lotchips';
+    if(!cands.length){
+      chips.innerHTML = '<span class="footnote" style="margin:0">Aucun numéro reconnu : saisissez-le à la main, ou reprenez la photo de plus près, bien à plat.</span>';
+    } else {
+      const lbl = document.createElement('span'); lbl.className = 'footnote'; lbl.style.margin = '0';
+      lbl.textContent = 'Touchez le bon numéro :';
+      chips.appendChild(lbl);
+      for(const c of cands){
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = c;
+        b.addEventListener('click', ()=>{ l.lot = c; save(); renderLots(); });
+        chips.appendChild(b);
+      }
+    }
+    row.appendChild(chips);
+  }catch(e){
+    alert('Extraction impossible : la reconnaissance de texte n\'a pas pu être chargée (connexion internet nécessaire la première fois). Saisissez le numéro à la main.');
+  }
+  btn.disabled = false; btn.textContent = ancien;
+}
+/* recharge les photos de la recette en cours au démarrage */
+async function chargerPhotos(){
+  const lots = state.lots || {};
+  for(const id of Object.keys(lots)){
+    const p = lots[id].photo;
+    if(p && !photoCache[p]){
+      try{
+        const d = await photoGet(p);
+        if(d) photoCache[p] = d; else lots[id].photo = null;
+      }catch(e){}
+    }
+  }
+  renderLots();
+}
+/* annexe photos de la feuille de fabrication */
+function htmlAnnexePhotos(){
+  const chk = el('fichePhotos');
+  if(chk && !chk.checked) return '';
+  const cells = [];
+  for(const r of state.rows){
+    const l = state.lots && state.lots[r.id];
+    if(!l || !l.photo || !photoCache[l.photo]) continue;
+    const ing = ING_BY_ID[r.id]; if(!ing) continue;
+    cells.push(`<div class="photocell"><img src="${photoCache[l.photo]}" alt=""><div><strong>${ing.nom}</strong>${l.lot?' — lot '+esc(l.lot):''}</div></div>`);
+  }
+  return cells.length ? `<h2>Photos des étiquettes fournisseurs</h2><div class="photogrid">${cells.join('')}</div>` : '';
+}
+function buildFiche(){
+  el('printArea').innerHTML = htmlFicheTrac(donneesTrac());
+}
+
 /* ---- fichiers autonomes (téléchargement & envoi Drive) ---- */
 const DOC_CSS = `
   body{font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:#000;background:#fff;
@@ -1564,6 +1830,9 @@ const DOC_CSS = `
   .label h3{font-size:10.5px;margin:0 0 1mm;border:none;padding:0}
   .label .lot{font-weight:700;margin-top:1mm}
   .signature{margin-top:10mm;font-size:11px}
+  .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:4mm;margin-top:4mm}
+  .photocell{border:1px solid #999;border-radius:2mm;padding:2mm;font-size:9.5px;break-inside:avoid}
+  .photocell img{width:100%;border-radius:1mm}
   .noprint{margin:0 0 14px}
   .noprint button{font:inherit;font-weight:700;padding:9px 16px;border-radius:999px;border:none;
     background:linear-gradient(135deg,#e8467c,#f2745f);color:#fff;cursor:pointer}
@@ -1838,7 +2107,11 @@ function init(){
   const fermerApercu = ()=>{ el('apercu').hidden = true; document.body.style.overflow = ''; };
   el('apercuClose').addEventListener('click', fermerApercu);
   el('apercu').addEventListener('click', e=>{ if(e.target===el('apercu')) fermerApercu(); });
-  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !el('apercu').hidden) fermerApercu(); });
+  document.addEventListener('keydown', e=>{
+    if(e.key!=='Escape') return;
+    if(!el('photoView').hidden) el('photoView').hidden = true;
+    else if(!el('apercu').hidden) fermerApercu();
+  });
   el('apercuPrint').addEventListener('click', ()=>{ try{ window.print(); }catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez le fichier dans Safari ou Chrome pour imprimer.'); } });
 
   el('btnEtiquettes').addEventListener('click',()=>{
@@ -1852,6 +2125,29 @@ function init(){
   });
   el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); driveAuto([docRecette()]); });
 
+  // --- photos & lots fournisseurs ---
+  el('lotPhotoInput').addEventListener('change', async ()=>{
+    const f = el('lotPhotoInput').files[0];
+    el('lotPhotoInput').value = '';
+    if(!f || !pendingLotId) return;
+    try{
+      const data = await lirePhoto(f);
+      const lots = lotsCourants();
+      const l = lots[pendingLotId] || (lots[pendingLotId] = {lot:'', photo:null});
+      if(l.photo){ photoDel(l.photo); delete photoCache[l.photo]; }
+      l.photo = 'ph_' + Date.now();
+      photoCache[l.photo] = data;
+      photoPut(l.photo, data).catch(()=>{});
+      save(); renderLots();
+    }catch(e){ alert('Photo illisible : réessayez.'); }
+    pendingLotId = null;
+  });
+  el('photoView').addEventListener('click', ()=>{ el('photoView').hidden = true; });
+  el('btnFiche').addEventListener('click', ()=>{
+    printMode = 'fiche'; buildFiche(); ouvrirApercu(); driveAuto([docTracabilite()]);
+  });
+  chargerPhotos();
+
   // --- Google Drive ---
   el('driveUrl').value = driveCfg.url;
   el('driveAuto').checked = driveCfg.auto !== false;
@@ -1864,7 +2160,11 @@ function init(){
   el('btnDriveNow').addEventListener('click',()=>{
     envoyerDrive([docRecette(), docTracabilite(), docEtiquettes()]);
   });
-  window.addEventListener('beforeprint', ()=>{ if(printMode==='etiquettes') buildLabels(); else buildPrint(); });
+  window.addEventListener('beforeprint', ()=>{
+    if(printMode==='etiquettes') buildLabels();
+    else if(printMode==='fiche') buildFiche();
+    else buildPrint();
+  });
   window.addEventListener('afterprint', ()=>{ printMode='recette'; });
 
   // --- mes recettes ---

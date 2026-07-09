@@ -1717,18 +1717,37 @@ function renderLots(){
   }
   if(!nb) box.innerHTML = '<p class="footnote" style="margin:0">La recette est vide : composez d\'abord une recette dans l\'onglet 🧮 Recette.</p>';
 }
-/* --- reconnaissance de texte (chargée uniquement à la demande) --- */
+/* --- reconnaissance de texte (chargée uniquement à la demande) ---
+   Les fichiers sont d'abord cherchés dans le dossier « ocr/ » hébergé avec
+   l'application (fonctionne alors hors CDN, et hors connexion une fois en
+   cache) ; à défaut, le CDN jsdelivr sert de secours. --- */
 let tessPromise = null;
-function chargerTesseract(){
+function chargerTesseract(src){
   if(window.Tesseract) return Promise.resolve(window.Tesseract);
   if(!tessPromise) tessPromise = new Promise((res, rej)=>{
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.src = src;
     s.onload = ()=>res(window.Tesseract);
     s.onerror = ()=>{ tessPromise = null; s.remove(); rej(new Error('chargement impossible')); };
     document.head.appendChild(s);
   });
   return tessPromise;
+}
+let ocrLocal = null;   // true si le dossier ocr/ est hébergé avec l'application
+async function creerWorkerOCR(){
+  if(ocrLocal === null){
+    try{
+      const r = await fetch(new URL('ocr/worker.min.js', location.href), {method:'HEAD'});
+      ocrLocal = r.ok;
+    }catch(e){ ocrLocal = false; }
+  }
+  if(ocrLocal){
+    const base = new URL('ocr', location.href).href;
+    const T = await chargerTesseract(base + '/tesseract.min.js');
+    return T.createWorker('eng', 1, {workerPath: base + '/worker.min.js', corePath: base, langPath: base});
+  }
+  const T = await chargerTesseract('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+  return T.createWorker('eng');
 }
 /* candidats « numéro de lot » dans le texte reconnu */
 function candidatsLot(txt){
@@ -1757,8 +1776,7 @@ async function extraireLot(ingId, row, btn){
   const ancien = btn.textContent;
   btn.disabled = true; btn.textContent = '⏳ Analyse…';
   try{
-    const T = await chargerTesseract();
-    const worker = await T.createWorker('eng');
+    const worker = await creerWorkerOCR();
     const { data } = await worker.recognize(photoCache[l.photo]);
     await worker.terminate();
     const cands = candidatsLot(data.text);
@@ -1778,7 +1796,7 @@ async function extraireLot(ingId, row, btn){
     }
     row.appendChild(chips);
   }catch(e){
-    alert('Extraction impossible : la reconnaissance de texte n\'a pas pu être chargée (connexion internet nécessaire la première fois). Saisissez le numéro à la main.');
+    alert('Extraction impossible ici : ouvrez l\'application depuis son adresse web habituelle (l\'extraction ne fonctionne ni dans l\'aperçu d\'essai, ni depuis un fichier ouvert directement). Une connexion internet est nécessaire à la première utilisation. En attendant, saisissez le numéro à la main.');
   }
   btn.disabled = false; btn.textContent = ancien;
 }

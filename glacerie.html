@@ -181,10 +181,13 @@
   .docview .st-warn::before{content:"! "}
   .docview .st-bad::before{content:"✗ "}
   .docview .foot{font-size:10.5px;color:#555;margin-top:14px}
-  .docview .labelgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:12px}
-  .docview .label{border:1.5px dashed #777;border-radius:8px;padding:10px;font-size:10.5px;line-height:1.35;color:#000}
-  .docview .label h3{font-size:12px;margin:0 0 4px;border:none;padding:0}
-  .docview .label .lot{font-weight:700;margin-top:4px}
+  .docview .noetiq{background:#fffbe6;border:1px solid #e0c200;border-radius:6px;padding:8px 10px;font-size:12px;margin:10px 0;color:#000}
+  .docview .labelpage{margin-top:6px;overflow-x:auto}
+  .docview .labelgrid{display:grid;grid-template-columns:repeat(5,38mm);grid-auto-rows:19mm;gap:0;width:190mm}
+  .docview .label{width:38mm;height:19mm;padding:1mm 1.5mm;overflow:hidden;outline:1px dotted #bbb;
+    font-size:6pt;line-height:1.3;color:#000;border:none;border-radius:0}
+  .docview .label .l1{font-size:7pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .docview .label .l5{font-size:4.8pt}
   .docview .signature{margin-top:26px;font-size:12px}
   .docview .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
   .docview .photocell{border:1px solid #999;border-radius:6px;padding:6px;font-size:10.5px;color:#000}
@@ -207,15 +210,25 @@
     #printArea .st-warn::before{content:"! "}
     #printArea .st-bad::before{content:"✗ "}
     #printArea .foot{font-size:9.5px;color:#555;margin-top:14px}
-    #printArea .labelgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:5mm}
-    #printArea .label{border:1.2px dashed #777;border-radius:2mm;padding:2.5mm;font-size:8.5px;line-height:1.3;break-inside:avoid}
-    #printArea .label h3{font-size:10.5px;margin:0 0 1mm;border:none;padding:0}
-    #printArea .label .lot{font-weight:700;margin-top:1mm}
+    #printArea .noetiq{display:none}
+    #printArea .fichewrap{break-after:page}
+    #printArea .labelpage{width:210mm;height:296mm;padding:6mm 10mm;overflow:hidden;break-after:page}
+    #printArea .labelgrid{display:grid;grid-template-columns:repeat(5,38mm);grid-auto-rows:19mm;gap:0}
+    #printArea .label{width:38mm;height:19mm;padding:1mm 1.5mm;overflow:hidden;font-size:6pt;line-height:1.3;break-inside:avoid}
+    #printArea .label .l1{font-size:7pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #printArea .label .l5{font-size:4.8pt}
     #printArea .signature{margin-top:10mm;font-size:11px}
     #printArea .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:4mm;margin-top:4mm}
     #printArea .photocell{border:1px solid #999;border-radius:2mm;padding:2mm;font-size:9px;break-inside:avoid}
     #printArea .photocell img{width:100%}
   }
+</style>
+<!-- réglage de page activé uniquement pour l'impression des planches d'étiquettes
+     (38 × 19 mm : la grille doit être calée sur la feuille, sans marges d'imprimante) -->
+<style id="etiqPage" media="print">
+  @page{size:A4;margin:0}
+  #printArea{padding:0}
+  #printArea .fichewrap{padding:8mm 10mm}
 </style>
 </head>
 <body>
@@ -404,7 +417,8 @@
     <section class="card">
       <h2>🏷️ Traçabilité &amp; étiquettes DLC</h2>
       <p class="hint">Une fois la production sortie de turbine, indiquez la date, le lot et le nombre de pots remplis,
-         puis imprimez la fiche de traçabilité et la planche d'étiquettes à coller sur les pots.</p>
+         puis imprimez la fiche de traçabilité et les étiquettes — calées sur des planches autocollantes A4
+         de 75 étiquettes de 38 × 19 mm (5 × 15).</p>
       <div class="toolbar">
         <div class="field"><label for="tracDate">Date de production</label><input type="date" id="tracDate"></div>
         <div class="field"><label for="tracDuree">Conservation (mois)</label><input type="number" id="tracDuree" value="12" min="1" max="24" step="1" style="width:90px"></div>
@@ -416,9 +430,10 @@
       <p class="footnote" id="tracInfo" style="margin-bottom:0"></p>
       <details class="more"><summary>Que contiennent la fiche et les étiquettes ?</summary>
         La fiche de traçabilité reprend la production (date, lot, DDM, pots), le coût du lot et la liste des ingrédients
-        mis en œuvre avec une colonne « lot fournisseur » à compléter. Chaque étiquette porte la liste des ingrédients
-        par ordre décroissant avec les allergènes en gras, le poids net, le n° de lot, la date de production et la date
-        de durabilité minimale.
+        mis en œuvre avec leur lot fournisseur. Chaque étiquette de 38 × 19 mm porte le nom du produit, le n° de lot,
+        le poids net, la date de production, la DDM et les allergènes ; la liste complète des ingrédients figure sur
+        la feuille de fabrication. À l'impression : échelle 100 % (taille réelle), marges automatiques et en-têtes /
+        pieds de page désactivés, pour que la grille tombe exactement sur les étiquettes prédécoupées.
       </details>
     </section>
   </section>
@@ -1582,19 +1597,40 @@ function htmlFicheTrac(d){
   Réalisé par : ______________________&nbsp;&nbsp;&nbsp;&nbsp;Visa : ______________</p>`;
   return h;
 }
+/* allergènes majeurs présents dans la recette (pour l'étiquette 38 × 19 mm) */
+function allergenesEtiquette(){
+  const a = new Set();
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id]; if(!ing || !(r.g>0)) continue;
+    if(ing.cat==='LAIT') a.add('lait');
+    else if(ing.cat==='OEUF') a.add('œufs');
+    else if(ing.cat==='OLEA') a.add(r.id==='p_arachide' ? 'arachide' : 'fruits à coque');
+  }
+  return [...a];
+}
+/* planche A4 d'étiquettes autocollantes 38 × 19 mm — 75 par page (5 × 15),
+   marges 10 mm à gauche/droite et 6 mm en haut/bas, sans espace entre elles */
+const ETIQ_PAR_PAGE = 75;
 function htmlPlanche(d){
-  const label = `<div class="label"><h3>${d.nom}</h3>
-    <div>Ingrédients : ${d.ingListe}.</div>
-    <div class="lot">Lot ${d.lot} · Poids net : ${fmt0(d.potG)} g</div>
-    <div>Produit le ${d.dP} · À consommer de préférence avant le : <b>${d.dD}</b></div>
-    <div>À conserver à −18 °C. Ne jamais recongeler un produit décongelé.</div>
+  const allg = allergenesEtiquette();
+  const l5 = allg.length ? `Allergènes : ${allg.join(', ')} · À conserver à −18 °C`
+                         : 'À conserver à −18 °C · Ne jamais recongeler';
+  const label = `<div class="label">
+    <div class="l1">${esc(d.nom)}</div>
+    <div class="l2">Lot ${esc(d.lot)} · ${fmt0(d.potG)} g</div>
+    <div class="l2">Produit le ${d.dP}</div>
+    <div class="l2"><b>À consommer avant : ${d.dD}</b></div>
+    <div class="l5">${l5}</div>
   </div>`;
-  return `<h2>Étiquettes (${d.nb} pot${d.nb>1?'s':''} de ${fmt0(d.potG)} g) — lot ${d.lot}</h2>
-  <div class="labelgrid">`+label.repeat(d.nb)+`</div>`;
+  let pages = '';
+  for(let i = 0; i < d.nb; i += ETIQ_PAR_PAGE)
+    pages += `<div class="labelpage"><div class="labelgrid">${label.repeat(Math.min(ETIQ_PAR_PAGE, d.nb - i))}</div></div>`;
+  return `<div class="noetiq">Planche d'étiquettes <strong>38 × 19 mm</strong> — ${d.nb} étiquette${d.nb>1?'s':''}, 75 par page A4 (5 × 15) — lot ${esc(d.lot)}.
+    Dans la fenêtre d'impression : échelle <strong>100 %</strong> (taille réelle), sans marges ajoutées, en-têtes et pieds de page désactivés.</div>` + pages;
 }
 function buildLabels(){
   const d = donneesTrac();
-  el('printArea').innerHTML = htmlFicheTrac(d) + '<div style="break-before:page"></div>' + htmlPlanche(d);
+  el('printArea').innerHTML = '<div class="fichewrap">' + htmlFicheTrac(d) + '</div>' + htmlPlanche(d);
 }
 
 /* =====================================================================
@@ -1843,10 +1879,14 @@ const DOC_CSS = `
   tr.total td{font-weight:700;background:#f3f3f3}
   .st-ok::before{content:"✓ "} .st-warn::before{content:"! "} .st-bad::before{content:"✗ "}
   .foot{font-size:10.5px;color:#555;margin-top:14px}
-  .labelgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:5mm}
-  .label{border:1.2px dashed #777;border-radius:2mm;padding:2.5mm;font-size:8.5px;line-height:1.3;break-inside:avoid}
-  .label h3{font-size:10.5px;margin:0 0 1mm;border:none;padding:0}
-  .label .lot{font-weight:700;margin-top:1mm}
+  .noetiq{background:#fffbe6;border:1px solid #e0c200;border-radius:6px;padding:8px 10px;font-size:12px;margin:10px}
+  .labelpage{width:210mm;height:296mm;padding:6mm 10mm;box-sizing:border-box;overflow:hidden;break-after:page}
+  .labelgrid{display:grid;grid-template-columns:repeat(5,38mm);grid-auto-rows:19mm;gap:0}
+  .label{width:38mm;height:19mm;padding:1mm 1.5mm;box-sizing:border-box;overflow:hidden;
+    outline:1px dotted #bbb;font-size:6pt;line-height:1.3;break-inside:avoid}
+  .label .l1{font-size:7pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .label .l5{font-size:4.8pt}
+  @media print{.noetiq{display:none}.label{outline:none}}
   .signature{margin-top:10mm;font-size:11px}
   .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:4mm;margin-top:4mm}
   .photocell{border:1px solid #999;border-radius:2mm;padding:2mm;font-size:9.5px;break-inside:avoid}
@@ -1855,8 +1895,9 @@ const DOC_CSS = `
   .noprint button{font:inherit;font-weight:700;padding:9px 16px;border-radius:999px;border:none;
     background:linear-gradient(135deg,#e8467c,#f2745f);color:#fff;cursor:pointer}
   @media print{.noprint{display:none}body{padding:0}}`;
-function docAutonome(titre, corps){
-  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${titre}</title><style>${DOC_CSS}</style></head><body><div class="noprint"><button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button></div>${corps}</body></html>`;
+function docAutonome(titre, corps, etiq){
+  const extra = etiq ? '<style>@page{size:A4;margin:0} body{max-width:none;margin:0;padding:0} .noprint{padding:10px 14px}</style>' : '';
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${titre}</title><style>${DOC_CSS}</style>${extra}</head><body><div class="noprint"><button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button></div>${corps}</body></html>`;
 }
 function slugFichier(s){
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
@@ -1872,7 +1913,7 @@ function telechargerFichier(nomFichier, contenu){
 function docEtiquettes(){
   const d = donneesTrac();
   return {nom:`${d.dateISO}_${slugFichier(d.nom)}_etiquettes.html`,
-          contenu: docAutonome(`Étiquettes — ${d.nom} — lot ${d.lot}`, htmlPlanche(d))};
+          contenu: docAutonome(`Étiquettes — ${d.nom} — lot ${d.lot}`, htmlPlanche(d), true)};
 }
 function docTracabilite(){
   const d = donneesTrac();
@@ -2178,7 +2219,9 @@ function init(){
   el('btnDriveNow').addEventListener('click',()=>{
     envoyerDrive([docRecette(), docTracabilite(), docEtiquettes()]);
   });
+  el('etiqPage').disabled = true;
   window.addEventListener('beforeprint', ()=>{
+    el('etiqPage').disabled = (printMode!=='etiquettes');
     if(printMode==='etiquettes') buildLabels();
     else if(printMode==='fiche') buildFiche();
     else buildPrint();

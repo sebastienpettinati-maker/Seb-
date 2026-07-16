@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fiches techniques — Tartes modernes</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥧</text></svg>">
+<meta name="theme-color" content="#e8467c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  :root{
+    --page:#f7f3ed;
+    --surface-1:#ffffff;
+    --ink-1:#28211a; --ink-2:#645a4e; --ink-3:#9b8f80;
+    --grid:#e9decf; --border:rgba(40,33,26,.08);
+    --accent:#e8467c; --accent-2:#f2745f; --accent-soft:#fdeaf1;
+    --grad:linear-gradient(135deg,#e8467c 0%,#f2745f 100%);
+    --zebra:rgba(140,100,70,.045);
+    --good:#0ca30c; --warn:#fab219; --bad:#d03b3b;
+    --bad-bg:rgba(208,59,59,.10);
+    --shadow:0 1px 2px rgba(120,70,40,.05),0 8px 20px rgba(120,70,40,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --page:#171310;
+      --surface-1:#211c17;
+      --ink-1:#f8f2e9; --ink-2:#cbbfb0; --ink-3:#94897a;
+      --grid:#3b332a; --border:rgba(255,255,255,.09);
+      --accent:#ff6b9d; --accent-2:#ff8a5c; --accent-soft:#3d2029;
+      --grad:linear-gradient(135deg,#e8467c 0%,#e0603f 100%);
+      --zebra:rgba(255,255,255,.03);
+      --bad:#e05252; --bad-bg:rgba(224,82,82,.16);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 24px rgba(0,0,0,.28);
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--page);color:var(--ink-1);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;
+    background:var(--surface-1);border-bottom:1px solid var(--grid);padding:0 14px;min-height:56px}
+  .brand{font-weight:800;font-size:1.02rem;white-space:nowrap}
+  nav.tabs{display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto}
+  .tab{display:flex;align-items:center;gap:7px;border:none;background:none;box-shadow:none;
+    padding:8px 13px;border-radius:12px;font:inherit;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+  .tab:hover{background:var(--zebra);color:var(--ink-1)}
+  .tab.active{background:var(--accent-soft);color:var(--accent);font-weight:800}
+  .tab .ico{font-size:1.05rem;line-height:1}
+  .actions{display:flex;gap:8px;margin-left:auto}
+  @media(max-width:760px){
+    nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface-1);
+      border-top:1px solid var(--grid);justify-content:space-around;
+      padding:6px 6px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+    .tab{flex:1;flex-direction:column;gap:2px;font-size:.66rem;padding:5px 4px;border-radius:10px}
+    .tab .ico{font-size:1.3rem}
+    .actions .lbl{display:none}
+    body{padding-bottom:84px}
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 60px}
+  .panel{display:none}
+  .panel.active{display:block}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;
+    padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:1.08rem;letter-spacing:-.01em}
+  .card h2::after{content:"";flex:1;order:1;height:3px;border-radius:2px;background:var(--grad);opacity:.15;min-width:24px}
+  .hint{font-size:.85rem;color:var(--ink-2);margin:0 0 12px;max-width:80ch}
+  .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:.72rem;color:var(--ink-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  select,input[type=text],input[type=number],input[type=date],textarea{
+    background:var(--surface-1);color:var(--ink-1);border:1.5px solid var(--grid);
+    border-radius:12px;padding:9px 12px;font:inherit;transition:border-color .15s, box-shadow .15s}
+  textarea{width:100%;min-height:70px;resize:vertical;line-height:1.5}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  select:hover,input:hover,textarea:hover{border-color:var(--accent)}
+  input[type=number]{width:100px;font-variant-numeric:tabular-nums}
+  button{border:1.5px solid var(--grid);background:var(--surface-1);color:var(--ink-1);
+    border-radius:999px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer;
+    transition:transform .12s, box-shadow .12s, border-color .12s, color .12s, filter .12s}
+  button:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px);
+    box-shadow:0 5px 14px rgba(232,70,124,.20)}
+  button:active{transform:translateY(0)}
+  button.primary{background:var(--grad);border:none;color:#fff;padding:11px 20px;
+    box-shadow:0 4px 14px rgba(232,70,124,.35)}
+  button.primary:hover{color:#fff;filter:brightness(1.07);box-shadow:0 7px 18px rgba(232,70,124,.4)}
+  button.small{padding:7px 14px;font-size:.84rem}
+  button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 9px;font-size:1.05rem;box-shadow:none}
+  button.ghost:hover{color:var(--bad);background:var(--bad-bg);transform:none;box-shadow:none}
+  table{border-collapse:collapse;width:100%}
+  th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);
+     text-align:left;padding:8px;border-bottom:2px solid var(--grid);font-weight:700}
+  td{padding:8px;border-bottom:1px solid var(--grid);vertical-align:middle}
+  tbody tr:nth-child(even) td{background:var(--zebra)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tablewrap{overflow-x:auto}
+  /* --- vue tableau (grille façon papier) --- */
+  #grilleTable td{font-size:.9rem;cursor:pointer}
+  #grilleTable tbody tr:hover td{background:var(--accent-soft)}
+  #grilleTable td:first-child{font-weight:800}
+  /* --- éditeur : blocs éléments --- */
+  .elems{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}
+  .elem{border:1.5px solid var(--grid);border-radius:14px;padding:14px;background:var(--surface-1)}
+  .elem.off{opacity:.55}
+  .elem h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:.95rem}
+  .elem h3 .type{flex:1}
+  .elem h3 .switch{font-size:.75rem;font-weight:600;color:var(--ink-3);display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+  .elem input.nomElem{width:100%;margin-bottom:10px;font-weight:700}
+  .ingTable input[type=text]{width:100%}
+  .ingTable input.qte{width:76px}
+  .ingTable input.unite{width:64px}
+  .ingTable td{padding:3px 4px;border-bottom:none}
+  .ingTable tbody tr td{background:none !important}
+  .elem details{margin-top:8px}
+  .elem summary{cursor:pointer;font-size:.8rem;font-weight:700;color:var(--ink-2)}
+  .elem .subhead{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:700;margin:10px 0 4px}
+  /* --- cartes bibliothèque --- */
+  .biblio{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .tcard{border:1.5px solid var(--grid);border-radius:14px;padding:14px;cursor:pointer;
+    transition:transform .12s, box-shadow .12s, border-color .12s}
+  .tcard:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--shadow)}
+  .tcard h3{margin:0 0 6px;font-size:1rem}
+  .tcard .meta{font-size:.78rem;color:var(--ink-3);margin-bottom:8px}
+  .tcard ul{margin:0;padding-left:0;list-style:none;font-size:.82rem;color:var(--ink-2)}
+  .tcard li{margin:2px 0}
+  .tcard .cardActions{display:flex;gap:6px;margin-top:10px}
+  .badge{display:inline-block;font-size:.7rem;font-weight:800;padding:2px 9px;border-radius:999px;
+    background:var(--accent-soft);color:var(--accent)}
+  /* --- fiche technique --- */
+  .fiche-head{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between}
+  .fiche-head h2{font-size:1.5rem;margin:0}
+  .fiche-head h2::after{display:none}
+  .fiche-meta{font-size:.85rem;color:var(--ink-2)}
+  .fiche-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:14px}
+  .fiche-elem{border:1.5px solid var(--grid);border-radius:14px;padding:14px;break-inside:avoid}
+  .fiche-elem h3{display:flex;align-items:center;gap:8px;margin:0 0 2px;font-size:.95rem}
+  .fiche-elem .parfum{font-weight:800;color:var(--accent);margin:0 0 8px;font-size:1.02rem}
+  .fiche-elem table td{padding:4px 6px;font-size:.88rem}
+  .fiche-elem .procede{font-size:.85rem;color:var(--ink-2);white-space:pre-wrap;margin-top:8px;
+    border-top:1px dashed var(--grid);padding-top:8px}
+  .fiche-block{margin-top:14px;border-top:2px solid var(--grid);padding-top:12px}
+  .fiche-block h3{margin:0 0 6px;font-size:.95rem}
+  .fiche-block p{margin:0;white-space:pre-wrap;font-size:.9rem;color:var(--ink-2)}
+  .empty{color:var(--ink-3);font-style:italic;padding:20px;text-align:center}
+  .coef-note{font-size:.78rem;color:var(--ink-3)}
+  /* --- impression --- */
+  @media print{
+    body{background:#fff;color:#000;font-size:12px}
+    .top,.no-print,nav.tabs,.actions{display:none !important}
+    .wrap{max-width:none;padding:0}
+    .card{box-shadow:none;border:none;padding:0;margin:0}
+    .panel{display:none}
+    #panel-fiche{display:block}
+    .fiche-elem{border:1px solid #999;page-break-inside:avoid}
+    .fiche-grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">🥧 Tartes modernes</div>
+  <nav class="tabs">
+    <button class="tab active" data-panel="biblio"><span class="ico">📚</span><span>Mes tartes</span></button>
+    <button class="tab" data-panel="editeur"><span class="ico">✏️</span><span>Éditeur</span></button>
+    <button class="tab" data-panel="fiche"><span class="ico">📋</span><span>Fiche technique</span></button>
+  </nav>
+  <div class="actions">
+    <button class="small" id="btnExport" title="Exporter toutes les fiches en JSON">⬇️ <span class="lbl">Exporter</span></button>
+    <button class="small" id="btnImport" title="Importer un fichier JSON">⬆️ <span class="lbl">Importer</span></button>
+    <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ═══════════ BIBLIOTHÈQUE ═══════════ -->
+  <section class="panel active" id="panel-biblio">
+    <div class="card">
+      <h2>🗂️ Vue d'ensemble</h2>
+      <p class="hint">Le tableau récapitule chaque tarte et ses six éléments — comme sur votre feuille papier. Cliquez sur une ligne pour ouvrir la fiche technique.</p>
+      <div class="tablewrap">
+        <table id="grilleTable">
+          <thead>
+            <tr>
+              <th>Tarte</th><th>Pâte</th><th>Déco extérieure</th><th>Crème de cuisson</th>
+              <th>Crémeux</th><th>Gelée</th><th>Mousseux</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>📚 Bibliothèque</h2>
+      <div class="toolbar no-print" style="margin-bottom:14px">
+        <button class="primary" id="btnNouvelle">➕ Nouvelle tarte</button>
+      </div>
+      <div class="biblio" id="biblioGrid"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ ÉDITEUR ═══════════ -->
+  <section class="panel" id="panel-editeur">
+    <div class="card">
+      <h2>✏️ Identité de la tarte</h2>
+      <div class="toolbar">
+        <div class="field" style="flex:1;min-width:220px">
+          <label>Nom de la tarte</label>
+          <input type="text" id="edNom" placeholder="Ex. Tarte citron – fraise – basilic">
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="edDate">
+        </div>
+        <div class="field">
+          <label>Diamètre (cm)</label>
+          <input type="number" id="edDiam" min="0" step="1" placeholder="20">
+        </div>
+        <div class="field">
+          <label>Nombre de parts</label>
+          <input type="number" id="edParts" min="0" step="1" placeholder="8">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🧩 Les six éléments</h2>
+      <p class="hint">Renseignez le parfum de chaque élément, puis dépliez « Recette » pour saisir ingrédients et procédé. Décochez un élément si la tarte ne l'utilise pas.</p>
+      <div class="elems" id="edElems"></div>
+    </div>
+
+    <div class="card">
+      <h2>🛠️ Montage &amp; finition</h2>
+      <textarea id="edMontage" placeholder="Ordre de montage, cuissons, températures, pochage, glaçage…"></textarea>
+      <div class="subhead" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:700;margin:12px 0 4px">Notes / points de vigilance</div>
+      <textarea id="edNotes" placeholder="Allergènes, conservation, remarques d'essai…"></textarea>
+    </div>
+
+    <div class="card no-print">
+      <div class="toolbar">
+        <button class="primary" id="btnEnregistrer">💾 Enregistrer</button>
+        <button id="btnVoirFiche">📋 Voir la fiche</button>
+        <button id="btnSupprimer" style="margin-left:auto;color:var(--bad)">🗑️ Supprimer</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ FICHE TECHNIQUE ═══════════ -->
+  <section class="panel" id="panel-fiche">
+    <div class="card no-print">
+      <div class="toolbar">
+        <div class="field" style="flex:1;min-width:200px">
+          <label>Tarte</label>
+          <select id="ficheSelect"></select>
+        </div>
+        <div class="field">
+          <label>Coefficient ×</label>
+          <input type="number" id="ficheCoef" min="0.1" step="0.1" value="1">
+        </div>
+        <button id="btnModifier">✏️ Modifier</button>
+        <button class="primary" id="btnImprimer">🖨️ Imprimer / PDF</button>
+      </div>
+      <p class="coef-note">Le coefficient multiplie toutes les quantités (ex. ×2 pour deux tartes). Le PDF imprimé peut ensuite être déposé dans votre Google Drive.</p>
+    </div>
+    <div class="card" id="ficheContenu"></div>
+  </section>
+
+</div>
+
+<script>
+'use strict';
+
+/* ── Modèle ─────────────────────────────────────────── */
+const TYPES = [
+  {id:'pate',    ico:'🥧', nom:'Pâte'},
+  {id:'deco',    ico:'✨', nom:'Déco extérieure'},
+  {id:'cuisson', ico:'🔥', nom:'Crème de cuisson'},
+  {id:'cremeux', ico:'🍮', nom:'Crémeux'},
+  {id:'gelee',   ico:'🫐', nom:'Gelée'},
+  {id:'mousseux',ico:'☁️', nom:'Mousseux'},
+];
+const STORE_KEY = 'tartes_fiches_v1';
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+function elemVide(type){
+  return {type, actif:true, nom:'', ingredients:[], procede:''};
+}
+function tarteVide(){
+  return {
+    id: uid(), nom:'', date: new Date().toISOString().slice(0,10),
+    diametre:'', parts:'',
+    elements: TYPES.map(t => elemVide(t.id)),
+    montage:'', notes:''
+  };
+}
+
+/* Exemples issus du tableau manuscrit */
+function exemples(){
+  const mk = (nom, els) => {
+    const t = tarteVide();
+    t.nom = nom;
+    t.elements = TYPES.map((ty,i)=>{ const e = elemVide(ty.id); e.nom = els[i]; return e; });
+    return t;
+  };
+  return [
+    mk('Tarte citron – fraise – basilic',
+       ['Sablé zeste citron','Sucre roux','Crème d’amande + fruits','Citron','Fraise','Chantilly basilic']),
+    mk('Tarte tout chocolat – noisette',
+       ['Sablé cacao','Grué de cacao','Biscuit choco + éclats choco','Chocolat','Praliné','Ganache montée noisette']),
+    mk('Tarte abricot – miel',
+       ['Sablé nature','Amandes effilées','Crème d’amande + abricot','Crème brûlée','Abricot','Chantilly miel']),
+  ];
+}
+
+/* ── Persistance ────────────────────────────────────── */
+let tartes = [];
+function charger(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    tartes = raw ? JSON.parse(raw) : exemples();
+  }catch(e){ tartes = exemples(); }
+  if(!Array.isArray(tartes)) tartes = exemples();
+  sauver();
+}
+function sauver(){ localStorage.setItem(STORE_KEY, JSON.stringify(tartes)); }
+
+/* ── Navigation ─────────────────────────────────────── */
+const panels = document.querySelectorAll('.panel');
+const tabs = document.querySelectorAll('.tab');
+function goTo(name){
+  tabs.forEach(t=>t.classList.toggle('active', t.dataset.panel===name));
+  panels.forEach(p=>p.classList.toggle('active', p.id==='panel-'+name));
+  if(name==='biblio') renderBiblio();
+  if(name==='fiche') renderFiche();
+  window.scrollTo({top:0});
+}
+tabs.forEach(t=>t.addEventListener('click', ()=>goTo(t.dataset.panel)));
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ── Bibliothèque ───────────────────────────────────── */
+function renderBiblio(){
+  const tbody = document.querySelector('#grilleTable tbody');
+  tbody.innerHTML = tartes.length ? tartes.map(t=>{
+    const cells = TYPES.map(ty=>{
+      const e = t.elements.find(x=>x.type===ty.id);
+      return `<td>${e && e.actif && e.nom ? esc(e.nom) : '<span style="color:var(--ink-3)">—</span>'}</td>`;
+    }).join('');
+    return `<tr data-id="${t.id}"><td>${esc(t.nom)||'<i>Sans nom</i>'}</td>${cells}</tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Aucune tarte — créez-en une !</td></tr>';
+  tbody.querySelectorAll('tr[data-id]').forEach(tr=>{
+    tr.addEventListener('click', ()=>{ ouvrirFiche(tr.dataset.id); });
+  });
+
+  const grid = document.getElementById('biblioGrid');
+  grid.innerHTML = tartes.map(t=>{
+    const lis = TYPES.map(ty=>{
+      const e = t.elements.find(x=>x.type===ty.id);
+      if(!e || !e.actif || !e.nom) return '';
+      return `<li>${ty.ico} ${esc(e.nom)}</li>`;
+    }).join('');
+    const nbRec = t.elements.filter(e=>e.actif && e.ingredients.length).length;
+    return `<div class="tcard" data-id="${t.id}">
+      <h3>${esc(t.nom)||'<i>Sans nom</i>'}</h3>
+      <div class="meta">${esc(t.date||'')}${t.diametre?` · Ø ${esc(t.diametre)} cm`:''}${t.parts?` · ${esc(t.parts)} parts`:''}
+        ${nbRec?` <span class="badge">${nbRec} recette${nbRec>1?'s':''}</span>`:''}</div>
+      <ul>${lis}</ul>
+      <div class="cardActions no-print">
+        <button class="small" data-act="fiche">📋 Fiche</button>
+        <button class="small" data-act="edit">✏️ Modifier</button>
+        <button class="small" data-act="dup">📄 Dupliquer</button>
+      </div>
+    </div>`;
+  }).join('') || '<p class="empty">Aucune tarte enregistrée.</p>';
+
+  grid.querySelectorAll('.tcard').forEach(card=>{
+    const id = card.dataset.id;
+    card.addEventListener('click', e=>{
+      const act = e.target.closest('button')?.dataset.act;
+      if(act==='edit') return ouvrirEditeur(id);
+      if(act==='dup')  return dupliquer(id);
+      ouvrirFiche(id);
+    });
+  });
+}
+
+function dupliquer(id){
+  const src = tartes.find(t=>t.id===id); if(!src) return;
+  const copie = JSON.parse(JSON.stringify(src));
+  copie.id = uid(); copie.nom = src.nom + ' (copie)';
+  tartes.push(copie); sauver(); renderBiblio();
+}
+
+/* ── Éditeur ────────────────────────────────────────── */
+let editId = null; // id de la tarte en cours d'édition
+
+function ouvrirEditeur(id){
+  editId = id;
+  const t = tartes.find(x=>x.id===id) || tarteVide();
+  document.getElementById('edNom').value = t.nom;
+  document.getElementById('edDate').value = t.date || '';
+  document.getElementById('edDiam').value = t.diametre || '';
+  document.getElementById('edParts').value = t.parts || '';
+  document.getElementById('edMontage').value = t.montage || '';
+  document.getElementById('edNotes').value = t.notes || '';
+  renderElems(t);
+  goTo('editeur');
+}
+
+function renderElems(t){
+  const wrap = document.getElementById('edElems');
+  wrap.innerHTML = TYPES.map(ty=>{
+    const e = t.elements.find(x=>x.type===ty.id) || elemVide(ty.id);
+    const rows = e.ingredients.map((ing,i)=>ingRow(ty.id,i,ing)).join('');
+    return `<div class="elem ${e.actif?'':'off'}" data-type="${ty.id}">
+      <h3><span>${ty.ico}</span><span class="type">${ty.nom}</span>
+        <label class="switch"><input type="checkbox" class="chkActif" ${e.actif?'checked':''}> utilisé</label></h3>
+      <input type="text" class="nomElem" placeholder="Parfum / intitulé (ex. ${ty.id==='pate'?'Sablé cacao':ty.id==='gelee'?'Fraise':'…'})" value="${esc(e.nom)}">
+      <details ${e.ingredients.length||e.procede?'open':''}>
+        <summary>Recette (${e.ingredients.length} ingrédient${e.ingredients.length>1?'s':''})</summary>
+        <div class="subhead">Ingrédients</div>
+        <table class="ingTable"><tbody>${rows}</tbody></table>
+        <button class="small btnAddIng" type="button">➕ Ingrédient</button>
+        <div class="subhead">Procédé</div>
+        <textarea class="procedeElem" placeholder="Étapes, températures, temps…">${esc(e.procede)}</textarea>
+      </details>
+    </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.elem').forEach(div=>{
+    div.querySelector('.chkActif').addEventListener('change', ev=>{
+      div.classList.toggle('off', !ev.target.checked);
+    });
+    div.querySelector('.btnAddIng').addEventListener('click', ()=>{
+      const tbody = div.querySelector('.ingTable tbody');
+      tbody.insertAdjacentHTML('beforeend', ingRow(div.dataset.type, tbody.children.length, {nom:'',qte:'',unite:'g'}));
+      brancherSuppr(tbody.lastElementChild);
+      tbody.lastElementChild.querySelector('input').focus();
+    });
+    div.querySelectorAll('.ingTable tr').forEach(brancherSuppr);
+  });
+}
+
+function ingRow(type,i,ing){
+  return `<tr>
+    <td><input type="text" class="ingNom" placeholder="Ingrédient" value="${esc(ing.nom)}"></td>
+    <td><input type="number" class="qte ingQte" step="any" placeholder="Qté" value="${esc(ing.qte)}"></td>
+    <td><input type="text" class="unite ingUnite" placeholder="g" value="${esc(ing.unite)}"></td>
+    <td><button class="ghost btnDelIng" type="button" title="Retirer">✕</button></td>
+  </tr>`;
+}
+function brancherSuppr(tr){
+  tr.querySelector('.btnDelIng').addEventListener('click', ()=>tr.remove());
+}
+
+function lireEditeur(){
+  const t = tartes.find(x=>x.id===editId) || tarteVide();
+  if(!tartes.includes(t)) tartes.push(t);
+  editId = t.id;
+  t.nom = document.getElementById('edNom').value.trim();
+  t.date = document.getElementById('edDate').value;
+  t.diametre = document.getElementById('edDiam').value;
+  t.parts = document.getElementById('edParts').value;
+  t.montage = document.getElementById('edMontage').value;
+  t.notes = document.getElementById('edNotes').value;
+  t.elements = Array.from(document.querySelectorAll('#edElems .elem')).map(div=>{
+    const e = elemVide(div.dataset.type);
+    e.actif = div.querySelector('.chkActif').checked;
+    e.nom = div.querySelector('.nomElem').value.trim();
+    e.procede = div.querySelector('.procedeElem').value;
+    e.ingredients = Array.from(div.querySelectorAll('.ingTable tr')).map(tr=>({
+      nom: tr.querySelector('.ingNom').value.trim(),
+      qte: tr.querySelector('.ingQte').value,
+      unite: tr.querySelector('.ingUnite').value.trim()
+    })).filter(ing=>ing.nom);
+    return e;
+  });
+  return t;
+}
+
+document.getElementById('btnNouvelle').addEventListener('click', ()=>{
+  const t = tarteVide(); tartes.push(t); sauver();
+  ouvrirEditeur(t.id);
+});
+document.getElementById('btnEnregistrer').addEventListener('click', ()=>{
+  const t = lireEditeur(); sauver();
+  const btn = document.getElementById('btnEnregistrer');
+  btn.textContent = '✅ Enregistré'; setTimeout(()=>btn.textContent='💾 Enregistrer', 1400);
+  renderBiblio();
+});
+document.getElementById('btnVoirFiche').addEventListener('click', ()=>{
+  const t = lireEditeur(); sauver(); ouvrirFiche(t.id);
+});
+document.getElementById('btnSupprimer').addEventListener('click', ()=>{
+  if(!editId) return;
+  const t = tartes.find(x=>x.id===editId);
+  if(!confirm(`Supprimer « ${t?.nom || 'cette tarte'} » ?`)) return;
+  tartes = tartes.filter(x=>x.id!==editId); editId = null; sauver();
+  goTo('biblio');
+});
+
+/* ── Fiche technique ────────────────────────────────── */
+let ficheId = null;
+
+function ouvrirFiche(id){ ficheId = id; goTo('fiche'); }
+
+function renderFiche(){
+  const sel = document.getElementById('ficheSelect');
+  sel.innerHTML = tartes.map(t=>`<option value="${t.id}">${esc(t.nom)||'Sans nom'}</option>`).join('');
+  if(!tartes.length){ document.getElementById('ficheContenu').innerHTML = '<p class="empty">Aucune tarte.</p>'; return; }
+  if(!ficheId || !tartes.find(t=>t.id===ficheId)) ficheId = tartes[0].id;
+  sel.value = ficheId;
+  dessinerFiche();
+}
+document.getElementById('ficheSelect').addEventListener('change', e=>{ ficheId = e.target.value; dessinerFiche(); });
+document.getElementById('ficheCoef').addEventListener('input', dessinerFiche);
+document.getElementById('btnModifier').addEventListener('click', ()=>{ if(ficheId) ouvrirEditeur(ficheId); });
+document.getElementById('btnImprimer').addEventListener('click', ()=>window.print());
+
+const fmtQ = n => {
+  if(n === '' || n == null || isNaN(n)) return '';
+  const v = Math.round(n*100)/100;
+  return String(v).replace('.', ',');
+};
+
+function dessinerFiche(){
+  const t = tartes.find(x=>x.id===ficheId); if(!t) return;
+  const coef = parseFloat(document.getElementById('ficheCoef').value) || 1;
+  const box = document.getElementById('ficheContenu');
+
+  const elems = TYPES.map(ty=>{
+    const e = t.elements.find(x=>x.type===ty.id);
+    if(!e || !e.actif || (!e.nom && !e.ingredients.length && !e.procede)) return '';
+    const ings = e.ingredients.length ? `<table><thead><tr><th>Ingrédient</th><th class="num">Qté</th><th></th></tr></thead><tbody>${
+      e.ingredients.map(ing=>`<tr><td>${esc(ing.nom)}</td><td class="num">${fmtQ(parseFloat(ing.qte)*coef)}</td><td>${esc(ing.unite)}</td></tr>`).join('')
+    }</tbody></table>` : '';
+    const proc = e.procede ? `<div class="procede">${esc(e.procede)}</div>` : '';
+    return `<div class="fiche-elem">
+      <h3>${ty.ico} ${ty.nom}</h3>
+      <p class="parfum">${esc(e.nom)||'—'}</p>
+      ${ings}${proc}
+    </div>`;
+  }).join('');
+
+  box.innerHTML = `
+    <div class="fiche-head">
+      <h2>${esc(t.nom)||'Sans nom'}</h2>
+      <div class="fiche-meta">
+        ${t.date?esc(t.date):''}${t.diametre?` · Ø ${esc(t.diametre)} cm`:''}${t.parts?` · ${esc(t.parts)} parts`:''}
+        ${coef!==1?` · <b>coefficient ×${fmtQ(coef)}</b>`:''}
+      </div>
+    </div>
+    <div class="fiche-grid">${elems || '<p class="empty">Aucun élément renseigné — passez par l’éditeur.</p>'}</div>
+    ${t.montage?`<div class="fiche-block"><h3>🛠️ Montage &amp; finition</h3><p>${esc(t.montage)}</p></div>`:''}
+    ${t.notes?`<div class="fiche-block"><h3>📝 Notes</h3><p>${esc(t.notes)}</p></div>`:''}
+  `;
+}
+
+/* ── Export / import JSON ───────────────────────────── */
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(tartes,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `fiches-tartes-${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById('btnImport').addEventListener('click', ()=>document.getElementById('fileImport').click());
+document.getElementById('fileImport').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const data = JSON.parse(rd.result);
+      if(!Array.isArray(data)) throw new Error('format');
+      const ids = new Set(tartes.map(t=>t.id));
+      let n = 0;
+      data.forEach(t=>{ if(t && t.id && !ids.has(t.id)){ tartes.push(t); n++; } });
+      sauver(); renderBiblio();
+      alert(`${n} tarte(s) importée(s).`);
+    }catch(err){ alert('Fichier JSON invalide.'); }
+  };
+  rd.readAsText(f);
+  e.target.value = '';
+});
+
+/* ── Démarrage ──────────────────────────────────────── */
+charger();
+renderBiblio();
+</script>
+</body>
+</html>

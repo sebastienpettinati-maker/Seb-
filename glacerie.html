@@ -39,6 +39,7 @@
     }
   }
   *{box-sizing:border-box}
+  [hidden]{display:none !important}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--page);color:var(--ink-1);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
   /* --- barre supérieure : titre, onglets, actions --- */
@@ -181,10 +182,18 @@
   .docview .st-warn::before{content:"! "}
   .docview .st-bad::before{content:"✗ "}
   .docview .foot{font-size:10.5px;color:#555;margin-top:14px}
-  .docview .labelgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:12px}
-  .docview .label{border:1.5px dashed #777;border-radius:8px;padding:10px;font-size:10.5px;line-height:1.35;color:#000}
-  .docview .label h3{font-size:12px;margin:0 0 4px;border:none;padding:0}
-  .docview .label .lot{font-weight:700;margin-top:4px}
+  .docview .noetiq{background:#fffbe6;border:1px solid #e0c200;border-radius:6px;padding:8px 10px;font-size:12px;margin:10px 0;color:#000}
+  .docview .labelpage{margin-top:6px;overflow-x:auto}
+  .docview .labelgrid{display:grid;grid-template-columns:repeat(2,100mm);grid-auto-rows:30mm;gap:0;width:200mm}
+  .docview .label{position:relative;width:100mm;height:30mm;padding:2.2mm 3mm 2mm;overflow:hidden;
+    outline:1px dotted #bbb;border-radius:2.5mm;border:none;color:#000;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:6pt;line-height:1.3}
+  .docview .label .croquis{position:absolute;right:-3mm;top:50%;margin-top:-14mm;width:28mm;height:28mm;opacity:.14}
+  .docview .label .et-nom{font-family:Didot,"Bodoni MT",Georgia,"Times New Roman",serif;font-size:11pt;font-weight:400;
+    letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .docview .label .et-filet{width:14mm;border-top:.5px solid #000;margin:1mm 0 1.1mm}
+  .docview .label .et-ing{font-size:5.2pt;line-height:1.3;color:#222;max-height:13.6pt;overflow:hidden}
+  .docview .label .et-info{font-size:6pt;line-height:1.45;letter-spacing:.02em}
   .docview .signature{margin-top:26px;font-size:12px}
   .docview .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
   .docview .photocell{border:1px solid #999;border-radius:6px;padding:6px;font-size:10.5px;color:#000}
@@ -207,15 +216,30 @@
     #printArea .st-warn::before{content:"! "}
     #printArea .st-bad::before{content:"✗ "}
     #printArea .foot{font-size:9.5px;color:#555;margin-top:14px}
-    #printArea .labelgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:5mm}
-    #printArea .label{border:1.2px dashed #777;border-radius:2mm;padding:2.5mm;font-size:8.5px;line-height:1.3;break-inside:avoid}
-    #printArea .label h3{font-size:10.5px;margin:0 0 1mm;border:none;padding:0}
-    #printArea .label .lot{font-weight:700;margin-top:1mm}
+    #printArea .noetiq{display:none}
+    #printArea .fichewrap{break-after:page}
+    #printArea .labelpage{width:210mm;height:296mm;padding:13.5mm 5mm;overflow:hidden;break-after:page}
+    #printArea .labelgrid{display:grid;grid-template-columns:repeat(2,100mm);grid-auto-rows:30mm;gap:0}
+    #printArea .label{position:relative;width:100mm;height:30mm;padding:2.2mm 3mm 2mm;overflow:hidden;
+      font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:6pt;line-height:1.3;break-inside:avoid}
+    #printArea .label .croquis{position:absolute;right:-3mm;top:50%;margin-top:-14mm;width:28mm;height:28mm;opacity:.14}
+    #printArea .label .et-nom{font-family:Didot,"Bodoni MT",Georgia,"Times New Roman",serif;font-size:11pt;font-weight:400;
+      letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #printArea .label .et-filet{width:14mm;border-top:.5px solid #000;margin:1mm 0 1.1mm}
+    #printArea .label .et-ing{font-size:5.2pt;line-height:1.3;color:#222;max-height:13.6pt;overflow:hidden}
+    #printArea .label .et-info{font-size:6pt;line-height:1.45;letter-spacing:.02em}
     #printArea .signature{margin-top:10mm;font-size:11px}
     #printArea .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:4mm;margin-top:4mm}
     #printArea .photocell{border:1px solid #999;border-radius:2mm;padding:2mm;font-size:9px;break-inside:avoid}
     #printArea .photocell img{width:100%}
   }
+</style>
+<!-- réglage de page activé uniquement pour l'impression des planches d'étiquettes
+     (100 × 30 mm : la grille doit être calée sur la feuille, sans marges d'imprimante) -->
+<style id="etiqPage" media="print">
+  @page{size:A4;margin:0}
+  #printArea{padding:0}
+  #printArea .fichewrap{padding:8mm 10mm}
 </style>
 </head>
 <body>
@@ -366,12 +390,21 @@
       <div class="toolbar" style="margin-top:14px">
         <div class="field"><label for="potG">Poids du pot (g)</label><input type="number" id="potG" value="120" min="10" step="10"></div>
         <div class="field"><label for="potCoeff">Coefficient sur coût matières</label><input type="number" id="potCoeff" value="5" min="1" step="0.5"></div>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;padding-bottom:9px">
+          <input type="checkbox" id="contenantOn"> Contenant vendu avec la glace (pot, cornet…)
+        </label>
+        <div class="field" id="contenantField" hidden>
+          <label for="contenantPrix">Prix d'achat du contenant (€) — coefficient × 2</label>
+          <input type="number" id="contenantPrix" value="0.20" min="0" step="0.05">
+        </div>
       </div>
       <div class="verdict ok" id="potResult" style="margin-top:10px"></div>
       <details class="more"><summary>Comment sont calculés ces prix ?</summary>
         Prix indicatifs pré-remplis : modifiez-les selon vos fournisseurs, ils sont enregistrés sur cet appareil et réutilisés
         pour toutes vos recettes. Le poids du pot correspond au poids de mix : le foisonnement ajoute du volume, pas du poids —
-        un pot de 120 g contient bien 120 g de mix.
+        un pot de 120 g contient bien 120 g de mix. Si un contenant est vendu avec la glace, son prix d'achat entre dans le
+        prix de vente avec un coefficient de 2 (contre le coefficient choisi, en général 5, pour les matières premières) :
+        prix conseillé = coût matières du pot × coefficient + prix du contenant × 2.
       </details>
     </section>
   </section>
@@ -404,21 +437,24 @@
     <section class="card">
       <h2>🏷️ Traçabilité &amp; étiquettes DLC</h2>
       <p class="hint">Une fois la production sortie de turbine, indiquez la date, le lot et le nombre de pots remplis,
-         puis imprimez la fiche de traçabilité et la planche d'étiquettes à coller sur les pots.</p>
+         puis imprimez la fiche de traçabilité et les étiquettes — calées sur des planches autocollantes A4
+         de 18 étiquettes de 100 × 30 mm (2 × 9).</p>
       <div class="toolbar">
         <div class="field"><label for="tracDate">Date de production</label><input type="date" id="tracDate"></div>
         <div class="field"><label for="tracDuree">Conservation (mois)</label><input type="number" id="tracDuree" value="12" min="1" max="24" step="1" style="width:90px"></div>
         <div class="field"><label for="tracLot">N° de lot</label><input type="text" id="tracLot" style="width:150px"></div>
-        <div class="field"><label for="tracNb">Pots produits</label><input type="number" id="tracNb" min="1" step="1" style="width:90px"></div>
+        <div class="field"><label for="tracNb">Étiquettes à imprimer</label><input type="number" id="tracNb" min="1" step="1" style="width:90px" title="Calculé automatiquement : poids de la recette ÷ poids du pot. Modifiable ; videz le champ pour revenir au calcul automatique."></div>
         <button class="primary" id="btnEtiquettes">🖨 Imprimer fiche + étiquettes</button>
         <button class="small" id="btnDlEtiquettes">⬇ Fichier étiquettes seules</button>
       </div>
       <p class="footnote" id="tracInfo" style="margin-bottom:0"></p>
       <details class="more"><summary>Que contiennent la fiche et les étiquettes ?</summary>
         La fiche de traçabilité reprend la production (date, lot, DDM, pots), le coût du lot et la liste des ingrédients
-        mis en œuvre avec une colonne « lot fournisseur » à compléter. Chaque étiquette porte la liste des ingrédients
-        par ordre décroissant avec les allergènes en gras, le poids net, le n° de lot, la date de production et la date
-        de durabilité minimale.
+        mis en œuvre avec leur lot fournisseur. Chaque étiquette de 100 × 30 mm porte le nom du produit en élégantes
+        capitales, un croquis au trait assorti au produit en fond (fraise, agrume, chocolat… choisi automatiquement),
+        la liste des ingrédients par ordre décroissant avec les allergènes en gras, le n° de lot, le poids net, la date
+        de production et la DDM. À l'impression : échelle 100 % (taille réelle), marges automatiques et en-têtes /
+        pieds de page désactivés, pour que la grille tombe exactement sur les étiquettes prédécoupées.
       </details>
     </section>
   </section>
@@ -1392,12 +1428,17 @@ function setPrix(id, v){
 }
 const fmtE = x => fmt(x,2);
 function coutMix(){ return state.rows.reduce((s,r)=> s + (r.g||0)/1000*getPrix(r.id), 0); }
+const COEF_CONTENANT = 2;   // coefficient appliqué au prix d'achat du contenant
 function coutsPot(total, mixG){
   const potG = (state.pot && state.pot.g) || 120;
   const coeff = (state.pot && state.pot.coeff) || 5;
-  return {potG, coeff, coutKg: mixG>0 ? total/mixG*1000 : 0,
-          coutPot: mixG>0 ? total/mixG*potG : 0,
-          prixVente: mixG>0 ? total/mixG*potG*coeff : 0,
+  const contenant = !!(state.pot && state.pot.contenant);
+  const contenantPrix = contenant ? ((state.pot && state.pot.contenantPrix) || 0) : 0;
+  const coutPot = mixG>0 ? total/mixG*potG : 0;
+  return {potG, coeff, contenant, contenantPrix,
+          coutKg: mixG>0 ? total/mixG*1000 : 0,
+          coutPot,
+          prixVente: coutPot*coeff + contenantPrix*COEF_CONTENANT,
           nbPots: potG>0 ? Math.floor(mixG/potG) : 0};
 }
 function majResultatsCouts(){
@@ -1407,7 +1448,9 @@ function majResultatsCouts(){
   el('coutKg').textContent = t.g>0 ? fmtE(total/t.g*1000)+' €/kg' : '—';
   const p = coutsPot(total, t.g);
   el('potResult').innerHTML = t.g>0
-    ? `Pot de ${fmt0(p.potG)} g : coût matières <strong>${fmtE(p.coutPot)} €</strong> × ${fmt(p.coeff)} → <strong>prix de vente conseillé : ${fmtE(p.prixVente)} €</strong>`
+    ? `Pot de ${fmt0(p.potG)} g : coût matières <strong>${fmtE(p.coutPot)} €</strong> × ${fmt(p.coeff)}`
+      + (p.contenant ? ` + contenant ${fmtE(p.contenantPrix)} € × ${COEF_CONTENANT}` : '')
+      + ` → <strong>prix de vente conseillé : ${fmtE(p.prixVente)} €</strong>`
       + ` &nbsp;·&nbsp; cette recette remplit ${p.nbPots} pot${p.nbPots>1?'s':''}`
     : 'Ajoutez des ingrédients pour calculer les coûts.';
 }
@@ -1497,7 +1540,7 @@ function buildPrint(){
       h += `<tr><td>${ing.nom}</td><td class="num">${fmt0(r.g||0)}</td><td class="num">${fmtE(getPrix(r.id))}</td><td class="num">${fmtE((r.g||0)/1000*getPrix(r.id))}</td></tr>`;
     }
     h += `<tr class="total"><td>Coût matières du mix</td><td class="num">${fmt0(t.g)}</td><td class="num">${fmtE(cp.coutKg)} €/kg</td><td class="num">${fmtE(coutTotal)} €</td></tr>
-    <tr class="total"><td colspan="4">Pot de ${fmt0(cp.potG)} g : coût matières ${fmtE(cp.coutPot)} € × coefficient ${fmt(cp.coeff)} = <strong>prix de vente conseillé ${fmtE(cp.prixVente)} €</strong> — cette recette remplit ${cp.nbPots} pot${cp.nbPots>1?'s':''}</td></tr>
+    <tr class="total"><td colspan="4">Pot de ${fmt0(cp.potG)} g : coût matières ${fmtE(cp.coutPot)} € × ${fmt(cp.coeff)}${cp.contenant?' + contenant '+fmtE(cp.contenantPrix)+' € × '+COEF_CONTENANT:''} = <strong>prix de vente conseillé ${fmtE(cp.prixVente)} €</strong> — cette recette remplit ${cp.nbPots} pot${cp.nbPots>1?'s':''}</td></tr>
     </tbody></table>`;
   }
 
@@ -1522,12 +1565,18 @@ function lotAuto(){
 function majTracInfo(){
   const t = computeTotals();
   const potG = (state.pot && state.pot.g) || 120;
-  const auto = Math.max(1, Math.floor(t.g/potG));
-  if(!el('tracNb').value) el('tracNb').placeholder = auto;
+  const auto = t.g>0 ? Math.max(1, Math.floor(t.g/potG)) : 0;
+  const manuel = state.trac && state.trac.nbPots;
+  if(!manuel) el('tracNb').value = auto || '';
   const duree = parseFloat(el('tracDuree').value)||12;
   const d = el('tracDate').value ? new Date(el('tracDate').value+'T00:00') : new Date();
   const ddm = new Date(d); ddm.setMonth(ddm.getMonth()+duree);
-  el('tracInfo').textContent = `Pots de ${fmt0(potG)} g (réglable dans la section coûts) — la recette permet environ ${auto} pots. `
+  el('tracInfo').textContent =
+    (t.g>0
+      ? `Nombre d'étiquettes calculé automatiquement : ${fmt0(t.g)} g de mix ÷ ${fmt0(potG)} g par pot = ${auto} étiquettes`
+        + (manuel ? ` — remplacé à la main par ${manuel} (videz le champ pour revenir au calcul automatique)` : '')
+        + `. Poids du pot réglable dans la section coûts. `
+      : '')
     + `DDM calculée : ${ddm.toLocaleDateString('fr-FR')} (à conserver à −18 °C).`;
 }
 function listeIngredientsEtiquette(t){
@@ -1567,7 +1616,7 @@ function htmlFicheTrac(d){
     <tr><td>Produit</td><td><strong>${d.nom}</strong></td><td>N° de lot</td><td><strong>${d.lot}</strong></td></tr>
     <tr><td>Date de production</td><td>${d.dP}</td><td>DDM (à conserver à −18 °C)</td><td><strong>${d.dD}</strong> (${fmt0(d.duree)} mois)</td></tr>
     <tr><td>Poids de mix produit</td><td>${fmt0(d.t.g)} g</td><td>Pots produits</td><td><strong>${d.nb}</strong> × ${fmt0(d.potG)} g net</td></tr>
-    <tr><td>Coût matières du lot</td><td>${coutTotal>0?fmtE(coutTotal)+' €':'—'}</td><td>Prix de vente conseillé / pot</td><td>${coutTotal>0?fmtE(cp.prixVente)+' € (coef. '+fmt(cp.coeff)+')':'—'}</td></tr>
+    <tr><td>Coût matières du lot</td><td>${coutTotal>0?fmtE(coutTotal)+' €':'—'}</td><td>Prix de vente conseillé / pot</td><td>${coutTotal>0?fmtE(cp.prixVente)+' € (coef. '+fmt(cp.coeff)+(cp.contenant?' + contenant × '+COEF_CONTENANT:'')+')':'—'}</td></tr>
   </tbody></table>
   <h2>Ingrédients mis en œuvre (ordre décroissant, allergènes en gras)</h2>
   <p style="font-size:11px">${d.ingListe}.</p>
@@ -1582,19 +1631,104 @@ function htmlFicheTrac(d){
   Réalisé par : ______________________&nbsp;&nbsp;&nbsp;&nbsp;Visa : ______________</p>`;
   return h;
 }
+/* =====================================================================
+   CROQUIS AU TRAIT (fond d'étiquette, noir & blanc)
+   Dessins vectoriels minimalistes, choisis selon le produit de la recette.
+===================================================================== */
+const CROQUIS = (()=>{
+  const P = {
+    fraise: '<path d="M50 86 C26 72 22 46 33 37 C41 30 59 30 67 37 C78 46 74 72 50 86 Z"/>'
+      + '<path d="M38 32 L44 22 L50 31 L56 21 L62 32"/><line x1="50" y1="22" x2="50" y2="12"/>'
+      + '<line x1="42" y1="50" x2="42" y2="53"/><line x1="58" y1="50" x2="58" y2="53"/>'
+      + '<line x1="50" y1="44" x2="50" y2="47"/><line x1="50" y1="62" x2="50" y2="65"/>'
+      + '<line x1="44" y1="70" x2="44" y2="72"/><line x1="56" y1="70" x2="56" y2="72"/>',
+    baies: '<circle cx="34" cy="50" r="11"/><circle cx="56" cy="44" r="12"/><circle cx="46" cy="66" r="12"/>'
+      + '<circle cx="66" cy="64" r="10"/><path d="M52 30 C54 18 66 12 76 16 C74 26 64 32 52 30 Z"/>'
+      + '<line x1="52" y1="30" x2="47" y2="38"/>',
+    cerise: '<circle cx="34" cy="68" r="13"/><circle cx="64" cy="72" r="12"/>'
+      + '<path d="M36 55 C40 38 52 28 64 22"/><path d="M64 60 C62 44 62 32 64 22"/>'
+      + '<path d="M64 22 C70 12 84 14 88 22 C80 28 70 28 64 22 Z"/>',
+    rond: '<circle cx="50" cy="58" r="30"/><path d="M50 30 C45 40 45 50 50 58"/>'
+      + '<line x1="50" y1="28" x2="50" y2="16"/><path d="M50 20 C58 8 72 10 76 16 C70 24 58 26 50 20 Z"/>',
+    poire: '<path d="M50 88 C32 88 26 70 32 56 C37 46 43 42 45 32 C47 22 53 22 55 32 C57 42 63 46 68 56 C74 70 68 88 50 88 Z"/>'
+      + '<line x1="50" y1="24" x2="50" y2="12"/><path d="M50 16 C58 6 70 8 74 14 C68 22 56 22 50 16 Z"/>',
+    banane: '<path d="M18 34 C22 62 48 80 78 74 C84 72 86 66 82 64 C56 66 34 52 26 32 C24 26 17 27 18 34 Z"/>',
+    ananas: '<ellipse cx="50" cy="64" rx="22" ry="26"/>'
+      + '<path d="M32 52 L68 76 M30 62 L64 84 M36 44 L70 66 M68 52 L32 76 M70 62 L36 84 M64 44 L30 66"/>'
+      + '<path d="M42 38 L34 18 M50 38 L50 14 M58 38 L66 18"/>',
+    coco: '<circle cx="50" cy="58" r="30"/><circle cx="50" cy="58" r="20"/><path d="M42 32 C46 24 54 24 58 32"/>',
+    melon: '<path d="M14 60 A36 36 0 0 1 86 60 Z"/><path d="M20 60 A30 30 0 0 1 80 60"/>'
+      + '<line x1="36" y1="48" x2="38" y2="52"/><line x1="50" y1="42" x2="50" y2="46"/><line x1="64" y1="48" x2="62" y2="52"/>',
+    choco: '<path d="M50 12 C70 24 76 56 50 88 C24 56 30 24 50 12 Z"/><line x1="50" y1="20" x2="50" y2="80"/>'
+      + '<path d="M38 30 C36 50 38 62 44 76 M62 30 C64 50 62 62 56 76"/>',
+    noix: '<path d="M50 32 C64 32 72 44 70 58 C68 74 60 84 50 84 C40 84 32 74 30 58 C28 44 36 32 50 32 Z"/>'
+      + '<path d="M32 44 C40 36 60 36 68 44"/>',
+  };
+  const branche = '<line x1="50" y1="50" x2="50" y2="9"/><polyline points="42,21 50,29 58,21"/><polyline points="44,11 50,17 56,11"/>';
+  P.flocon = [0,60,120,180,240,300].map(a=>`<g transform="rotate(${a} 50 50)">${branche}</g>`).join('');
+  let agr = '<circle cx="50" cy="50" r="38"/><circle cx="50" cy="50" r="30"/>';
+  for(let i=0;i<8;i++){
+    const t = i*Math.PI/4, c = Math.cos(t), s = Math.sin(t);
+    agr += `<line x1="${(50+8*c).toFixed(1)}" y1="${(50+8*s).toFixed(1)}" x2="${(50+27*c).toFixed(1)}" y2="${(50+27*s).toFixed(1)}"/>`;
+  }
+  P.agrume = agr;
+  let kiwi = '<circle cx="50" cy="54" r="32"/><circle cx="50" cy="54" r="9"/>';
+  for(let i=0;i<12;i++){
+    const t = i*Math.PI/6, c = Math.cos(t), s = Math.sin(t);
+    kiwi += `<line x1="${(50+15*c).toFixed(1)}" y1="${(54+15*s).toFixed(1)}" x2="${(50+21*c).toFixed(1)}" y2="${(54+21*s).toFixed(1)}"/>`;
+  }
+  P.kiwi = kiwi;
+  return P;
+})();
+const CROQUIS_PRODUIT = {
+  fraise:'fraise',
+  citron:'agrume', orange:'agrume', mandarine:'agrume', pamplemousse:'agrume',
+  framboise:'baies', mure:'baies', myrtille:'baies', cassis:'baies', groseille:'baies',
+  airelle:'baies', raisin:'baies', grenade:'baies',
+  cerise:'cerise',
+  pomme:'rond', peche:'rond', abricot:'rond', prune:'rond', mangue:'rond', papaye:'rond',
+  goyave:'rond', litchi:'rond', figue:'rond', avocat:'rond',
+  poire:'poire', banane:'banane', ananas:'ananas', coco:'coco',
+  kiwi:'kiwi', passion:'kiwi',
+  melon:'melon', pasteque:'melon',
+  marron:'noix',
+};
+/* croquis assorti à la recette : fruit dominant, sinon chocolat, fruits secs, ou flocon */
+function croquisRecette(){
+  let best = null, bestG = 0;
+  for(const r of state.rows){
+    const ing = ING_BY_ID[r.id]; if(!ing || !(r.g>0)) continue;
+    if(ing.cat==='FRUIT'){
+      const base = r.id.startsWith('puree_') ? r.id.split('_')[1] : r.id;
+      if(CROQUIS_PRODUIT[base] && r.g > bestG){ bestG = r.g; best = CROQUIS_PRODUIT[base]; }
+    }
+  }
+  if(best) return best;
+  if(state.rows.some(r=>ING_BY_ID[r.id] && ING_BY_ID[r.id].cat==='CHOC' && r.g>0)) return 'choco';
+  if(state.rows.some(r=>ING_BY_ID[r.id] && ING_BY_ID[r.id].cat==='OLEA' && r.g>0)) return 'noix';
+  return 'flocon';
+}
+/* planche A4 d'étiquettes autocollantes 100 × 30 mm — 18 par page (2 × 9),
+   marges 5 mm à gauche/droite et 13,5 mm en haut/bas, sans espace entre elles */
+const ETIQ_PAR_PAGE = 18;
 function htmlPlanche(d){
-  const label = `<div class="label"><h3>${d.nom}</h3>
-    <div>Ingrédients : ${d.ingListe}.</div>
-    <div class="lot">Lot ${d.lot} · Poids net : ${fmt0(d.potG)} g</div>
-    <div>Produit le ${d.dP} · À consommer de préférence avant le : <b>${d.dD}</b></div>
-    <div>À conserver à −18 °C. Ne jamais recongeler un produit décongelé.</div>
+  const svg = `<svg class="croquis" viewBox="0 0 100 100" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${CROQUIS[croquisRecette()] || CROQUIS.flocon}</svg>`;
+  const label = `<div class="label">${svg}
+    <div class="et-nom">${esc(d.nom)}</div>
+    <div class="et-filet"></div>
+    <div class="et-ing">Ingrédients : ${d.ingListe}.</div>
+    <div class="et-info">Lot ${esc(d.lot)} · Poids net ${fmt0(d.potG)} g · Produit le ${d.dP}</div>
+    <div class="et-info"><b>À consommer de préférence avant le : ${d.dD}</b> · À conserver à −18 °C</div>
   </div>`;
-  return `<h2>Étiquettes (${d.nb} pot${d.nb>1?'s':''} de ${fmt0(d.potG)} g) — lot ${d.lot}</h2>
-  <div class="labelgrid">`+label.repeat(d.nb)+`</div>`;
+  let pages = '';
+  for(let i = 0; i < d.nb; i += ETIQ_PAR_PAGE)
+    pages += `<div class="labelpage"><div class="labelgrid">${label.repeat(Math.min(ETIQ_PAR_PAGE, d.nb - i))}</div></div>`;
+  return `<div class="noetiq">Planche d'étiquettes <strong>100 × 30 mm</strong> — ${d.nb} étiquette${d.nb>1?'s':''}, 18 par page A4 (2 × 9) — lot ${esc(d.lot)}.
+    Dans la fenêtre d'impression : échelle <strong>100 %</strong> (taille réelle), sans marges ajoutées, en-têtes et pieds de page désactivés.</div>` + pages;
 }
 function buildLabels(){
   const d = donneesTrac();
-  el('printArea').innerHTML = htmlFicheTrac(d) + '<div style="break-before:page"></div>' + htmlPlanche(d);
+  el('printArea').innerHTML = '<div class="fichewrap">' + htmlFicheTrac(d) + '</div>' + htmlPlanche(d);
 }
 
 /* =====================================================================
@@ -1717,18 +1851,37 @@ function renderLots(){
   }
   if(!nb) box.innerHTML = '<p class="footnote" style="margin:0">La recette est vide : composez d\'abord une recette dans l\'onglet 🧮 Recette.</p>';
 }
-/* --- reconnaissance de texte (chargée uniquement à la demande) --- */
+/* --- reconnaissance de texte (chargée uniquement à la demande) ---
+   Les fichiers sont d'abord cherchés dans le dossier « ocr/ » hébergé avec
+   l'application (fonctionne alors hors CDN, et hors connexion une fois en
+   cache) ; à défaut, le CDN jsdelivr sert de secours. --- */
 let tessPromise = null;
-function chargerTesseract(){
+function chargerTesseract(src){
   if(window.Tesseract) return Promise.resolve(window.Tesseract);
   if(!tessPromise) tessPromise = new Promise((res, rej)=>{
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.src = src;
     s.onload = ()=>res(window.Tesseract);
     s.onerror = ()=>{ tessPromise = null; s.remove(); rej(new Error('chargement impossible')); };
     document.head.appendChild(s);
   });
   return tessPromise;
+}
+let ocrLocal = null;   // true si le dossier ocr/ est hébergé avec l'application
+async function creerWorkerOCR(){
+  if(ocrLocal === null){
+    try{
+      const r = await fetch(new URL('ocr/worker.min.js', location.href), {method:'HEAD'});
+      ocrLocal = r.ok;
+    }catch(e){ ocrLocal = false; }
+  }
+  if(ocrLocal){
+    const base = new URL('ocr', location.href).href;
+    const T = await chargerTesseract(base + '/tesseract.min.js');
+    return T.createWorker('eng', 1, {workerPath: base + '/worker.min.js', corePath: base, langPath: base});
+  }
+  const T = await chargerTesseract('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+  return T.createWorker('eng');
 }
 /* candidats « numéro de lot » dans le texte reconnu */
 function candidatsLot(txt){
@@ -1757,8 +1910,7 @@ async function extraireLot(ingId, row, btn){
   const ancien = btn.textContent;
   btn.disabled = true; btn.textContent = '⏳ Analyse…';
   try{
-    const T = await chargerTesseract();
-    const worker = await T.createWorker('eng');
+    const worker = await creerWorkerOCR();
     const { data } = await worker.recognize(photoCache[l.photo]);
     await worker.terminate();
     const cands = candidatsLot(data.text);
@@ -1778,7 +1930,7 @@ async function extraireLot(ingId, row, btn){
     }
     row.appendChild(chips);
   }catch(e){
-    alert('Extraction impossible : la reconnaissance de texte n\'a pas pu être chargée (connexion internet nécessaire la première fois). Saisissez le numéro à la main.');
+    alert('Extraction impossible ici : ouvrez l\'application depuis son adresse web habituelle (l\'extraction ne fonctionne ni dans l\'aperçu d\'essai, ni depuis un fichier ouvert directement). Une connexion internet est nécessaire à la première utilisation. En attendant, saisissez le numéro à la main.');
   }
   btn.disabled = false; btn.textContent = ancien;
 }
@@ -1825,10 +1977,19 @@ const DOC_CSS = `
   tr.total td{font-weight:700;background:#f3f3f3}
   .st-ok::before{content:"✓ "} .st-warn::before{content:"! "} .st-bad::before{content:"✗ "}
   .foot{font-size:10.5px;color:#555;margin-top:14px}
-  .labelgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:5mm}
-  .label{border:1.2px dashed #777;border-radius:2mm;padding:2.5mm;font-size:8.5px;line-height:1.3;break-inside:avoid}
-  .label h3{font-size:10.5px;margin:0 0 1mm;border:none;padding:0}
-  .label .lot{font-weight:700;margin-top:1mm}
+  .noetiq{background:#fffbe6;border:1px solid #e0c200;border-radius:6px;padding:8px 10px;font-size:12px;margin:10px}
+  .labelpage{width:210mm;height:296mm;padding:13.5mm 5mm;box-sizing:border-box;overflow:hidden;break-after:page}
+  .labelgrid{display:grid;grid-template-columns:repeat(2,100mm);grid-auto-rows:30mm;gap:0}
+  .label{position:relative;width:100mm;height:30mm;padding:2.2mm 3mm 2mm;box-sizing:border-box;overflow:hidden;
+    outline:1px dotted #bbb;border-radius:2.5mm;color:#000;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:6pt;line-height:1.3;break-inside:avoid}
+  .label .croquis{position:absolute;right:-3mm;top:50%;margin-top:-14mm;width:28mm;height:28mm;opacity:.14}
+  .label .et-nom{font-family:Didot,"Bodoni MT",Georgia,"Times New Roman",serif;font-size:11pt;font-weight:400;
+    letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .label .et-filet{width:14mm;border-top:.5px solid #000;margin:1mm 0 1.1mm}
+  .label .et-ing{font-size:5.2pt;line-height:1.3;color:#222;max-height:13.6pt;overflow:hidden}
+  .label .et-info{font-size:6pt;line-height:1.45;letter-spacing:.02em}
+  @media print{.noetiq{display:none}.label{outline:none;border-radius:0}}
   .signature{margin-top:10mm;font-size:11px}
   .photogrid{display:grid;grid-template-columns:repeat(2,1fr);gap:4mm;margin-top:4mm}
   .photocell{border:1px solid #999;border-radius:2mm;padding:2mm;font-size:9.5px;break-inside:avoid}
@@ -1837,8 +1998,9 @@ const DOC_CSS = `
   .noprint button{font:inherit;font-weight:700;padding:9px 16px;border-radius:999px;border:none;
     background:linear-gradient(135deg,#e8467c,#f2745f);color:#fff;cursor:pointer}
   @media print{.noprint{display:none}body{padding:0}}`;
-function docAutonome(titre, corps){
-  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${titre}</title><style>${DOC_CSS}</style></head><body><div class="noprint"><button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button></div>${corps}</body></html>`;
+function docAutonome(titre, corps, etiq){
+  const extra = etiq ? '<style>@page{size:A4;margin:0} body{max-width:none;margin:0;padding:0} .noprint{padding:10px 14px}</style>' : '';
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${titre}</title><style>${DOC_CSS}</style>${extra}</head><body><div class="noprint"><button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button></div>${corps}</body></html>`;
 }
 function slugFichier(s){
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
@@ -1854,7 +2016,7 @@ function telechargerFichier(nomFichier, contenu){
 function docEtiquettes(){
   const d = donneesTrac();
   return {nom:`${d.dateISO}_${slugFichier(d.nom)}_etiquettes.html`,
-          contenu: docAutonome(`Étiquettes — ${d.nom} — lot ${d.lot}`, htmlPlanche(d))};
+          contenu: docAutonome(`Étiquettes — ${d.nom} — lot ${d.lot}`, htmlPlanche(d), true)};
 }
 function docTracabilite(){
   const d = donneesTrac();
@@ -2075,8 +2237,22 @@ function init(){
 
   state.pot = state.pot || {g:120, coeff:5};
   el('potG').value = state.pot.g; el('potCoeff').value = state.pot.coeff;
-  el('potG').addEventListener('input',()=>{ state.pot.g = parseFloat(el('potG').value)||120; save(); majResultatsCouts(); });
+  el('potG').addEventListener('input',()=>{ state.pot.g = parseFloat(el('potG').value)||120; save(); majResultatsCouts(); majTracInfo(); });
   el('potCoeff').addEventListener('input',()=>{ state.pot.coeff = parseFloat(el('potCoeff').value)||5; save(); majResultatsCouts(); });
+  el('contenantOn').checked = !!state.pot.contenant;
+  if(state.pot.contenantPrix != null) el('contenantPrix').value = state.pot.contenantPrix;
+  el('contenantField').hidden = !state.pot.contenant;
+  el('contenantOn').addEventListener('change',()=>{
+    state.pot.contenant = el('contenantOn').checked;
+    if(state.pot.contenant && state.pot.contenantPrix == null)
+      state.pot.contenantPrix = parseFloat(el('contenantPrix').value)||0;
+    el('contenantField').hidden = !state.pot.contenant;
+    save(); majResultatsCouts();
+  });
+  el('contenantPrix').addEventListener('input',()=>{
+    state.pot.contenantPrix = parseFloat(el('contenantPrix').value)||0;
+    save(); majResultatsCouts();
+  });
 
   // --- traçabilité ---
   state.trac = state.trac || {};
@@ -2160,7 +2336,9 @@ function init(){
   el('btnDriveNow').addEventListener('click',()=>{
     envoyerDrive([docRecette(), docTracabilite(), docEtiquettes()]);
   });
+  el('etiqPage').disabled = true;
   window.addEventListener('beforeprint', ()=>{
+    el('etiqPage').disabled = (printMode!=='etiquettes');
     if(printMode==='etiquettes') buildLabels();
     else if(printMode==='fiche') buildFiche();
     else buildPrint();

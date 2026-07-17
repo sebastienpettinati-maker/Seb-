@@ -433,7 +433,7 @@
         <div class="field"><label for="tracDate">Date de production</label><input type="date" id="tracDate"></div>
         <div class="field"><label for="tracDuree">Conservation (mois)</label><input type="number" id="tracDuree" value="12" min="1" max="24" step="1" style="width:90px"></div>
         <div class="field"><label for="tracLot">N° de lot</label><input type="text" id="tracLot" style="width:150px"></div>
-        <div class="field"><label for="tracNb">Pots produits</label><input type="number" id="tracNb" min="1" step="1" style="width:90px"></div>
+        <div class="field"><label for="tracNb">Étiquettes à imprimer</label><input type="number" id="tracNb" min="1" step="1" style="width:90px" title="Calculé automatiquement : poids de la recette ÷ poids du pot. Modifiable ; videz le champ pour revenir au calcul automatique."></div>
         <button class="primary" id="btnEtiquettes">🖨 Imprimer fiche + étiquettes</button>
         <button class="small" id="btnDlEtiquettes">⬇ Fichier étiquettes seules</button>
       </div>
@@ -1554,12 +1554,18 @@ function lotAuto(){
 function majTracInfo(){
   const t = computeTotals();
   const potG = (state.pot && state.pot.g) || 120;
-  const auto = Math.max(1, Math.floor(t.g/potG));
-  if(!el('tracNb').value) el('tracNb').placeholder = auto;
+  const auto = t.g>0 ? Math.max(1, Math.floor(t.g/potG)) : 0;
+  const manuel = state.trac && state.trac.nbPots;
+  if(!manuel) el('tracNb').value = auto || '';
   const duree = parseFloat(el('tracDuree').value)||12;
   const d = el('tracDate').value ? new Date(el('tracDate').value+'T00:00') : new Date();
   const ddm = new Date(d); ddm.setMonth(ddm.getMonth()+duree);
-  el('tracInfo').textContent = `Pots de ${fmt0(potG)} g (réglable dans la section coûts) — la recette permet environ ${auto} pots. `
+  el('tracInfo').textContent =
+    (t.g>0
+      ? `Nombre d'étiquettes calculé automatiquement : ${fmt0(t.g)} g de mix ÷ ${fmt0(potG)} g par pot = ${auto} étiquettes`
+        + (manuel ? ` — remplacé à la main par ${manuel} (videz le champ pour revenir au calcul automatique)` : '')
+        + `. Poids du pot réglable dans la section coûts. `
+      : '')
     + `DDM calculée : ${ddm.toLocaleDateString('fr-FR')} (à conserver à −18 °C).`;
 }
 function listeIngredientsEtiquette(t){
@@ -2151,7 +2157,7 @@ function init(){
 
   state.pot = state.pot || {g:120, coeff:5};
   el('potG').value = state.pot.g; el('potCoeff').value = state.pot.coeff;
-  el('potG').addEventListener('input',()=>{ state.pot.g = parseFloat(el('potG').value)||120; save(); majResultatsCouts(); });
+  el('potG').addEventListener('input',()=>{ state.pot.g = parseFloat(el('potG').value)||120; save(); majResultatsCouts(); majTracInfo(); });
   el('potCoeff').addEventListener('input',()=>{ state.pot.coeff = parseFloat(el('potCoeff').value)||5; save(); majResultatsCouts(); });
   el('contenantOn').checked = !!state.pot.contenant;
   if(state.pot.contenantPrix != null) el('contenantPrix').value = state.pot.contenantPrix;

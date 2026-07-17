@@ -39,6 +39,7 @@
     }
   }
   *{box-sizing:border-box}
+  [hidden]{display:none !important}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--page);color:var(--ink-1);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
   /* --- barre supérieure : titre, onglets, actions --- */
@@ -379,12 +380,21 @@
       <div class="toolbar" style="margin-top:14px">
         <div class="field"><label for="potG">Poids du pot (g)</label><input type="number" id="potG" value="120" min="10" step="10"></div>
         <div class="field"><label for="potCoeff">Coefficient sur coût matières</label><input type="number" id="potCoeff" value="5" min="1" step="0.5"></div>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;padding-bottom:9px">
+          <input type="checkbox" id="contenantOn"> Contenant vendu avec la glace (pot, cornet…)
+        </label>
+        <div class="field" id="contenantField" hidden>
+          <label for="contenantPrix">Prix d'achat du contenant (€) — coefficient × 2</label>
+          <input type="number" id="contenantPrix" value="0.20" min="0" step="0.05">
+        </div>
       </div>
       <div class="verdict ok" id="potResult" style="margin-top:10px"></div>
       <details class="more"><summary>Comment sont calculés ces prix ?</summary>
         Prix indicatifs pré-remplis : modifiez-les selon vos fournisseurs, ils sont enregistrés sur cet appareil et réutilisés
         pour toutes vos recettes. Le poids du pot correspond au poids de mix : le foisonnement ajoute du volume, pas du poids —
-        un pot de 120 g contient bien 120 g de mix.
+        un pot de 120 g contient bien 120 g de mix. Si un contenant est vendu avec la glace, son prix d'achat entre dans le
+        prix de vente avec un coefficient de 2 (contre le coefficient choisi, en général 5, pour les matières premières) :
+        prix conseillé = coût matières du pot × coefficient + prix du contenant × 2.
       </details>
     </section>
   </section>
@@ -1407,12 +1417,17 @@ function setPrix(id, v){
 }
 const fmtE = x => fmt(x,2);
 function coutMix(){ return state.rows.reduce((s,r)=> s + (r.g||0)/1000*getPrix(r.id), 0); }
+const COEF_CONTENANT = 2;   // coefficient appliqué au prix d'achat du contenant
 function coutsPot(total, mixG){
   const potG = (state.pot && state.pot.g) || 120;
   const coeff = (state.pot && state.pot.coeff) || 5;
-  return {potG, coeff, coutKg: mixG>0 ? total/mixG*1000 : 0,
-          coutPot: mixG>0 ? total/mixG*potG : 0,
-          prixVente: mixG>0 ? total/mixG*potG*coeff : 0,
+  const contenant = !!(state.pot && state.pot.contenant);
+  const contenantPrix = contenant ? ((state.pot && state.pot.contenantPrix) || 0) : 0;
+  const coutPot = mixG>0 ? total/mixG*potG : 0;
+  return {potG, coeff, contenant, contenantPrix,
+          coutKg: mixG>0 ? total/mixG*1000 : 0,
+          coutPot,
+          prixVente: coutPot*coeff + contenantPrix*COEF_CONTENANT,
           nbPots: potG>0 ? Math.floor(mixG/potG) : 0};
 }
 function majResultatsCouts(){
@@ -1422,7 +1437,9 @@ function majResultatsCouts(){
   el('coutKg').textContent = t.g>0 ? fmtE(total/t.g*1000)+' €/kg' : '—';
   const p = coutsPot(total, t.g);
   el('potResult').innerHTML = t.g>0
-    ? `Pot de ${fmt0(p.potG)} g : coût matières <strong>${fmtE(p.coutPot)} €</strong> × ${fmt(p.coeff)} → <strong>prix de vente conseillé : ${fmtE(p.prixVente)} €</strong>`
+    ? `Pot de ${fmt0(p.potG)} g : coût matières <strong>${fmtE(p.coutPot)} €</strong> × ${fmt(p.coeff)}`
+      + (p.contenant ? ` + contenant ${fmtE(p.contenantPrix)} € × ${COEF_CONTENANT}` : '')
+      + ` → <strong>prix de vente conseillé : ${fmtE(p.prixVente)} €</strong>`
       + ` &nbsp;·&nbsp; cette recette remplit ${p.nbPots} pot${p.nbPots>1?'s':''}`
     : 'Ajoutez des ingrédients pour calculer les coûts.';
 }
@@ -1512,7 +1529,7 @@ function buildPrint(){
       h += `<tr><td>${ing.nom}</td><td class="num">${fmt0(r.g||0)}</td><td class="num">${fmtE(getPrix(r.id))}</td><td class="num">${fmtE((r.g||0)/1000*getPrix(r.id))}</td></tr>`;
     }
     h += `<tr class="total"><td>Coût matières du mix</td><td class="num">${fmt0(t.g)}</td><td class="num">${fmtE(cp.coutKg)} €/kg</td><td class="num">${fmtE(coutTotal)} €</td></tr>
-    <tr class="total"><td colspan="4">Pot de ${fmt0(cp.potG)} g : coût matières ${fmtE(cp.coutPot)} € × coefficient ${fmt(cp.coeff)} = <strong>prix de vente conseillé ${fmtE(cp.prixVente)} €</strong> — cette recette remplit ${cp.nbPots} pot${cp.nbPots>1?'s':''}</td></tr>
+    <tr class="total"><td colspan="4">Pot de ${fmt0(cp.potG)} g : coût matières ${fmtE(cp.coutPot)} € × ${fmt(cp.coeff)}${cp.contenant?' + contenant '+fmtE(cp.contenantPrix)+' € × '+COEF_CONTENANT:''} = <strong>prix de vente conseillé ${fmtE(cp.prixVente)} €</strong> — cette recette remplit ${cp.nbPots} pot${cp.nbPots>1?'s':''}</td></tr>
     </tbody></table>`;
   }
 
@@ -1582,7 +1599,7 @@ function htmlFicheTrac(d){
     <tr><td>Produit</td><td><strong>${d.nom}</strong></td><td>N° de lot</td><td><strong>${d.lot}</strong></td></tr>
     <tr><td>Date de production</td><td>${d.dP}</td><td>DDM (à conserver à −18 °C)</td><td><strong>${d.dD}</strong> (${fmt0(d.duree)} mois)</td></tr>
     <tr><td>Poids de mix produit</td><td>${fmt0(d.t.g)} g</td><td>Pots produits</td><td><strong>${d.nb}</strong> × ${fmt0(d.potG)} g net</td></tr>
-    <tr><td>Coût matières du lot</td><td>${coutTotal>0?fmtE(coutTotal)+' €':'—'}</td><td>Prix de vente conseillé / pot</td><td>${coutTotal>0?fmtE(cp.prixVente)+' € (coef. '+fmt(cp.coeff)+')':'—'}</td></tr>
+    <tr><td>Coût matières du lot</td><td>${coutTotal>0?fmtE(coutTotal)+' €':'—'}</td><td>Prix de vente conseillé / pot</td><td>${coutTotal>0?fmtE(cp.prixVente)+' € (coef. '+fmt(cp.coeff)+(cp.contenant?' + contenant × '+COEF_CONTENANT:'')+')':'—'}</td></tr>
   </tbody></table>
   <h2>Ingrédients mis en œuvre (ordre décroissant, allergènes en gras)</h2>
   <p style="font-size:11px">${d.ingListe}.</p>
@@ -2136,6 +2153,20 @@ function init(){
   el('potG').value = state.pot.g; el('potCoeff').value = state.pot.coeff;
   el('potG').addEventListener('input',()=>{ state.pot.g = parseFloat(el('potG').value)||120; save(); majResultatsCouts(); });
   el('potCoeff').addEventListener('input',()=>{ state.pot.coeff = parseFloat(el('potCoeff').value)||5; save(); majResultatsCouts(); });
+  el('contenantOn').checked = !!state.pot.contenant;
+  if(state.pot.contenantPrix != null) el('contenantPrix').value = state.pot.contenantPrix;
+  el('contenantField').hidden = !state.pot.contenant;
+  el('contenantOn').addEventListener('change',()=>{
+    state.pot.contenant = el('contenantOn').checked;
+    if(state.pot.contenant && state.pot.contenantPrix == null)
+      state.pot.contenantPrix = parseFloat(el('contenantPrix').value)||0;
+    el('contenantField').hidden = !state.pot.contenant;
+    save(); majResultatsCouts();
+  });
+  el('contenantPrix').addEventListener('input',()=>{
+    state.pot.contenantPrix = parseFloat(el('contenantPrix').value)||0;
+    save(); majResultatsCouts();
+  });
 
   // --- traçabilité ---
   state.trac = state.trac || {};

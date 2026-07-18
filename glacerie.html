@@ -281,7 +281,9 @@
       <h2>⚡ Recette automatique</h2>
       <p class="hint">Indiquez seulement le poids de votre ingrédient principal — purées de fruits pour un sorbet,
          lait entier pour une glace : sucres, poudre de lait, crème, jaunes, stabilisateur et eau sont calculés
-         pour un mix équilibré, conforme aux appellations légales.</p>
+         pour un mix équilibré, conforme aux appellations légales. Astuce : pour une glace, mettez le parfum dans
+         le nom de la recette (« Crème glacée pistache ») et l'ingrédient est ajouté tout seul à la dose
+         professionnelle.</p>
       <div class="toolbar">
         <div class="field">
           <label for="autoType">Produit</label>
@@ -642,6 +644,8 @@ const INGREDIENTS = [
   // ---- Autres ----
   D({id:'eau',        nom:'Eau',                   cat:'AUTRE', eau:100}),
   D({id:'jus_citron', nom:'Jus de citron',         cat:'AUTRE', eau:92, suc:1.6, autres:6.4}),
+  D({id:'cafe_sol',   nom:'Café soluble *',        cat:'AUTRE', eau:3,  autres:97, approx:true, etiq:'café'}),
+  D({id:'vanille',    nom:'Gousse de vanille *',   cat:'AUTRE', eau:20, autres:80, approx:true, etiq:'vanille'}),
 ];
 const ING_BY_ID = Object.fromEntries(INGREDIENTS.map(i=>[i.id,i]));
 
@@ -1386,12 +1390,102 @@ function recetteAuto(){
     state.rows = rows;
     state.type = mode;
     state.cibles = {mode:'glace', mg:c.mg, suc:c.suc, esdl:c.esdl, jaune:c.jaune, stab:c.stab};
-    state.nom = mode==='glace_oeufs' ? 'Glace aux œufs' : 'Crème glacée';
+    // si le nom saisi contient un parfum reconnu (« Crème glacée pistache »),
+    // on le conserve : l'ingrédient sera ajouté juste après (appliquerParfum)
+    const nomSaisi = el('produitNom').value.trim();
+    const avecParfum = nomSaisi && PARFUMS.some(([mot])=>normaliserNom(nomSaisi).includes(mot));
+    state.nom = avecParfum ? nomSaisi : (mode==='glace_oeufs' ? 'Glace aux œufs' : 'Crème glacée');
     el('autoNote').textContent = `Mix total : ${fmt0(T)} g pour ${fmt0(W)} g de lait entier (${fmt(ref.lait/10)} % du mix). Table analytique calculée par la méthode en 5 étapes.`;
   }
   el('produitType').value = state.type;
   el('produitNom').value = state.nom;
   update();
+  appliquerParfum();
+}
+
+/* =====================================================================
+   PARFUM AUTOMATIQUE D'APRÈS LE NOM (glaces et crèmes glacées)
+   « Crème glacée pistache » → la pâte de pistache est ajoutée au mix à la
+   dose professionnelle, puis la recette est rééquilibrée.
+===================================================================== */
+const PARFUMS = [
+  // pâtes de fruits secs
+  ['pistache',  {id:'p_pistache', pct:8}],
+  ['noisette',  {id:'p_noisette', pct:8}],
+  ['praline',   {id:'praline',    pct:10}],
+  ['amande',    {id:'p_amande',   pct:7}],
+  ['arachide',  {id:'p_arachide', pct:7}],
+  ['cacahuete', {id:'p_arachide', pct:7}],
+  // chocolat, café, vanille…
+  ['chocolat',  {id:'couv70',   pct:8}],
+  ['choco',     {id:'couv70',   pct:8}],
+  ['cacao',     {id:'cacao',    pct:3}],
+  ['cafe',      {id:'cafe_sol', pct:1.5}],
+  ['moka',      {id:'cafe_sol', pct:1.5}],
+  ['expresso',  {id:'cafe_sol', pct:1.5}],
+  ['espresso',  {id:'cafe_sol', pct:1.5}],
+  ['vanille',   {id:'vanille',  pct:0.5}],
+  ['miel',      {id:'miel',     pct:5}],
+  ['marron',    {id:'marron',   pct:15}],
+  ['coco',      {id:'coco',     pct:10}],
+  // fruits (crème glacée ou glace aux fruits)
+  ['fraise',    {id:'fraise',    pct:15}],
+  ['framboise', {id:'framboise', pct:15}],
+  ['myrtille',  {id:'myrtille',  pct:15}],
+  ['cassis',    {id:'cassis',    pct:10}],
+  ['cerise',    {id:'cerise',    pct:15}],
+  ['griotte',   {id:'cerise',    pct:15}],
+  ['banane',    {id:'banane',    pct:15}],
+  ['mangue',    {id:'mangue',    pct:15}],
+  ['passion',   {id:'passion',   pct:10}],
+  ['citron',    {id:'citron',    pct:8}],
+  ['orange',    {id:'orange',    pct:12}],
+  ['abricot',   {id:'abricot',   pct:15}],
+  ['peche',     {id:'peche',     pct:15}],
+  ['poire',     {id:'poire',     pct:15}],
+  ['pomme',     {id:'pomme',     pct:15}],
+  ['ananas',    {id:'ananas',    pct:12}],
+  ['melon',     {id:'melon',     pct:15}],
+  ['kiwi',      {id:'kiwi',      pct:12}],
+];
+function appliquerParfum(){
+  if(!['creme_glacee','glace','glace_lait','glace_oeufs'].includes(state.type)) return;
+  const nom = normaliserNom(el('produitNom').value);
+  let parfum = null;
+  for(const [mot, p] of PARFUMS) if(nom.includes(mot)){ parfum = p; break; }
+  if(!parfum) return;
+  if(state.rows.some(r=>r.id===parfum.id)) return;   // déjà dans la recette
+  const T = state.rows.reduce((s,r)=>s+(r.g||0),0);
+  if(T<=0) return;
+  const g = Math.max(5, Math.round(T*parfum.pct/100));
+  // compenser l'extrait sec du parfum (pâtes, chocolat : moins de poudre de
+  // lait puis un peu moins de sucres ; fruits, qui diluent : un peu plus de
+  // poudre), pour rester dans les repères d'EST de la glace
+  const ingP = ING_BY_ID[parfum.id];
+  const t0 = computeTotals();
+  // après rééquilibrage, la base (MG, ESDL, sucres…) est remise en % du
+  // nouveau total : l'extrait sec du parfum s'ajoute donc entièrement
+  const estProj = pct(t0.est, t0.g)
+    + (g * (ingP.mg + ingP.esdl + ingP.suc + ingP.autres) / 100) / (t0.g + g) * 100;
+  const cib = Object.assign({}, ciblesCourantes());
+  if(cib.mode==='glace'){
+    if(estProj > 41.5){
+      let delta = estProj - 41.5;
+      const dEsdl = Math.min(delta, Math.max(0, (cib.esdl ?? 9.5) - 7.5));
+      cib.esdl = (cib.esdl ?? 9.5) - dEsdl; delta -= dEsdl;
+      const dSuc = Math.min(delta/0.95, Math.max(0, (cib.suc ?? 18) - 16.5));
+      cib.suc = (cib.suc ?? 18) - dSuc;
+    } else if(estProj < 37.5){
+      cib.esdl = Math.min(9.8, (cib.esdl ?? 9.5) + (37.5 - estProj));
+    }
+    state.cibles = cib;
+  }
+  state.rows.push({id:parfum.id, g});
+  reequilibrer();
+  const ing = ING_BY_ID[parfum.id];
+  el('rebalInfo').innerHTML =
+    `✨ <strong>${ing.nom.replace(' *','')}</strong> — ${fmt0(g)} g, soit ${fmt(parfum.pct)} % du mix (dose professionnelle) — `
+    + `ajouté automatiquement d'après le nom de la recette. ` + el('rebalInfo').innerHTML;
 }
 
 /* =====================================================================
@@ -1414,7 +1508,7 @@ const PRIX_DEFAUT = {
   p_amande:18, p_noisette:22, p_pistache:35, p_noix:20, p_arachide:8, praline:12,
   couv70:10, cacao:8, bcacao:15,
   stab:15, e471:12, gelatine:25,
-  eau:0, jus_citron:3,
+  eau:0, jus_citron:3, cafe_sol:25, vanille:400,
 };
 let prixPerso = {};
 try{ prixPerso = JSON.parse(localStorage.getItem('glacerie_prix')) || {}; }catch(e){}
@@ -2235,6 +2329,7 @@ function init(){
   selType.addEventListener('change',()=>{ state.type = selType.value; update(); });
   el('produitNom').value = state.nom||'';
   el('produitNom').addEventListener('input',()=>{ state.nom = el('produitNom').value; save(); });
+  el('produitNom').addEventListener('change', appliquerParfum);
 
   el('btnAdd').addEventListener('click',()=>{ state.rows.push({id:'saccharose', g:0}); update(); });
   el('btnRebal').addEventListener('click', reequilibrer);

@@ -565,12 +565,12 @@ const INGREDIENTS = [
   // ---- Produits laitiers (MG butyrique) ----
   D({id:'lait_entier',   nom:'Lait entier',            cat:'LAIT', eau:88,   mg:3.6,  mgL:true, esdl:8.4}),
   D({id:'lait_ecreme',   nom:'Lait écrémé',            cat:'LAIT', eau:91,   mg:0.06, mgL:true, esdl:9.24}),
-  D({id:'creme30',       nom:'Crème 30 % MG',          cat:'LAIT', eau:63.5, mg:30,   mgL:true, esdl:6.44}),
-  D({id:'creme35',       nom:'Crème 35 % MG',          cat:'LAIT', eau:59.02,mg:35,   mgL:true, esdl:5.98}),
-  D({id:'creme40',       nom:'Crème 40 % MG',          cat:'LAIT', eau:54.48,mg:40,   mgL:true, esdl:5.52}),
-  D({id:'beurre',        nom:'Beurre laitier',         cat:'LAIT', eau:16,   mg:82,   mgL:true, esdl:2}),
-  D({id:'pdl26',         nom:'Poudre de lait 26 % MG', cat:'LAIT', eau:3,    mg:26,   mgL:true, esdl:71}),
-  D({id:'pdl0',          nom:'Poudre de lait 0 % MG',  cat:'LAIT', eau:3.3,  mg:0.88, mgL:true, esdl:95.85}),
+  D({id:'creme30',       nom:'Crème 30 % MG',          cat:'LAIT', eau:63.5, mg:30,   mgL:true, esdl:6.44, etiq:'crème'}),
+  D({id:'creme35',       nom:'Crème 35 % MG',          cat:'LAIT', eau:59.02,mg:35,   mgL:true, esdl:5.98, etiq:'crème'}),
+  D({id:'creme40',       nom:'Crème 40 % MG',          cat:'LAIT', eau:54.48,mg:40,   mgL:true, esdl:5.52, etiq:'crème'}),
+  D({id:'beurre',        nom:'Beurre laitier',         cat:'LAIT', eau:16,   mg:82,   mgL:true, esdl:2, etiq:'beurre'}),
+  D({id:'pdl26',         nom:'Poudre de lait 26 % MG', cat:'LAIT', eau:3,    mg:26,   mgL:true, esdl:71, etiq:'poudre de lait'}),
+  D({id:'pdl0',          nom:'Poudre de lait 0 % MG',  cat:'LAIT', eau:3.3,  mg:0.88, mgL:true, esdl:95.85, etiq:'poudre de lait écrémé'}),
   // ---- Œufs ----
   D({id:'jaune',         nom:'Jaune d’œuf',       cat:'OEUF', eau:50, mg:33, autres:17, jaune:true}),
   D({id:'oeuf',          nom:'Œuf entier',             cat:'OEUF', eau:60, autres:40}),
@@ -578,12 +578,12 @@ const INGREDIENTS = [
   // ---- Sucres ----
   D({id:'saccharose',    nom:'Saccharose',             cat:'SUCRE', eau:0.1, suc:99.9, psr:100}),
   D({id:'dextrose',      nom:'Dextrose',               cat:'SUCRE', eau:8,   suc:92,   psr:74}),
-  D({id:'glucose_atom',  nom:'Glucose atomisé',        cat:'SUCRE', eau:5,   suc:95,   psr:47}),
-  D({id:'inverti',       nom:'Sucre inverti (trimoline)',cat:'SUCRE', eau:22, suc:78,  psr:127}),
+  D({id:'glucose_atom',  nom:'Glucose atomisé',        cat:'SUCRE', eau:5,   suc:95,   psr:47, etiq:'sirop de glucose déshydraté'}),
+  D({id:'inverti',       nom:'Sucre inverti (trimoline)',cat:'SUCRE', eau:22, suc:78,  psr:127, etiq:'sucre inverti'}),
   D({id:'miel',          nom:'Miel',                   cat:'SUCRE', eau:15,  suc:85,   psr:130}),
   D({id:'fructose',      nom:'Fructose',               cat:'SUCRE', eau:0,   suc:100,  psr:173}),
-  D({id:'lactose',       nom:'Lactose (poudre)',       cat:'SUCRE', eau:0,   suc:100,  psr:16}),
-  D({id:'glucose_sirop', nom:'Glucose en sirop *',     cat:'SUCRE', eau:20,  suc:80,   psr:38,  approx:true}),
+  D({id:'lactose',       nom:'Lactose (poudre)',       cat:'SUCRE', eau:0,   suc:100,  psr:16, etiq:'lactose'}),
+  D({id:'glucose_sirop', nom:'Glucose en sirop *',     cat:'SUCRE', eau:20,  suc:80,   psr:38,  approx:true, etiq:'sirop de glucose'}),
   D({id:'maltose',       nom:'Maltose *',              cat:'SUCRE', eau:5,   suc:95,   psr:32,  approx:true}),
   D({id:'sorbitol',      nom:'Sorbitol *',             cat:'SUCRE', eau:0,   suc:100,  psr:30,  approx:true}),
   // ---- Fruits : extrait sec du formulaire BTM ; teneur en sucres du formulaire
@@ -592,12 +592,12 @@ const INGREDIENTS = [
   //      Pour melon, pastèque et litchi, l'ES du formulaire a été relevé pour
   //      rester cohérent avec la teneur en sucres mesurée. ----
   D({id:'abricot',   nom:'Abricot',              cat:'FRUIT', fruit:'std',   eau:86, suc:13.14, autres:0.86}),
-  D({id:'airelle',   nom:'Airelle / canneberge', cat:'FRUIT', fruit:'acide', eau:84, suc:4.3,   autres:11.7}),
+  D({id:'airelle',   nom:'Airelle / canneberge', cat:'FRUIT', fruit:'acide', eau:84, suc:4.3,   autres:11.7, etiq:'canneberge'}),
   D({id:'ananas',    nom:'Ananas',               cat:'FRUIT', fruit:'acide', eau:86, suc:10.5,  autres:3.5}),
   D({id:'avocat',    nom:'Avocat',               cat:'FRUIT', fruit:'std',   eau:68, mg:20.6, suc:0.4, autres:11}),
   D({id:'banane',    nom:'Banane',               cat:'FRUIT', fruit:'acide', eau:75, suc:12.13, autres:12.87}),
   D({id:'cassis',    nom:'Cassis',               cat:'FRUIT', fruit:'acide', eau:85, suc:9.7,   autres:5.3}),
-  D({id:'cerise',    nom:'Cerise / griotte',     cat:'FRUIT', fruit:'std',   eau:81, suc:12.13, autres:6.87}),
+  D({id:'cerise',    nom:'Cerise / griotte',     cat:'FRUIT', fruit:'std',   eau:81, suc:12.13, autres:6.87, etiq:'cerise'}),
   D({id:'citron',    nom:'Citron',               cat:'FRUIT', fruit:'acide', eau:91, suc:0.8,   autres:8.2}),
   D({id:'figue',     nom:'Figue *',              cat:'FRUIT', fruit:'std',   eau:79.4, suc:8.9, autres:11.7, approx:true}),
   D({id:'fraise',    nom:'Fraise',               cat:'FRUIT', fruit:'std',   eau:89, suc:4.1,   autres:6.9}),
@@ -610,11 +610,11 @@ const INGREDIENTS = [
   D({id:'litchi',    nom:'Litchi',               cat:'FRUIT', fruit:'acide', eau:83.3, suc:15.7, autres:1}),
   D({id:'mandarine', nom:'Mandarine',            cat:'FRUIT', fruit:'acide', eau:88, suc:9,     autres:3}),
   D({id:'mangue',    nom:'Mangue',               cat:'FRUIT', fruit:'acide', eau:85, suc:13,    autres:2}),
-  D({id:'marron',    nom:'Marron frais *',       cat:'FRUIT', fruit:'coque', eau:51, suc:5,     autres:44,   approx:true}),
+  D({id:'marron',    nom:'Marron frais *',       cat:'FRUIT', fruit:'coque', eau:51, suc:5,     autres:44,   approx:true, etiq:'marron'}),
   D({id:'melon',     nom:'Melon',                cat:'FRUIT', fruit:'std',   eau:88.4, suc:10.6, autres:1}),
   D({id:'mure',      nom:'Mûre',                 cat:'FRUIT', fruit:'std',   eau:84, suc:8.1,   autres:7.9}),
   D({id:'myrtille',  nom:'Myrtille',             cat:'FRUIT', fruit:'std',   eau:85, suc:10,    autres:5}),
-  D({id:'coco',      nom:'Noix de coco (chair)', cat:'FRUIT', fruit:'coque', eau:43.8, mg:35.55, suc:6.2, autres:14.45}),
+  D({id:'coco',      nom:'Noix de coco (chair)', cat:'FRUIT', fruit:'coque', eau:43.8, mg:35.55, suc:6.2, autres:14.45, etiq:'noix de coco'}),
   D({id:'orange',    nom:'Orange',               cat:'FRUIT', fruit:'acide', eau:90, suc:8,     autres:2}),
   D({id:'pamplemousse',nom:'Pamplemousse',       cat:'FRUIT', fruit:'acide', eau:90, suc:6.2,   autres:3.8}),
   D({id:'papaye',    nom:'Papaye',               cat:'FRUIT', fruit:'acide', eau:85, suc:8.1,   autres:6.9}),
@@ -625,19 +625,19 @@ const INGREDIENTS = [
   D({id:'prune',     nom:'Prune',                cat:'FRUIT', fruit:'std',   eau:81, suc:12.14, autres:6.86}),
   D({id:'raisin',    nom:'Raisin',               cat:'FRUIT', fruit:'std',   eau:79, suc:16,    autres:5}),
   // ---- Fruits secs (pâtes pures 100 %) & pralinés ----
-  D({id:'p_amande',   nom:'Pâte d’amande pure *',  cat:'OLEA', fruit:'coque', mg:54,   autres:46, approx:true}),
-  D({id:'p_noisette', nom:'Pâte de noisette pure *',    cat:'OLEA', fruit:'coque', mg:60,   autres:40, approx:true}),
-  D({id:'p_pistache', nom:'Pâte de pistache pure *',    cat:'OLEA', fruit:'coque', mg:54.5, autres:45.5, approx:true}),
-  D({id:'p_noix',     nom:'Pâte de noix pure *',        cat:'OLEA', fruit:'coque', mg:55,   autres:45, approx:true}),
-  D({id:'p_arachide', nom:'Pâte d’arachide pure *',cat:'OLEA', fruit:'coque', mg:48.7, autres:51.3, approx:true}),
-  D({id:'praline',    nom:'Praliné 50/50 *',            cat:'OLEA', mg:30, suc:50, psr:100, autres:20, approx:true}),
+  D({id:'p_amande',   nom:'Pâte d’amande pure *',  cat:'OLEA', fruit:'coque', mg:54,   autres:46, approx:true, etiq:'pâte d’amande'}),
+  D({id:'p_noisette', nom:'Pâte de noisette pure *',    cat:'OLEA', fruit:'coque', mg:60,   autres:40, approx:true, etiq:'pâte de noisette'}),
+  D({id:'p_pistache', nom:'Pâte de pistache pure *',    cat:'OLEA', fruit:'coque', mg:54.5, autres:45.5, approx:true, etiq:'pâte de pistache'}),
+  D({id:'p_noix',     nom:'Pâte de noix pure *',        cat:'OLEA', fruit:'coque', mg:55,   autres:45, approx:true, etiq:'pâte de noix'}),
+  D({id:'p_arachide', nom:'Pâte d’arachide pure *',cat:'OLEA', fruit:'coque', mg:48.7, autres:51.3, approx:true, etiq:'pâte d’arachide'}),
+  D({id:'praline',    nom:'Praliné 50/50 *',            cat:'OLEA', mg:30, suc:50, psr:100, autres:20, approx:true, etiq:'praliné (fruits à coque, sucre)'}),
   // ---- Chocolat & cacao ----
-  D({id:'couv70',   nom:'Couverture noire 70 % (fiche : MG 42,7 %)', cat:'CHOC', eau:0.5, mg:42.7, suc:29, psr:100, autres:27.8}),
-  D({id:'cacao',    nom:'Cacao en poudre non sucré',    cat:'CHOC', eau:3, mg:21, suc:0.9, psr:100, autres:75.1}),
+  D({id:'couv70',   nom:'Couverture noire 70 % (fiche : MG 42,7 %)', cat:'CHOC', eau:0.5, mg:42.7, suc:29, psr:100, autres:27.8, etiq:'chocolat noir 70 %'}),
+  D({id:'cacao',    nom:'Cacao en poudre non sucré',    cat:'CHOC', eau:3, mg:21, suc:0.9, psr:100, autres:75.1, etiq:'cacao en poudre'}),
   D({id:'bcacao',   nom:'Beurre de cacao',              cat:'CHOC', mg:100}),
   // ---- Stabilisateurs / émulsifiants ----
-  D({id:'stab',   nom:'Stabilisateur (mix pour glace/sorbet)', cat:'STAB', autres:100, stab:true}),
-  D({id:'e471',   nom:'Émulsifiant E471 (mono/diglycérides)',  cat:'STAB', autres:100, stab:true}),
+  D({id:'stab',   nom:'Stabilisateur (mix pour glace/sorbet)', cat:'STAB', autres:100, stab:true, etiq:'stabilisateur'}),
+  D({id:'e471',   nom:'Émulsifiant E471 (mono/diglycérides)',  cat:'STAB', autres:100, stab:true, etiq:'émulsifiant : mono- et diglycérides d’acides gras'}),
   D({id:'gelatine',nom:'Gélatine',                             cat:'STAB', eau:13, autres:87, stab:true}),
   // ---- Autres ----
   D({id:'eau',        nom:'Eau',                   cat:'AUTRE', eau:100}),
@@ -1586,7 +1586,7 @@ function listeIngredientsEtiquette(t){
     .slice().sort((a,b)=>(b.g||0)-(a.g||0))
     .map(r=>{
       const ing = ING_BY_ID[r.id];
-      let n = ing.nom.toLowerCase().replace(' *','');
+      let n = (ing.etiq || ing.nom).toLowerCase().replace(' *','');
       if(ing.cat==='FRUIT') n += ' '+fmt(pct(r.g*(ing.fruitFrac||1), t.g),0)+' %';
       const allergene = ing.cat==='LAIT' || ing.cat==='OEUF' || ing.cat==='OLEA' || r.id==='coco';
       return allergene ? '<b>'+n+'</b>' : n;

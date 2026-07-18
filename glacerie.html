@@ -7,118 +7,118 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍨</text></svg>">
 <link rel="manifest" href="glacerie.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="theme-color" content="#e8467c">
+<meta name="theme-color" content="#d63d72">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   :root{
-    --page:#f7f3ed;
-    --surface-1:#ffffff;
-    --ink-1:#28211a; --ink-2:#645a4e; --ink-3:#9b8f80;
-    --grid:#e9decf; --border:rgba(40,33,26,.08);
-    --accent:#e8467c; --accent-2:#f2745f; --accent-soft:#fdeaf1;
-    --grad:linear-gradient(135deg,#e8467c 0%,#f2745f 100%);
-    --zebra:rgba(140,100,70,.045);
-    --good:#0ca30c; --good-text:#006300; --warn:#fab219; --bad:#d03b3b;
-    --good-bg:rgba(12,163,12,.10); --warn-bg:rgba(250,178,25,.16); --bad-bg:rgba(208,59,59,.10);
-    --shadow:0 1px 2px rgba(120,70,40,.05),0 8px 20px rgba(120,70,40,.06);
+    --page:#f6f1e8;
+    --surface-1:#fffdf9;
+    --ink-1:#2a2119; --ink-2:#6b5f51; --ink-3:#a2947f;
+    --grid:#eadfcd; --border:rgba(42,33,25,.08);
+    --accent:#d63d72; --accent-2:#e8734f; --accent-soft:#fbecf2;
+    --grad:linear-gradient(135deg,#d63d72 0%,#e8734f 100%);
+    --zebra:rgba(140,100,70,.05);
+    --good:#0ca30c; --good-text:#046b04; --warn:#f4a814; --bad:#d03b3b;
+    --good-bg:rgba(12,163,12,.10); --warn-bg:rgba(244,168,20,.15); --bad-bg:rgba(208,59,59,.09);
+    --shadow:0 1px 2px rgba(90,60,30,.05),0 10px 28px rgba(90,60,30,.07);
+    --serif:"Didot","Bodoni MT",Georgia,"Times New Roman",serif;
   }
   @media (prefers-color-scheme: dark){
     :root{
-      --page:#171310;
-      --surface-1:#211c17;
-      --ink-1:#f8f2e9; --ink-2:#cbbfb0; --ink-3:#94897a;
+      --page:#16110d;
+      --surface-1:#221a14;
+      --ink-1:#f6efe4; --ink-2:#c9bcaa; --ink-3:#93887a;
       --grid:#3b332a; --border:rgba(255,255,255,.09);
       --accent:#ff6b9d; --accent-2:#ff8a5c; --accent-soft:#3d2029;
-      --grad:linear-gradient(135deg,#e8467c 0%,#e0603f 100%);
+      --grad:linear-gradient(135deg,#d63d72 0%,#df5f3d 100%);
       --zebra:rgba(255,255,255,.03);
-      --good:#0ca30c; --good-text:#3fd43f; --warn:#fab219; --bad:#e05252;
-      --good-bg:rgba(12,163,12,.18); --warn-bg:rgba(250,178,25,.15); --bad-bg:rgba(224,82,82,.16);
-      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 24px rgba(0,0,0,.28);
+      --good:#0ca30c; --good-text:#3fd43f; --warn:#f4a814; --bad:#e05252;
+      --good-bg:rgba(12,163,12,.18); --warn-bg:rgba(244,168,20,.15); --bad-bg:rgba(224,82,82,.16);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 28px rgba(0,0,0,.28);
     }
   }
   *{box-sizing:border-box}
   [hidden]{display:none !important}
   html{scroll-behavior:smooth}
-  body{margin:0;background:var(--page);color:var(--ink-1);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+  body{margin:0;background:var(--page);color:var(--ink-1);
+    font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased}
   /* --- barre supérieure : titre, onglets, actions --- */
   .top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;
-    background:var(--surface-1);border-bottom:1px solid var(--grid);padding:0 14px;min-height:56px}
-  .brand{font-weight:800;font-size:1.02rem;white-space:nowrap}
+    background:var(--surface-1);border-bottom:1px solid var(--grid);padding:0 16px;min-height:58px}
+  .brand{font-family:var(--serif);font-weight:400;font-size:1.12rem;letter-spacing:.1em;white-space:nowrap}
   nav.tabs{display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto}
   .tab{display:flex;align-items:center;gap:7px;border:none;background:none;box-shadow:none;
-    padding:8px 13px;border-radius:12px;font:inherit;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+    padding:9px 14px;border-radius:999px;font:inherit;font-weight:600;color:var(--ink-2);
+    cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
   .tab:hover{background:var(--zebra);color:var(--ink-1)}
-  .tab.active{background:var(--accent-soft);color:var(--accent);font-weight:800}
+  .tab.active{background:var(--accent-soft);color:var(--accent);font-weight:700}
   .tab .ico{font-size:1.05rem;line-height:1}
   .actions{display:flex;gap:8px;margin-left:auto}
-  @media(max-width:760px){
-    nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface-1);
-      border-top:1px solid var(--grid);justify-content:space-around;
-      padding:6px 6px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(0,0,0,.06)}
-    .tab{flex:1;flex-direction:column;gap:2px;font-size:.66rem;padding:5px 4px;border-radius:10px}
-    .tab .ico{font-size:1.3rem}
-    .actions .lbl{display:none}
-    body{padding-bottom:84px}
-  }
+  /* --- structure --- */
   .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 60px}
   .panel{display:none}
-  .panel.active{display:block}
-  /* --- cartes --- */
-  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;
-    padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
-  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:1.08rem;letter-spacing:-.01em}
-  .card h2::after{content:"";flex:1;order:1;height:3px;border-radius:2px;background:var(--grad);opacity:.15;min-width:24px}
+  .panel.active{display:block;animation:apparait .18s ease}
+  @keyframes apparait{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){.panel.active{animation:none}}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:18px;
+    padding:22px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 16px;
+    font-family:var(--serif);font-weight:400;font-size:1rem;letter-spacing:.13em;text-transform:uppercase}
+  .card h2::after{content:"";flex:1;order:1;height:1px;background:var(--grid);min-width:24px}
   .card h2 .ghost{order:2}
-  .hint{font-size:.85rem;color:var(--ink-2);margin:0 0 12px;max-width:80ch}
+  .hint{font-size:.85rem;color:var(--ink-2);margin:0 0 14px;max-width:80ch}
+  /* --- formulaires --- */
   .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
-  .field{display:flex;flex-direction:column;gap:5px}
-  .field label{font-size:.72rem;color:var(--ink-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:.7rem;color:var(--ink-3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
   select,input[type=text],input[type=number],input[type=date]{
     background:var(--surface-1);color:var(--ink-1);border:1.5px solid var(--grid);
-    border-radius:12px;padding:9px 12px;font:inherit;transition:border-color .15s, box-shadow .15s}
+    border-radius:12px;padding:10px 12px;font:inherit;min-height:44px;
+    transition:border-color .15s, box-shadow .15s}
   select:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   select:hover,input:hover{border-color:var(--accent)}
   input[type=number]{width:110px;font-variant-numeric:tabular-nums}
   button{border:1.5px solid var(--grid);background:var(--surface-1);color:var(--ink-1);
-    border-radius:999px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer;
+    border-radius:999px;padding:10px 18px;min-height:44px;font:inherit;font-weight:700;cursor:pointer;
     transition:transform .12s, box-shadow .12s, border-color .12s, color .12s, filter .12s}
   button:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px);
-    box-shadow:0 5px 14px rgba(232,70,124,.20)}
+    box-shadow:0 5px 14px rgba(214,61,114,.18)}
   button:active{transform:translateY(0)}
-  button.primary{background:var(--grad);border:none;color:#fff;padding:11px 20px;
-    box-shadow:0 4px 14px rgba(232,70,124,.35)}
-  button.primary:hover{color:#fff;filter:brightness(1.07);box-shadow:0 7px 18px rgba(232,70,124,.4)}
-  button.small{padding:7px 14px;font-size:.84rem}
-  button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 9px;font-size:1.05rem;box-shadow:none}
+  button:focus-visible{outline:none;box-shadow:0 0 0 3px var(--accent-soft);border-color:var(--accent)}
+  button.primary{background:var(--grad);border:none;color:#fff;padding:12px 22px;
+    box-shadow:0 4px 14px rgba(214,61,114,.32)}
+  button.primary:hover{color:#fff;filter:brightness(1.07);box-shadow:0 7px 18px rgba(214,61,114,.38)}
+  button.small{padding:8px 14px;min-height:38px;font-size:.84rem}
+  button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 9px;min-height:0;font-size:1.05rem;box-shadow:none}
   button.ghost:hover{color:var(--bad);background:var(--bad-bg);transform:none;box-shadow:none}
   .cols{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:16px;align-items:start}
   @media(max-width:920px){.cols{grid-template-columns:1fr}}
   /* --- tableaux --- */
   table{border-collapse:collapse;width:100%}
-  th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);
-     text-align:left;padding:8px;border-bottom:2px solid var(--grid);font-weight:700}
-  td{padding:8px;border-bottom:1px solid var(--grid);vertical-align:middle}
+  th{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);
+     text-align:left;padding:9px 8px;border-bottom:2px solid var(--grid);font-weight:700}
+  td{padding:9px 8px;border-bottom:1px solid var(--grid);vertical-align:middle}
   tbody tr:nth-child(even) td{background:var(--zebra)}
-  tbody tr:hover td{background:var(--accent-soft)}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   tr.total td{font-weight:800;border-top:2.5px solid var(--accent);border-bottom:none;background:none !important;font-size:1.02rem}
   tr.pct td{color:var(--ink-2);font-size:.85rem;border-bottom:none;background:none !important}
-  .rowhint{font-size:.78rem;color:var(--ink-3);margin-top:2px}
+  .rowhint{font-size:.76rem;color:var(--ink-3);margin-top:3px}
   #recetteTable td:first-child{width:58%}
   #recetteTable td:first-child select{width:100%;min-width:170px}
   #recetteTable input[type=number]{width:92px}
   .recipe-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
   .fruitrow{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;
-    background:var(--zebra);border-radius:14px;padding:6px 8px}
+    background:var(--zebra);border-radius:14px;padding:8px}
   .fruitrow input{width:100px}
   /* --- jauges d'équilibre --- */
-  .meter{margin-bottom:16px}
+  .meter{margin-bottom:18px}
   .meter .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
   .meter .name{font-size:.9rem;font-weight:700}
   .meter .val{font-variant-numeric:tabular-nums;font-weight:800;font-size:1.05rem}
-  .chip{display:inline-flex;align-items:center;gap:5px;font-size:.74rem;font-weight:800;
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:800;
         border-radius:20px;padding:3px 10px;white-space:nowrap}
   .chip.ok{color:var(--good-text);background:var(--good-bg)}
   .chip.warn{color:#8a5c00;background:var(--warn-bg)}
@@ -132,20 +132,22 @@
   .marker{position:absolute;top:-1px;bottom:-1px;width:5px;border-radius:3px;background:var(--ink-1);
     box-shadow:0 0 0 2px var(--surface-1);transition:left .35s ease}
   .scale{display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
-  .advice{font-size:.82rem;color:var(--ink-2);margin-top:4px;padding-left:10px;border-left:3px solid var(--grid)}
-  .verdict{border-radius:16px;padding:13px 16px;font-weight:800;margin-bottom:16px;
-    display:flex;gap:10px;align-items:center;font-size:1.02rem}
+  .advice{font-size:.82rem;color:var(--ink-2);margin-top:5px;padding-left:10px;border-left:3px solid var(--grid)}
+  .verdict{border-radius:14px;padding:13px 16px;font-weight:800;margin-bottom:16px;
+    display:flex;gap:10px;align-items:center;font-size:1rem}
   .verdict.ok{background:var(--good-bg);color:var(--good-text);border:1.5px solid rgba(12,163,12,.3)}
-  .verdict.warn{background:var(--warn-bg);color:#8a5c00;border:1.5px solid rgba(250,178,25,.4)}
+  .verdict.warn{background:var(--warn-bg);color:#8a5c00;border:1.5px solid rgba(244,168,20,.4)}
   @media (prefers-color-scheme: dark){.verdict.warn{color:var(--warn)}}
   .verdict.bad{background:var(--bad-bg);color:var(--bad);border:1.5px solid rgba(208,59,59,.35)}
   .footnote{font-size:.8rem;color:var(--ink-3);margin-top:10px;line-height:1.5}
-  .scroll{overflow-x:auto}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
   details.more{margin-top:12px;font-size:.82rem;color:var(--ink-2);line-height:1.5}
-  details.more summary{cursor:pointer;font-weight:700;color:var(--ink-3)}
+  details.more summary{cursor:pointer;font-weight:700;color:var(--ink-3);padding:4px 0}
   details.more[open] summary{margin-bottom:6px}
+  .card pre{background:var(--zebra);border:1px solid var(--grid);border-radius:12px;
+    padding:12px 14px;overflow-x:auto;font-size:.78rem;line-height:1.5}
   /* --- photos des lots fournisseurs --- */
-  .lotrow{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--grid);flex-wrap:wrap}
+  .lotrow{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--grid);flex-wrap:wrap}
   .lotrow:last-child{border-bottom:none}
   .lotthumb{width:64px;height:64px;border-radius:12px;object-fit:cover;border:1.5px solid var(--grid);cursor:zoom-in;flex:none}
   .lotthumb.vide{display:flex;align-items:center;justify-content:center;font-size:1.4rem;
@@ -154,13 +156,46 @@
   .lotname .rowhint{margin-top:0}
   .lotrow input[type=text]{width:150px}
   .lotchips{flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-  .lotchips button{padding:5px 12px;font-size:.8rem}
+  .lotchips button{padding:6px 12px;min-height:34px;font-size:.8rem}
   #photoView{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.8);
     display:flex;align-items:center;justify-content:center;cursor:zoom-out}
   #photoView[hidden]{display:none}
   #photoView img{max-width:94%;max-height:94%;border-radius:8px}
-  .card pre{background:var(--zebra);border:1px solid var(--grid);border-radius:12px;
-    padding:12px 14px;overflow-x:auto;font-size:.78rem;line-height:1.5}
+  /* --- téléphone : onglets en bas, formulaires pleine largeur, recette en fiches --- */
+  @media(max-width:760px){
+    .top{min-height:54px;padding:0 12px}
+    .brand{font-size:1.05rem}
+    nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface-1);
+      border-top:1px solid var(--grid);justify-content:space-around;gap:4px;
+      padding:8px 8px calc(8px + env(safe-area-inset-bottom));box-shadow:0 -6px 24px rgba(0,0,0,.08)}
+    .tab{flex:1;flex-direction:column;gap:3px;font-size:.63rem;padding:6px 2px;border-radius:12px}
+    .tab .ico{font-size:1.35rem}
+    .actions .lbl{display:none}
+    .actions button{padding:9px 14px}
+    body{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+    .wrap{padding:12px 12px 30px}
+    .card{padding:16px 14px;margin-bottom:12px;border-radius:14px}
+    .toolbar{gap:10px}
+    .toolbar .field{flex:1 1 45%;min-width:130px}
+    .toolbar .field select,.toolbar .field input{width:100%}
+    .toolbar > button{flex:1 1 100%}
+    .toolbar > label{flex:1 1 100%}
+    /* recette : chaque ligne devient une fiche (ingrédient, puis poids · % · ✕) */
+    #recetteTable thead{display:none}
+    #recetteTable,#recetteTable tbody,#recetteTable tfoot{display:block}
+    #recetteTable tbody tr{display:grid;grid-template-columns:max-content 1fr max-content;
+      gap:6px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--grid)}
+    #recetteTable td{display:block;border:none;padding:0;background:none !important;width:auto}
+    #recetteTable tbody td:nth-child(2){text-align:left}
+    #recetteTable td:first-child{grid-column:1/-1;width:auto}
+    #recetteTable td:first-child select{min-width:0}
+    #recetteTable input[type=number]{width:100%;max-width:140px}
+    #recetteTable tfoot tr.total{display:flex;justify-content:space-between;gap:10px;
+      padding:12px 0 0;border-bottom:none}
+    #recetteTable tfoot td{display:block;border:none;padding:0}
+    .recipe-actions button{flex:1 1 auto}
+    .lotrow input[type=text]{flex:1;min-width:110px}
+  }
   /* --- aperçu avant impression --- */
   #apercu{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);overflow:auto;padding:14px}
   .apercu-bar{max-width:860px;margin:0 auto 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
@@ -895,7 +930,7 @@ function renderRecette(t){
     hint.textContent = resumeIngredient(ing);
     tdIng.appendChild(hint);
     const tdG = document.createElement('td'); tdG.className='num';
-    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='5'; inp.value=r.g;
+    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='5'; inp.value=r.g; inp.inputMode='decimal';
     inp.addEventListener('input',()=>{ r.g = parseFloat(inp.value)||0; update(false); });
     tdG.appendChild(inp);
     const tdPct = document.createElement('td'); tdPct.className='num';
@@ -1279,10 +1314,10 @@ function renderAutoFruits(){
       sel.appendChild(o);
     }
     sel.addEventListener('change',()=>{ f.id = sel.value; });
-    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='50'; inp.value=f.g;
+    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='50'; inp.value=f.g; inp.inputMode='decimal';
     inp.title='Poids de purée (g)';
     inp.addEventListener('input',()=>{ f.g = parseFloat(inp.value)||0; });
-    const suc = document.createElement('input'); suc.type='number'; suc.min='0'; suc.max='50'; suc.step='1';
+    const suc = document.createElement('input'); suc.type='number'; suc.min='0'; suc.max='50'; suc.step='1'; suc.inputMode='numeric';
     suc.value = f.sucre||0; suc.style.width='72px';
     suc.title='% de sucre ajouté dans la purée (0 = purée non sucrée, souvent 10 % pour les purées du commerce)';
     suc.addEventListener('input',()=>{ f.sucre = Math.max(0, Math.min(50, parseFloat(suc.value)||0)); });
@@ -1558,7 +1593,7 @@ function renderCouts(){
     const tdN = document.createElement('td'); tdN.textContent = ing.nom;
     const tdG = document.createElement('td'); tdG.className='num'; tdG.textContent = fmt0(r.g||0);
     const tdP = document.createElement('td'); tdP.className='num';
-    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='0.1';
+    const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='0.1'; inp.inputMode='decimal';
     inp.value = getPrix(r.id); inp.style.width='80px';
     const tdC = document.createElement('td'); tdC.className='num';
     tdC.textContent = fmtE((r.g||0)/1000*getPrix(r.id));
@@ -2447,6 +2482,7 @@ function init(){
   el('btnDriveNow').addEventListener('click',()=>{
     envoyerDrive([docRecette(), docTracabilite(), docEtiquettes()]);
   });
+  document.querySelectorAll('input[type=number]').forEach(i=>{ if(!i.inputMode) i.inputMode='decimal'; });
   el('etiqPage').disabled = true;
   window.addEventListener('beforeprint', ()=>{
     el('etiqPage').disabled = (printMode!=='etiquettes');

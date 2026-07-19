@@ -193,8 +193,9 @@
   <section class="panel" data-panel="matin">
     <section class="card">
       <h2>📷 Photos du matin</h2>
-      <p class="hint">Le matin, photographiez l'étiquette de chaque produit sorti ou ouvert (le numéro de lot doit être
-         lisible). Nommez la photo — c'est ce nom qui servira à faire le lien avec vos productions du jour.</p>
+      <p class="hint">Le matin, photographiez l'étiquette de chaque produit sorti ou ouvert, bien à plat et de près.
+         L'appli lit l'étiquette toute seule : nom du produit, n° de lot et DLC sont pré-remplis — vous n'avez
+         qu'à vérifier. C'est ce nom qui fait le lien avec vos productions du jour.</p>
       <div class="toolbar" style="margin-bottom:14px">
         <div class="field"><label for="jourMatin">Journée</label><input type="date" id="jourMatin"></div>
       </div>
@@ -203,10 +204,11 @@
       <div id="photosList" style="margin-top:8px"></div>
       <p class="footnote" id="photosVide" style="margin-bottom:0">Aucune photo pour cette journée.</p>
       <details class="more"><summary>Comment ça marche ?</summary>
-        Les photos restent sur cet appareil (elles ne sont envoyées nulle part). Le bouton « 🔍 N° de lot » lit le
-        numéro de lot sur la photo (connexion internet nécessaire au moins la première fois) ; vous pouvez toujours
-        le saisir à la main. Le soir, dans l'onglet 🍳 Production, chaque ingrédient de vos produits est relié
-        automatiquement à la photo du matin qui porte le même nom.
+        Les photos restent sur cet appareil (elles ne sont envoyées nulle part). Dès la photo prise, l'étiquette est
+        lue automatiquement : le produit est reconnu (crème, beurre, mascarpone…), le numéro de lot et la DLC sont
+        extraits et pré-remplis — tout reste corrigeable à la main, et le bouton « 🔍 Relire » relance la lecture
+        (connexion internet nécessaire au moins la première fois). Le soir, dans l'onglet 🍳 Production, chaque
+        ingrédient de vos produits est relié automatiquement à la photo du matin qui porte le même nom.
       </details>
     </section>
   </section>
@@ -475,13 +477,19 @@ function renderPhotos(){
 
     const meta = document.createElement('div'); meta.className = 'photometa';
     const inpLot = document.createElement('input'); inpLot.type = 'text';
-    inpLot.placeholder = 'N° de lot'; inpLot.value = p.lot || ''; inpLot.style.flex = '1'; inpLot.style.minWidth = '110px';
+    inpLot.placeholder = 'N° de lot'; inpLot.value = p.lot || ''; inpLot.style.flex = '1'; inpLot.style.minWidth = '100px';
     inpLot.addEventListener('input', ()=>{ p.lot = inpLot.value; save(); });
     meta.appendChild(inpLot);
 
+    const inpDlc = document.createElement('input'); inpDlc.type = 'date';
+    inpDlc.title = 'DLC / DDM du produit'; inpDlc.value = p.dlc || '';
+    inpDlc.addEventListener('input', ()=>{ p.dlc = inpDlc.value; save(); renderPhotos(); });
+    meta.appendChild(inpDlc);
+
     const bOcr = document.createElement('button'); bOcr.className = 'small'; bOcr.type = 'button';
-    bOcr.textContent = '🔍 N° de lot';
-    bOcr.addEventListener('click', ()=>extraireLot(p, row, bOcr));
+    bOcr.textContent = '🔍 Relire';
+    bOcr.title = 'Relire l\'étiquette (produit, n° de lot, DLC)';
+    bOcr.addEventListener('click', ()=>analysePhoto(p));
     meta.appendChild(bOcr);
 
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
@@ -495,9 +503,37 @@ function renderPhotos(){
     meta.appendChild(bDel);
     fields.appendChild(meta);
 
-    if(p.heure){
-      const h = document.createElement('div'); h.className = 'footnote'; h.textContent = 'Prise à ' + p.heure;
-      fields.appendChild(h);
+    const st = document.createElement('div'); st.className = 'footnote';
+    if(analyseEnCours.has(p.id)) st.textContent = '⏳ Lecture de l\'étiquette en cours…';
+    else {
+      const bouts = [];
+      if(p.heure) bouts.push('Prise à ' + p.heure);
+      if(p.dlc && p.dlc < aujourdhui()) bouts.push('⚠️ DLC dépassée !');
+      st.textContent = bouts.join(' — ');
+    }
+    if(st.textContent) fields.appendChild(st);
+
+    /* autres lectures possibles de l'étiquette : un geste pour corriger */
+    if(p.ocr && !analyseEnCours.has(p.id)){
+      const autresNoms = (p.ocr.noms || []).filter(n=>n !== p.nom).slice(0,3);
+      const autresLots = (p.ocr.lots || []).filter(l=>l !== p.lot).slice(0,3);
+      if(autresNoms.length || autresLots.length){
+        const chips = document.createElement('div'); chips.className = 'lotchips';
+        const lbl = document.createElement('span'); lbl.className = 'footnote';
+        lbl.textContent = 'Aussi lu sur l\'étiquette :';
+        chips.appendChild(lbl);
+        for(const n of autresNoms){
+          const b = document.createElement('button'); b.type = 'button'; b.textContent = '📦 ' + n;
+          b.addEventListener('click', ()=>{ p.nom = n; save(); renderPhotos(); renderLiens(); });
+          chips.appendChild(b);
+        }
+        for(const l of autresLots){
+          const b = document.createElement('button'); b.type = 'button'; b.textContent = 'lot ' + l;
+          b.addEventListener('click', ()=>{ p.lot = l; save(); renderPhotos(); });
+          chips.appendChild(b);
+        }
+        fields.appendChild(chips);
+      }
     }
     row.appendChild(fields);
     box.appendChild(row);
@@ -508,12 +544,12 @@ async function ajouterPhoto(file){
   const d = jourMatin();
   try{
     const dataUrl = await lirePhoto(file);
-    const p = {id: uid('ph'), nom:'', lot:'', heure: heureNow()};
+    const p = {id: uid('ph'), nom:'', lot:'', dlc:'', heure: heureNow()};
     await photoPut(p.id, dataUrl);
     photoCache[p.id] = dataUrl;
     jour(d).photos.push(p);
     save(); renderPhotos(); renderLiens();
-    toast('📷 Photo ajoutée — nommez le produit');
+    analysePhoto(p);   // lecture automatique : produit, n° de lot, DLC
   }catch(e){ toast('⚠️ Photo illisible, réessayez'); }
 }
 
@@ -565,34 +601,106 @@ function candidatsLot(txt){
   }
   return out.slice(0, 6);
 }
-async function extraireLot(p, row, btn){
-  if(!photoCache[p.id]) return;
-  const ancien = btn.textContent;
-  btn.disabled = true; btn.textContent = '⏳ Analyse…';
-  try{
-    const worker = await creerWorkerOCR();
-    const { data } = await worker.recognize(photoCache[p.id]);
-    await worker.terminate();
-    const cands = candidatsLot(data.text);
-    row.querySelectorAll('.lotchips').forEach(x=>x.remove());
-    const chips = document.createElement('div'); chips.className = 'lotchips';
-    if(!cands.length){
-      chips.innerHTML = '<span class="footnote" style="margin:0">Aucun numéro reconnu : saisissez-le à la main, ou reprenez la photo de plus près, bien à plat.</span>';
-    } else {
-      const lbl = document.createElement('span'); lbl.className = 'footnote'; lbl.style.margin = '0';
-      lbl.textContent = 'Touchez le bon numéro :';
-      chips.appendChild(lbl);
-      for(const c of cands){
-        const b = document.createElement('button'); b.type = 'button'; b.textContent = c;
-        b.addEventListener('click', ()=>{ p.lot = c; save(); renderPhotos(); });
-        chips.appendChild(b);
+/* --- DLC / DDM dans le texte reconnu : d'abord les dates qui suivent un
+       mot-clé (DLC, DDM, à consommer…), sinon la date la plus lointaine --- */
+function trouverDLC(txt){
+  const t = (txt || '').toUpperCase();
+  const auj = new Date();
+  const min = new Date(auj); min.setFullYear(min.getFullYear() - 2);
+  const max = new Date(auj); max.setFullYear(max.getFullYear() + 6);
+  const scan = s=>{
+    const out = []; let m;
+    const re1 = /(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/g;
+    while((m = re1.exec(s))){
+      const j = +m[1], mo = +m[2]; let a = +m[3];
+      if(a < 100) a += 2000;
+      if(mo>=1 && mo<=12 && j>=1 && j<=31){
+        const dt = new Date(a, mo-1, j);
+        if(dt>=min && dt<=max) out.push(dt);
       }
     }
-    row.appendChild(chips);
+    const re2 = /(?:^|[^\d\/\.\-])(\d{1,2})[\/\.\-](\d{4})(?![\d\/\.\-])/g;
+    while((m = re2.exec(s))){
+      const mo = +m[1], a = +m[2];
+      if(mo>=1 && mo<=12){
+        const dt = new Date(a, mo, 0);   // DDM « MM/AAAA » → fin du mois
+        if(dt>=min && dt<=max) out.push(dt);
+      }
+    }
+    return out;
+  };
+  let dates = [];
+  const reK = /(?:DLC|DDM|CONSOMMER|JUSQU|AVANT\s+LE|AVANT\s+FIN|EXP|BBD|BEST\s*BEFORE)[^\n]{0,45}/g;
+  let k; while((k = reK.exec(t))) dates = dates.concat(scan(k[0]));
+  if(!dates.length) dates = scan(t);
+  if(!dates.length) return '';
+  const d = new Date(Math.max.apply(null, dates));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+/* --- identification du produit sur l'étiquette : d'abord votre propre
+       vocabulaire (ingrédients de vos produits, photos passées), puis les
+       produits courants de laboratoire --- */
+const PRODUITS_CONNUS = ['Crème liquide entière','Crème liquide','Crème fraîche','Crème épaisse','Lait entier',
+  'Lait demi-écrémé','Lait écrémé','Lait','Beurre doux','Beurre demi-sel','Beurre','Mascarpone','Œufs',
+  'Ovoproduits','Blancs d\'œufs','Jaunes d\'œufs','Farine de blé','Farine','Sucre glace','Sucre semoule','Sucre',
+  'Cassonade','Chocolat noir','Chocolat au lait','Chocolat blanc','Cacao','Poudre d\'amandes','Amandes',
+  'Noisettes','Pistaches','Vanille','Levure chimique','Levure boulangère','Levure','Miel','Sirop de glucose',
+  'Glucose','Poudre de lait','Stabilisant','Gélatine','Maïzena','Fromage blanc','Yaourt','Mozzarella','Parmesan',
+  'Emmental','Comté','Fromage râpé','Reblochon','Jambon','Lardons','Bacon','Poulet','Bœuf haché','Bœuf','Veau',
+  'Porc','Saumon','Cabillaud','Crevettes','Tomates','Concentré de tomates','Oignons','Ail','Carottes',
+  'Courgettes','Aubergines','Poivrons','Champignons','Pommes de terre','Pommes','Fraises','Framboises','Citrons',
+  'Oranges','Bananes','Pruneaux','Huile d\'olive','Huile de tournesol','Huile','Moutarde','Vinaigre','Mayonnaise',
+  'Pâtes','Riz','Semoule','Pain de mie','Biscuits cuillère','Biscuits'];
+const motsOCR = s => ' ' + norm(s).replace(/œ/g,'oe').replace(/æ/g,'ae').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim() + ' ';
+function identifierProduit(txt){
+  const t = motsOCR(txt);
+  const vus = new Set(), cands = [];
+  const essayer = (nom, bonus)=>{
+    const k = motsOCR(nom).trim();
+    if(k.length < 3 || vus.has(k)) return;
+    vus.add(k);
+    if(t.includes(' ' + k + ' ')) cands.push({nom, score: k.length + bonus});
+  };
+  for(const pr of produits) for(const i of pr.ingredients) essayer(i, 4);
+  for(const d of Object.keys(journal)) for(const ph of journal[d].photos) if(ph.nom) essayer(ph.nom, 4);
+  for(const n of PRODUITS_CONNUS) essayer(n, 0);
+  cands.sort((a,b)=>b.score - a.score);
+  return cands.slice(0,4).map(c=>c.nom);
+}
+
+/* --- lecture complète d'une étiquette : produit + n° de lot + DLC.
+       Lancée automatiquement à la prise de photo, relançable au bouton 🔍.
+       Le worker OCR est gardé en mémoire pour que les photos suivantes
+       soient lues bien plus vite. --- */
+let workerP = null;
+function workerOCR(){ if(!workerP) workerP = creerWorkerOCR(); return workerP; }
+const analyseEnCours = new Set();
+async function analysePhoto(p){
+  if(!photoCache[p.id] || analyseEnCours.has(p.id)) return;
+  analyseEnCours.add(p.id); renderPhotos();
+  try{
+    const worker = await workerOCR();
+    const { data } = await worker.recognize(photoCache[p.id]);
+    const lots = candidatsLot(data.text);
+    const noms = identifierProduit(data.text);
+    const dlc = trouverDLC(data.text);
+    p.ocr = {lots, noms};
+    if(!p.nom && noms.length) p.nom = noms[0];
+    if(!p.lot && lots.length) p.lot = lots[0];
+    if(!p.dlc && dlc) p.dlc = dlc;
+    save();
+    const lu = [];
+    if(p.nom) lu.push(p.nom);
+    if(p.lot) lu.push('lot ' + p.lot);
+    if(p.dlc) lu.push('DLC ' + new Date(p.dlc+'T12:00:00').toLocaleDateString('fr-FR'));
+    toast(lu.length ? '🔍 Lu : ' + lu.join(' · ') : 'Étiquette illisible : remplissez à la main ou reprenez la photo de plus près');
   }catch(e){
-    alert('Extraction impossible ici : une connexion internet est nécessaire à la première utilisation. En attendant, saisissez le numéro à la main.');
+    workerP = null;
+    toast('⚠️ Lecture impossible (connexion nécessaire la première fois) : remplissez à la main');
   }
-  btn.disabled = false; btn.textContent = ancien;
+  analyseEnCours.delete(p.id);
+  renderPhotos(); renderLiens();
 }
 
 /* =====================================================================
@@ -944,8 +1052,10 @@ async function imprimerJour(d){
 
   if(j.photos.length){
     html += `<h2>Produits photographiés le matin</h2>
-      <table><tr><th>Produit</th><th>N° de lot</th><th>Heure</th></tr>` +
-      j.photos.map(p=>`<tr><td>${esc(p.nom||'(sans nom)')}</td><td>${esc(p.lot||'—')}</td><td>${esc(p.heure||'')}</td></tr>`).join('') +
+      <table><tr><th>Produit</th><th>N° de lot</th><th>DLC / DDM</th><th>Heure</th></tr>` +
+      j.photos.map(p=>`<tr><td>${esc(p.nom||'(sans nom)')}</td><td>${esc(p.lot||'—')}</td>
+        <td>${p.dlc ? esc(new Date(p.dlc+'T12:00:00').toLocaleDateString('fr-FR')) : '—'}</td>
+        <td>${esc(p.heure||'')}</td></tr>`).join('') +
       `</table>`;
   }
 

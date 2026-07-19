@@ -220,10 +220,14 @@
       <div class="toolbar">
         <div class="field"><label for="jourProd">Journée</label><input type="date" id="jourProd"></div>
         <div class="field" style="flex:1;min-width:220px">
-          <label for="nomProduit">Produit réalisé</label>
-          <input type="text" id="nomProduit" list="dlProduits" placeholder="ex. Tiramisu, quiche lorraine…" autocomplete="off">
-          <datalist id="dlProduits"></datalist>
+          <label for="selProduit">Produits déjà enregistrés</label>
+          <select id="selProduit"><option value="">— choisir dans la liste —</option></select>
         </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label for="nomProduit">… ou nouveau produit</label>
+        <input type="text" id="nomProduit" list="dlProduits" placeholder="ex. Tiramisu, quiche lorraine…" autocomplete="off">
+        <datalist id="dlProduits"></datalist>
       </div>
       <div class="field" style="margin-top:12px">
         <label for="compoTexte">Composition — un ingrédient par ligne</label>
@@ -239,6 +243,26 @@
       <div id="liensList"></div>
       <p class="footnote" id="liensVide" hidden style="margin:0">Aucune photo prise ce jour-là : prenez d'abord les
          photos dans l'onglet 📷, ou enregistrez la production sans lien.</p>
+      <div class="toolbar" style="margin-top:16px">
+        <div class="field">
+          <label for="selConserv">Conservation</label>
+          <select id="selConserv">
+            <option value="frigo">❄️ Frigo — J + 3 jours</option>
+            <option value="congel">🧊 Congélateur</option>
+          </select>
+        </div>
+        <div class="field" id="fieldCongel" hidden>
+          <label for="selCongelMois">Durée au congélateur</label>
+          <select id="selCongelMois">
+            <option value="1">1 mois</option>
+            <option value="2">2 mois</option>
+            <option value="3" selected>3 mois</option>
+            <option value="6">6 mois</option>
+            <option value="12">12 mois</option>
+          </select>
+        </div>
+      </div>
+      <p class="footnote" id="dlcInfo" style="margin:8px 0 0;font-weight:700"></p>
       <div class="recipe-actions">
         <button class="primary" id="btnEnregistrerProd" type="button">✅ Enregistrer la production</button>
       </div>
@@ -572,6 +596,96 @@ async function extraireLot(p, row, btn){
 }
 
 /* =====================================================================
+   COMPOSITIONS CLASSIQUES
+   Quand le produit tapé n'est pas encore dans « Mes produits », l'appli
+   propose la composition utilisée classiquement pour ce genre de produit ;
+   il ne reste qu'à ajuster. Mots-clés sans accents, du plus précis au
+   plus général.
+===================================================================== */
+const BASE_COMPOS = [
+  /* --- pâtisserie & desserts --- */
+  {k:['tiramisu'], i:['Mascarpone','Œufs','Sucre','Café','Biscuits cuillère','Cacao']},
+  {k:['creme patissiere'], i:['Lait','Jaunes d\'œufs','Sucre','Maïzena','Vanille','Beurre']},
+  {k:['creme anglaise'], i:['Lait','Crème','Jaunes d\'œufs','Sucre','Vanille']},
+  {k:['chantilly'], i:['Crème liquide 35 %','Sucre glace','Vanille']},
+  {k:['ganache'], i:['Chocolat noir','Crème liquide','Beurre']},
+  {k:['mousse au chocolat','mousse chocolat'], i:['Chocolat noir','Œufs','Sucre','Crème']},
+  {k:['pate a choux','choux','chouquette','eclair','profiterole','paris-brest','paris brest','religieuse'], i:['Eau','Lait','Beurre','Farine','Œufs','Sucre','Sel']},
+  {k:['pate brisee'], i:['Farine','Beurre','Eau','Sel']},
+  {k:['pate sablee'], i:['Farine','Beurre','Sucre','Œufs','Sel']},
+  {k:['pate feuilletee'], i:['Farine','Beurre','Eau','Sel']},
+  {k:['genoise'], i:['Œufs','Sucre','Farine','Beurre']},
+  {k:['madeleine'], i:['Farine','Œufs','Sucre','Beurre','Levure chimique','Miel']},
+  {k:['financier'], i:['Poudre d\'amandes','Blancs d\'œufs','Beurre','Sucre glace','Farine']},
+  {k:['cookie'], i:['Farine','Beurre','Sucre','Œufs','Pépites de chocolat','Levure chimique','Sel']},
+  {k:['brownie'], i:['Chocolat noir','Beurre','Sucre','Œufs','Farine','Noix']},
+  {k:['crepe'], i:['Farine','Œufs','Lait','Beurre','Sucre','Sel']},
+  {k:['gaufre'], i:['Farine','Œufs','Lait','Beurre','Sucre','Levure chimique']},
+  {k:['flan patissier','flan'], i:['Lait','Crème','Œufs','Sucre','Maïzena','Vanille','Farine','Beurre']},
+  {k:['riz au lait'], i:['Riz rond','Lait','Sucre','Vanille']},
+  {k:['creme brulee'], i:['Crème','Jaunes d\'œufs','Sucre','Vanille','Cassonade']},
+  {k:['ile flottante','oeufs a la neige'], i:['Lait','Œufs','Sucre','Vanille']},
+  {k:['clafoutis'], i:['Cerises','Lait','Œufs','Sucre','Farine','Beurre']},
+  {k:['far breton'], i:['Farine','Œufs','Lait','Sucre','Pruneaux','Beurre']},
+  {k:['cannele'], i:['Lait','Farine','Sucre','Œufs','Beurre','Rhum','Vanille']},
+  {k:['macaron'], i:['Poudre d\'amandes','Sucre glace','Blancs d\'œufs','Sucre']},
+  {k:['meringue'], i:['Blancs d\'œufs','Sucre']},
+  {k:['tarte aux pommes','tarte pommes'], i:['Farine','Beurre','Sucre','Œufs','Pommes','Sel']},
+  {k:['tarte au citron','tarte citron'], i:['Farine','Beurre','Sucre','Œufs','Citrons']},
+  {k:['tarte aux fraises','tarte fraises'], i:['Farine','Beurre','Sucre','Œufs','Lait','Fraises','Vanille']},
+  {k:['tarte au chocolat','tarte chocolat'], i:['Farine','Beurre','Sucre','Œufs','Chocolat noir','Crème']},
+  {k:['tarte'], i:['Farine','Beurre','Sucre','Œufs','Garniture (fruits…)']},
+  {k:['cheesecake'], i:['Fromage frais','Biscuits','Beurre','Sucre','Œufs','Crème','Citron']},
+  {k:['panna cotta'], i:['Crème','Lait','Sucre','Gélatine','Vanille']},
+  {k:['brioche'], i:['Farine','Œufs','Beurre','Sucre','Lait','Levure','Sel']},
+  {k:['croissant','pain au chocolat','viennoiserie'], i:['Farine','Beurre','Lait','Sucre','Levure','Sel']},
+  {k:['pain'], i:['Farine','Eau','Levure','Sel']},
+  {k:['sorbet'], i:['Eau','Sucre','Glucose','Fruits','Stabilisant']},
+  {k:['glace','creme glacee'], i:['Lait','Crème','Sucre','Poudre de lait','Jaunes d\'œufs','Stabilisant']},
+  /* --- sauces & bases --- */
+  {k:['bechamel'], i:['Lait','Beurre','Farine','Sel','Muscade']},
+  {k:['mayonnaise'], i:['Huile','Jaunes d\'œufs','Moutarde','Vinaigre','Sel']},
+  {k:['vinaigrette'], i:['Huile','Vinaigre','Moutarde','Sel','Poivre']},
+  {k:['hollandaise'], i:['Beurre','Jaunes d\'œufs','Citron','Sel']},
+  {k:['bearnaise'], i:['Beurre','Jaunes d\'œufs','Échalotes','Estragon','Vinaigre']},
+  {k:['bolognaise'], i:['Bœuf haché','Tomates','Oignons','Carottes','Céleri','Ail','Huile d\'olive']},
+  /* --- plats cuisinés --- */
+  {k:['quiche lorraine'], i:['Farine','Beurre','Œufs','Crème','Lait','Lardons','Sel','Poivre','Muscade']},
+  {k:['quiche'], i:['Farine','Beurre','Œufs','Crème','Lait','Garniture','Sel','Poivre']},
+  {k:['lasagne'], i:['Pâtes à lasagne','Bœuf haché','Tomates','Oignons','Lait','Beurre','Farine','Fromage râpé']},
+  {k:['pizza'], i:['Farine','Eau','Levure','Sel','Tomates','Mozzarella','Huile d\'olive']},
+  {k:['tartiflette'], i:['Pommes de terre','Reblochon','Lardons','Oignons','Crème','Vin blanc']},
+  {k:['gratin dauphinois'], i:['Pommes de terre','Crème','Lait','Ail','Sel','Muscade']},
+  {k:['hachis parmentier','parmentier'], i:['Pommes de terre','Bœuf haché','Oignons','Beurre','Lait','Fromage râpé']},
+  {k:['bourguignon'], i:['Bœuf','Vin rouge','Carottes','Oignons','Lardons','Champignons','Farine','Beurre']},
+  {k:['blanquette'], i:['Veau','Carottes','Oignons','Champignons','Crème','Beurre','Farine','Citron']},
+  {k:['coq au vin'], i:['Poulet','Vin rouge','Lardons','Champignons','Oignons','Carottes','Farine']},
+  {k:['ratatouille'], i:['Aubergines','Courgettes','Poivrons','Tomates','Oignons','Ail','Huile d\'olive']},
+  {k:['veloute','potage','soupe'], i:['Légumes','Pommes de terre','Oignons','Beurre','Crème','Sel']},
+  {k:['puree'], i:['Pommes de terre','Beurre','Lait','Sel']},
+  {k:['risotto'], i:['Riz arborio','Bouillon','Oignons','Vin blanc','Beurre','Parmesan']},
+  {k:['paella'], i:['Riz','Poulet','Fruits de mer','Poivrons','Tomates','Safran','Huile d\'olive']},
+  {k:['couscous'], i:['Semoule','Carottes','Courgettes','Navets','Pois chiches','Viande','Épices']},
+  {k:['taboule'], i:['Semoule','Tomates','Concombre','Menthe','Citron','Huile d\'olive']},
+  {k:['piemontaise'], i:['Pommes de terre','Tomates','Œufs','Cornichons','Jambon','Mayonnaise']},
+  {k:['celeri remoulade'], i:['Céleri-rave','Mayonnaise','Moutarde','Citron']},
+  {k:['carottes rapees'], i:['Carottes','Huile','Citron','Sel','Persil']},
+  {k:['oeuf mayo','oeufs mayo'], i:['Œufs','Huile','Jaunes d\'œufs','Moutarde','Vinaigre']},
+  {k:['croque'], i:['Pain de mie','Jambon','Fromage','Beurre','Lait','Farine']},
+  {k:['terrine','pate de campagne'], i:['Viande de porc','Foie','Œufs','Crème','Sel','Poivre','Épices']},
+  {k:['rillettes'], i:['Porc','Graisse','Sel','Poivre']},
+];
+function trouverCompoClassique(nom){
+  const n = norm(nom);
+  if(!n) return null;
+  let best = null, bestLen = 0;
+  for(const e of BASE_COMPOS)
+    for(const k of e.k)
+      if(n.includes(k) && k.length > bestLen){ best = e; bestLen = k.length; }
+  return best ? best.i : null;
+}
+
+/* =====================================================================
    ONGLET 🍳 PRODUCTION
 ===================================================================== */
 function jourProd(){ return el('jourProd').value || aujourdhui(); }
@@ -585,19 +699,53 @@ function produitParNom(nom){
   return produits.find(p=>norm(p.nom)===k) || null;
 }
 function renderDlProduits(){
-  el('dlProduits').innerHTML = produits.map(p=>`<option value="${esc(p.nom)}">`).join('');
+  const tri = [...produits].sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+  el('dlProduits').innerHTML = tri.map(p=>`<option value="${esc(p.nom)}">`).join('');
+  el('selProduit').innerHTML = '<option value="">— choisir dans la liste —</option>' +
+    tri.map(p=>`<option value="${esc(p.nom)}">${esc(p.nom)} (${p.ingredients.length} ingr.)</option>`).join('');
 }
-/* « je mets mon produit et tu me sors la compo » */
+/* « je mets mon produit et tu me sors la compo » :
+   1) produit déjà enregistré et validé → sa composition ;
+   2) sinon, composition classique proposée d'après le nom → à ajuster ;
+   3) sinon, saisie libre. On n'écrase jamais une saisie faite à la main. */
+let derniereAuto = '';
 function chargerCompo(){
   const p = produitParNom(el('nomProduit').value);
+  const zone = el('compoTexte');
+  const libre = zone.value.trim() && zone.value !== derniereAuto;
+  const n = norm(el('nomProduit').value);
+  if(n.includes('glace') || n.includes('sorbet')) el('selCongelMois').value = '12';
   if(p){
-    el('compoTexte').value = p.ingredients.join('\n');
+    if(!libre){ zone.value = p.ingredients.join('\n'); derniereAuto = zone.value; }
     el('compoInfo').textContent = '✅ Produit connu — composition retrouvée (' + p.ingredients.length + ' ingrédients). Modifiable si besoin.';
   } else {
-    el('compoInfo').textContent = el('nomProduit').value.trim()
-      ? 'Nouveau produit : saisissez sa composition, elle sera enregistrée pour la prochaine fois.' : '';
+    const classique = trouverCompoClassique(el('nomProduit').value);
+    if(classique && !libre){
+      zone.value = classique.join('\n'); derniereAuto = zone.value;
+      el('compoInfo').textContent = '💡 Composition classique proposée pour ce genre de produit — vérifiez et ajustez, elle sera enregistrée pour la prochaine fois.';
+    } else {
+      el('compoInfo').textContent = el('nomProduit').value.trim()
+        ? 'Nouveau produit : saisissez sa composition, elle sera enregistrée pour la prochaine fois.' : '';
+    }
   }
   renderLiens();
+}
+/* conservation & DLC : frigo = jour de production + 3 jours ;
+   congélateur = durée choisie (3 mois par défaut, 12 pour glaces et sorbets) */
+function calcDLC(dateISO, mode, mois){
+  const d = new Date(dateISO + 'T12:00:00');
+  if(mode === 'congel') d.setMonth(d.getMonth() + (parseInt(mois,10) || 3));
+  else d.setDate(d.getDate() + 3);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function dlcCourante(){
+  return calcDLC(jourProd(), el('selConserv').value, el('selCongelMois').value);
+}
+function majDLC(){
+  const congel = el('selConserv').value === 'congel';
+  el('fieldCongel').hidden = !congel;
+  el('dlcInfo').textContent = (congel ? '🧊' : '❄️') + ' DLC : ' +
+    new Date(dlcCourante()+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'long',year:'numeric'});
 }
 /* lien automatique ingrédient → photo du matin qui porte le même nom */
 function scoreMatch(ing, photoNom){
@@ -667,10 +815,12 @@ function enregistrerProduction(){
   const produit = upsertProduit(nom, compo);
   jour(d).productions.push({
     id: uid('pd'), heure: heureNow(), produitId: produit.id, nom: produit.nom,
+    conservation: el('selConserv').value, dlc: dlcCourante(),
     ingredients: compo.map(ing=>({nom: ing, photoId: liensSel[norm(ing)] || ''}))
   });
   save();
   el('nomProduit').value = ''; el('compoTexte').value = ''; el('compoInfo').textContent = '';
+  el('selProduit').value = ''; derniereAuto = '';
   liensSel = {};
   renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
   toast('✅ Production enregistrée — « ' + produit.nom + ' »');
@@ -684,8 +834,10 @@ function renderProdJour(){
   for(const pr of prods){
     const lies = pr.ingredients.filter(i=>i.photoId && photos.some(p=>p.id===i.photoId)).length;
     const row = document.createElement('div'); row.className = 'itemrow';
+    const conserv = pr.dlc ? ' — ' + (pr.conservation==='congel' ? '🧊 congél.' : '❄️ frigo') +
+      ', DLC ' + new Date(pr.dlc+'T12:00:00').toLocaleDateString('fr-FR') : '';
     row.innerHTML = `<div class="grow"><strong>${esc(pr.nom)}</strong>
-      <div class="rowhint">${pr.heure ? 'à ' + esc(pr.heure) + ' — ' : ''}${pr.ingredients.length} ingrédients, ${lies} relié${lies>1?'s':''} aux photos</div></div>`;
+      <div class="rowhint">${pr.heure ? 'à ' + esc(pr.heure) + ' — ' : ''}${pr.ingredients.length} ingrédients, ${lies} relié${lies>1?'s':''} aux photos${conserv}</div></div>`;
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
     bDel.title = 'Supprimer cette production'; bDel.textContent = '✕';
     bDel.addEventListener('click', ()=>{
@@ -800,7 +952,9 @@ async function imprimerJour(d){
   if(j.productions.length){
     html += `<h2>Productions du jour</h2>`;
     for(const pr of j.productions){
-      html += `<h3>${esc(pr.nom)}${pr.heure ? ' — ' + esc(pr.heure) : ''}</h3>
+      const conserv = pr.dlc ? ' — ' + (pr.conservation==='congel' ? 'congélateur' : 'frigo') +
+        ' · DLC ' + new Date(pr.dlc+'T12:00:00').toLocaleDateString('fr-FR') : '';
+      html += `<h3>${esc(pr.nom)}${pr.heure ? ' — ' + esc(pr.heure) : ''}${esc(conserv)}</h3>
         <table><tr><th>Ingrédient</th><th>Photo reliée</th><th>N° de lot</th></tr>` +
         pr.ingredients.map(i=>{
           const p = i.photoId ? photoById[i.photoId] : null;
@@ -887,15 +1041,24 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   el('jourMatin').addEventListener('change', async ()=>{ await chargerPhotosJour(jourMatin()); renderPhotos(); });
 
   /* production */
+  el('selProduit').addEventListener('change', ()=>{
+    if(!el('selProduit').value) return;
+    el('nomProduit').value = el('selProduit').value;
+    el('compoTexte').value = '';
+    chargerCompo();
+  });
   el('nomProduit').addEventListener('change', chargerCompo);
   el('nomProduit').addEventListener('blur', chargerCompo);
   el('compoTexte').addEventListener('input', renderLiens);
   el('jourProd').addEventListener('change', async ()=>{
     liensSel = {};
     await chargerPhotosJour(jourProd());
-    renderLiens(); renderProdJour();
+    renderLiens(); renderProdJour(); majDLC();
   });
+  el('selConserv').addEventListener('change', majDLC);
+  el('selCongelMois').addEventListener('change', majDLC);
   el('btnEnregistrerProd').addEventListener('click', enregistrerProduction);
+  majDLC();
 
   /* bibliothèque */
   el('btnEditSave').addEventListener('click', ()=>{

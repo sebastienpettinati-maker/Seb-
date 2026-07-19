@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traçabilité — photos du matin &amp; productions</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<link rel="manifest" href="tracabilite.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#2e8b57">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root{
+    --page:#f2f5ef;
+    --surface-1:#fcfdfa;
+    --ink-1:#1f2a20; --ink-2:#59685b; --ink-3:#8b9a8d;
+    --grid:#dde6da; --border:rgba(31,42,32,.08);
+    --accent:#2e8b57; --accent-2:#4aa06a; --accent-soft:#e6f3ea;
+    --grad:linear-gradient(135deg,#2e8b57 0%,#57a05f 100%);
+    --zebra:rgba(70,110,80,.05);
+    --good:#0ca30c; --warn:#f4a814; --bad:#d03b3b;
+    --bad-bg:rgba(208,59,59,.09);
+    --shadow:0 1px 2px rgba(40,70,45,.05),0 10px 28px rgba(40,70,45,.07);
+    --serif:"Didot","Bodoni MT",Georgia,"Times New Roman",serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --page:#111713;
+      --surface-1:#1a221c;
+      --ink-1:#eaf2ec; --ink-2:#aabcae; --ink-3:#7d8d80;
+      --grid:#2c382f; --border:rgba(255,255,255,.09);
+      --accent:#5cc98a; --accent-2:#7ad49c; --accent-soft:#1f3a2a;
+      --grad:linear-gradient(135deg,#2e8b57 0%,#3f9159 100%);
+      --zebra:rgba(255,255,255,.03);
+      --bad:#e05252; --bad-bg:rgba(224,82,82,.16);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 28px rgba(0,0,0,.28);
+    }
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--page);color:var(--ink-1);
+    font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased}
+
+  /* --- barre supérieure --- */
+  .top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;
+    background:var(--surface-1);border-bottom:1px solid var(--grid);padding:0 16px;min-height:58px}
+  .brand{font-family:var(--serif);font-weight:400;font-size:1.12rem;letter-spacing:.1em;white-space:nowrap}
+  nav.tabs{display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto}
+  .tab{display:flex;align-items:center;gap:7px;border:none;background:none;box-shadow:none;
+    padding:9px 14px;border-radius:999px;font:inherit;font-weight:600;color:var(--ink-2);
+    cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+  .tab:hover{background:var(--zebra);color:var(--ink-1)}
+  .tab.active{background:var(--accent-soft);color:var(--accent);font-weight:700}
+  .tab .ico{font-size:1.05rem;line-height:1}
+
+  /* --- structure --- */
+  .wrap{max-width:900px;margin:0 auto;padding:18px 18px 60px}
+  .panel{display:none}
+  .panel.active{display:block;animation:apparait .18s ease}
+  @keyframes apparait{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){.panel.active{animation:none}}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:18px;
+    padding:22px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 16px;
+    font-family:var(--serif);font-weight:400;font-size:1rem;letter-spacing:.13em;text-transform:uppercase}
+  .card h2::after{content:"";flex:1;height:1px;background:var(--grid);min-width:24px}
+  .hint{font-size:.85rem;color:var(--ink-2);margin:0 0 14px;max-width:80ch}
+  .footnote{font-size:.8rem;color:var(--ink-3)}
+
+  /* --- formulaires --- */
+  .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:.7rem;color:var(--ink-3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+  select,textarea,input[type=text],input[type=date]{
+    background:var(--surface-1);color:var(--ink-1);border:1.5px solid var(--grid);
+    border-radius:12px;padding:10px 12px;font:inherit;min-height:44px;
+    transition:border-color .15s, box-shadow .15s}
+  select:focus,textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  textarea{width:100%;min-height:110px;resize:vertical;line-height:1.6}
+  button{border:1.5px solid var(--grid);background:var(--surface-1);color:var(--ink-1);
+    border-radius:999px;padding:10px 18px;min-height:44px;font:inherit;font-weight:700;cursor:pointer;
+    transition:transform .12s, box-shadow .12s, border-color .12s, color .12s, filter .12s}
+  button:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px);
+    box-shadow:0 5px 14px rgba(46,139,87,.18)}
+  button:active{transform:translateY(0)}
+  button:focus-visible{outline:none;box-shadow:0 0 0 3px var(--accent-soft);border-color:var(--accent)}
+  button.primary{background:var(--grad);border:none;color:#fff;padding:12px 22px;
+    box-shadow:0 4px 14px rgba(46,139,87,.32)}
+  button.primary:hover{color:#fff;filter:brightness(1.07)}
+  button.small{padding:8px 14px;min-height:38px;font-size:.84rem}
+  button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 9px;min-height:0;font-size:1.05rem;box-shadow:none}
+  button.ghost:hover{color:var(--bad);background:var(--bad-bg);transform:none;box-shadow:none}
+  button.bigphoto{width:100%;justify-content:center;display:flex;align-items:center;gap:10px;
+    font-size:1.05rem;padding:16px}
+
+  /* --- photos du matin --- */
+  .photorow{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--grid);flex-wrap:wrap}
+  .photorow:last-child{border-bottom:none}
+  .thumb{width:74px;height:74px;object-fit:cover;border-radius:12px;border:1px solid var(--grid);
+    cursor:zoom-in;flex-shrink:0;background:var(--zebra)}
+  .photofields{flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px}
+  .photofields input{width:100%}
+  .photometa{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .lotchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;width:100%}
+  .lotchips button{min-height:34px;padding:5px 12px;font-size:.85rem}
+
+  /* --- liens ingrédients / photos --- */
+  .lienrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;
+    align-items:center;padding:8px 0;border-bottom:1px solid var(--grid)}
+  .lienrow:last-child{border-bottom:none}
+  .lienrow .ing{font-weight:600;overflow-wrap:anywhere}
+  .lienrow select{width:100%;min-height:40px;font-size:.9rem}
+  .lienrow select.ok{border-color:var(--accent)}
+  @media(max-width:520px){.lienrow{grid-template-columns:1fr}.lienrow select{min-height:44px}}
+
+  /* --- listes (produits, historique) --- */
+  .itemrow{display:flex;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--grid);flex-wrap:wrap}
+  .itemrow:last-child{border-bottom:none}
+  .itemrow .grow{flex:1;min-width:160px}
+  .itemrow .rowhint{font-size:.8rem;color:var(--ink-3)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chip{background:var(--accent-soft);color:var(--accent);border-radius:999px;
+    padding:3px 10px;font-size:.78rem;font-weight:600}
+  .chip.gris{background:var(--zebra);color:var(--ink-2)}
+
+  .recipe-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;align-items:center}
+  details.more{margin-top:14px;font-size:.85rem;color:var(--ink-2)}
+  details.more summary{cursor:pointer;font-weight:600;color:var(--ink-2)}
+
+  /* --- visionneuse photo --- */
+  #photoView{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.85);
+    display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+  #photoView img{max-width:100%;max-height:100%;border-radius:10px}
+
+  /* --- toast --- */
+  #toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink-1);color:var(--page);padding:10px 20px;border-radius:999px;
+    font-weight:600;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:90}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* --- téléphone : onglets en bas --- */
+  @media(max-width:720px){
+    .top{min-height:52px}
+    nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface-1);
+      border-top:1px solid var(--grid);padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+      justify-content:space-around}
+    .tab{flex-direction:column;gap:2px;padding:6px 10px;font-size:.68rem}
+    .tab .ico{font-size:1.3rem}
+    .wrap{padding:14px 14px 110px}
+    .card{padding:16px;border-radius:16px}
+  }
+
+  /* --- impression : seule la feuille de traçabilité sort --- */
+  #printArea{display:none}
+  @media print{
+    body{background:#fff}
+    .top,.wrap,#toast,#photoView{display:none !important}
+    #printArea{display:block;color:#000;font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+    #printArea h1{font-size:19px;margin:0 0 2px}
+    #printArea .sub{color:#333;margin:0 0 14px;font-size:11px}
+    #printArea h2{font-size:13px;margin:16px 0 6px;border-bottom:1.5px solid #000;padding-bottom:3px}
+    #printArea h3{font-size:12px;margin:12px 0 4px}
+    #printArea table{width:100%;border-collapse:collapse;margin-bottom:8px}
+    #printArea th,#printArea td{border:1px solid #999;padding:4px 6px;font-size:11px;text-align:left;vertical-align:top}
+    #printArea th{background:#eee}
+    #printArea .photogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    #printArea .photocell{break-inside:avoid;font-size:10px}
+    #printArea .photocell img{width:100%;border:1px solid #999;border-radius:4px}
+    #printArea .signature{margin-top:24px;display:flex;justify-content:space-between;font-size:11px}
+    #printArea .signature span{border-top:1px solid #000;padding-top:4px;min-width:180px}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">📋 TRAÇABILITÉ</div>
+  <nav class="tabs">
+    <button class="tab" data-tab="matin" type="button"><span class="ico">📷</span><span class="lbl">Matin</span></button>
+    <button class="tab" data-tab="production" type="button"><span class="ico">🍳</span><span class="lbl">Production</span></button>
+    <button class="tab" data-tab="produits" type="button"><span class="ico">📁</span><span class="lbl">Mes produits</span></button>
+    <button class="tab" data-tab="historique" type="button"><span class="ico">📅</span><span class="lbl">Historique</span></button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <!-- ==================== Onglet PHOTOS DU MATIN ==================== -->
+  <section class="panel" data-panel="matin">
+    <section class="card">
+      <h2>📷 Photos du matin</h2>
+      <p class="hint">Le matin, photographiez l'étiquette de chaque produit sorti ou ouvert (le numéro de lot doit être
+         lisible). Nommez la photo — c'est ce nom qui servira à faire le lien avec vos productions du jour.</p>
+      <div class="toolbar" style="margin-bottom:14px">
+        <div class="field"><label for="jourMatin">Journée</label><input type="date" id="jourMatin"></div>
+      </div>
+      <button class="primary bigphoto" id="btnPhoto" type="button">📷 Photographier un produit</button>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+      <div id="photosList" style="margin-top:8px"></div>
+      <p class="footnote" id="photosVide" style="margin-bottom:0">Aucune photo pour cette journée.</p>
+      <details class="more"><summary>Comment ça marche ?</summary>
+        Les photos restent sur cet appareil (elles ne sont envoyées nulle part). Le bouton « 🔍 N° de lot » lit le
+        numéro de lot sur la photo (connexion internet nécessaire au moins la première fois) ; vous pouvez toujours
+        le saisir à la main. Le soir, dans l'onglet 🍳 Production, chaque ingrédient de vos produits est relié
+        automatiquement à la photo du matin qui porte le même nom.
+      </details>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet PRODUCTION ==================== -->
+  <section class="panel" data-panel="production">
+    <section class="card">
+      <h2>🍳 Production du jour</h2>
+      <p class="hint">Indiquez le produit réalisé : s'il est déjà connu, sa composition apparaît toute seule.
+         Sinon, saisissez-la une fois — elle sera enregistrée pour la prochaine fois.</p>
+      <div class="toolbar">
+        <div class="field"><label for="jourProd">Journée</label><input type="date" id="jourProd"></div>
+        <div class="field" style="flex:1;min-width:220px">
+          <label for="nomProduit">Produit réalisé</label>
+          <input type="text" id="nomProduit" list="dlProduits" placeholder="ex. Tiramisu, quiche lorraine…" autocomplete="off">
+          <datalist id="dlProduits"></datalist>
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label for="compoTexte">Composition — un ingrédient par ligne</label>
+        <textarea id="compoTexte" placeholder="ex.&#10;Mascarpone&#10;Œufs&#10;Sucre&#10;Café&#10;Biscuits cuillère"></textarea>
+      </div>
+      <p class="footnote" id="compoInfo" style="margin:6px 0 0"></p>
+    </section>
+
+    <section class="card" id="liensCard" hidden>
+      <h2>🔗 Lien avec les photos du matin</h2>
+      <p class="hint">Chaque ingrédient est relié automatiquement à la photo du matin qui porte le même nom.
+         Vous pouvez corriger le lien si besoin.</p>
+      <div id="liensList"></div>
+      <p class="footnote" id="liensVide" hidden style="margin:0">Aucune photo prise ce jour-là : prenez d'abord les
+         photos dans l'onglet 📷, ou enregistrez la production sans lien.</p>
+      <div class="recipe-actions">
+        <button class="primary" id="btnEnregistrerProd" type="button">✅ Enregistrer la production</button>
+      </div>
+    </section>
+
+    <section class="card" id="prodJourCard" hidden>
+      <h2>🧾 Déjà enregistré ce jour-là</h2>
+      <div id="prodJourList"></div>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet MES PRODUITS ==================== -->
+  <section class="panel" data-panel="produits">
+    <section class="card">
+      <h2>📁 Mes produits</h2>
+      <p class="hint">Les produits que vous avez déjà réalisés, avec leur composition. Ils se remplissent tout seuls :
+         chaque production enregistrée met la bibliothèque à jour.</p>
+      <div id="produitsList"></div>
+      <p class="footnote" id="produitsVide" style="margin-bottom:0">Aucun produit enregistré pour l'instant :
+         enregistrez une première production dans l'onglet 🍳.</p>
+    </section>
+
+    <section class="card" id="editCard" hidden>
+      <h2>✏️ Modifier le produit</h2>
+      <div class="field"><label for="editNom">Nom du produit</label><input type="text" id="editNom"></div>
+      <div class="field" style="margin-top:12px">
+        <label for="editCompo">Composition — un ingrédient par ligne</label>
+        <textarea id="editCompo"></textarea>
+      </div>
+      <div class="recipe-actions">
+        <button class="primary" id="btnEditSave" type="button">💾 Enregistrer</button>
+        <button id="btnEditCancel" type="button">Annuler</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>☁️ Sauvegarde</h2>
+      <p class="hint">Tout est enregistré sur cet appareil. Pour protéger ou transférer vos données (produits,
+         journées, photos) :</p>
+      <div class="recipe-actions" style="margin-top:0">
+        <button class="small" id="btnExport" type="button">⬇ Sauvegarder (fichier)</button>
+        <button class="small" id="btnImport" type="button">⬆ Restaurer un fichier</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet HISTORIQUE ==================== -->
+  <section class="panel" data-panel="historique">
+    <section class="card">
+      <h2>📅 Historique des journées</h2>
+      <p class="hint">Chaque journée regroupe les photos du matin et les productions enregistrées, avec leurs liens.
+         La feuille de traçabilité s'imprime ou s'enregistre en PDF — à archiver pour vos contrôles.</p>
+      <div id="histoList"></div>
+      <p class="footnote" id="histoVide" style="margin-bottom:0">Aucune journée enregistrée pour l'instant.</p>
+    </section>
+  </section>
+
+</main>
+
+<div id="photoView" hidden><img id="photoViewImg" alt="Photo agrandie"></div>
+<div id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+'use strict';
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+const uid = p => (p||'x') + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const aujourdhui = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const heureNow = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+const dateFr = iso => { try{ return new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }catch(e){ return iso; } };
+
+function toast(msg){
+  const t = el('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* =====================================================================
+   DONNÉES
+   - produits  : bibliothèque {id, nom, ingredients:[...]} (localStorage)
+   - journal   : { 'AAAA-MM-JJ': { photos:[{id,nom,lot,heure}], productions:[...] } } (localStorage)
+   - photos    : dataURL par id (IndexedDB, comme la glacerie)
+===================================================================== */
+let produits = [];
+try{ produits = JSON.parse(localStorage.getItem('trac_produits')) || []; }catch(e){}
+let journal = {};
+try{ journal = JSON.parse(localStorage.getItem('trac_journal')) || {}; }catch(e){}
+
+function save(){
+  try{
+    localStorage.setItem('trac_produits', JSON.stringify(produits));
+    localStorage.setItem('trac_journal', JSON.stringify(journal));
+  }catch(e){ toast('⚠️ Enregistrement impossible (stockage plein ?)'); }
+}
+function jour(d){ return journal[d] || (journal[d] = {photos:[], productions:[]}); }
+
+/* ---- photos (IndexedDB) ---- */
+let photoCache = {};
+let idbP = null;
+function idb(){
+  if(!idbP) idbP = new Promise((res, rej)=>{
+    const r = indexedDB.open('tracabilite', 1);
+    r.onupgradeneeded = ()=>r.result.createObjectStore('photos');
+    r.onsuccess = ()=>res(r.result);
+    r.onerror = ()=>rej(r.error);
+  });
+  return idbP;
+}
+async function photoPut(id, dataUrl){
+  const db = await idb();
+  return new Promise((res, rej)=>{
+    const tx = db.transaction('photos','readwrite');
+    tx.objectStore('photos').put(dataUrl, id);
+    tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
+  });
+}
+async function photoGet(id){
+  const db = await idb();
+  return new Promise((res, rej)=>{
+    const q = db.transaction('photos').objectStore('photos').get(id);
+    q.onsuccess = ()=>res(q.result||null); q.onerror = ()=>rej(q.error);
+  });
+}
+async function photoDel(id){
+  try{
+    const db = await idb();
+    return new Promise(res=>{
+      const tx = db.transaction('photos','readwrite');
+      tx.objectStore('photos').delete(id);
+      tx.oncomplete = res; tx.onerror = res;
+    });
+  }catch(e){}
+}
+/* lecture d'une photo, redressée par le navigateur puis réduite (≤ 1400 px, JPEG) */
+function lirePhoto(file){
+  return new Promise((res, rej)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const max = 1400, k = Math.min(1, max/Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width*k); cv.height = Math.round(img.height*k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(img.src);
+      res(cv.toDataURL('image/jpeg', .8));
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(img.src); rej(new Error('image illisible')); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function chargerPhotosJour(d){
+  for(const p of jour(d).photos){
+    if(!photoCache[p.id]){
+      try{ const data = await photoGet(p.id); if(data) photoCache[p.id] = data; }catch(e){}
+    }
+  }
+}
+function voirPhoto(id){
+  if(!photoCache[id]) return;
+  el('photoViewImg').src = photoCache[id];
+  el('photoView').hidden = false;
+}
+
+/* =====================================================================
+   ONGLET 📷 PHOTOS DU MATIN
+===================================================================== */
+function jourMatin(){ return el('jourMatin').value || aujourdhui(); }
+
+function dlIngredients(){
+  /* noms déjà connus : ingrédients des produits + noms de photos passés */
+  const vus = new Set(), out = [];
+  const add = n=>{ const k = norm(n); if(n && k && !vus.has(k)){ vus.add(k); out.push(n); } };
+  for(const p of produits) for(const i of p.ingredients) add(i);
+  for(const d of Object.keys(journal)) for(const ph of journal[d].photos) add(ph.nom);
+  return out.sort((a,b)=>a.localeCompare(b,'fr'));
+}
+
+function renderPhotos(){
+  const d = jourMatin(), box = el('photosList');
+  const photos = jour(d).photos;
+  box.innerHTML = '';
+  el('photosVide').hidden = photos.length > 0;
+
+  let dl = document.getElementById('dlNoms');
+  if(!dl){ dl = document.createElement('datalist'); dl.id = 'dlNoms'; document.body.appendChild(dl); }
+  dl.innerHTML = dlIngredients().map(n=>`<option value="${esc(n)}">`).join('');
+
+  for(const p of photos){
+    const row = document.createElement('div'); row.className = 'photorow';
+
+    if(photoCache[p.id]){
+      const im = document.createElement('img'); im.className = 'thumb';
+      im.src = photoCache[p.id]; im.alt = 'Étiquette ' + (p.nom || 'produit');
+      im.addEventListener('click', ()=>voirPhoto(p.id));
+      row.appendChild(im);
+    } else {
+      const ph = document.createElement('div'); ph.className = 'thumb';
+      ph.style.cssText += ';display:flex;align-items:center;justify-content:center;font-size:1.6rem';
+      ph.textContent = '📦';
+      row.appendChild(ph);
+    }
+
+    const fields = document.createElement('div'); fields.className = 'photofields';
+    const inpNom = document.createElement('input'); inpNom.type = 'text';
+    inpNom.placeholder = 'Nom du produit (ex. Crème liquide)'; inpNom.value = p.nom || '';
+    inpNom.setAttribute('list','dlNoms');
+    inpNom.addEventListener('input', ()=>{ p.nom = inpNom.value; save(); });
+    fields.appendChild(inpNom);
+
+    const meta = document.createElement('div'); meta.className = 'photometa';
+    const inpLot = document.createElement('input'); inpLot.type = 'text';
+    inpLot.placeholder = 'N° de lot'; inpLot.value = p.lot || ''; inpLot.style.flex = '1'; inpLot.style.minWidth = '110px';
+    inpLot.addEventListener('input', ()=>{ p.lot = inpLot.value; save(); });
+    meta.appendChild(inpLot);
+
+    const bOcr = document.createElement('button'); bOcr.className = 'small'; bOcr.type = 'button';
+    bOcr.textContent = '🔍 N° de lot';
+    bOcr.addEventListener('click', ()=>extraireLot(p, row, bOcr));
+    meta.appendChild(bOcr);
+
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
+    bDel.title = 'Supprimer cette photo'; bDel.textContent = '✕';
+    bDel.addEventListener('click', ()=>{
+      if(!confirm('Supprimer cette photo ?')) return;
+      photoDel(p.id); delete photoCache[p.id];
+      const j = jour(d); j.photos = j.photos.filter(x=>x.id!==p.id);
+      save(); renderPhotos(); renderLiens();
+    });
+    meta.appendChild(bDel);
+    fields.appendChild(meta);
+
+    if(p.heure){
+      const h = document.createElement('div'); h.className = 'footnote'; h.textContent = 'Prise à ' + p.heure;
+      fields.appendChild(h);
+    }
+    row.appendChild(fields);
+    box.appendChild(row);
+  }
+}
+
+async function ajouterPhoto(file){
+  const d = jourMatin();
+  try{
+    const dataUrl = await lirePhoto(file);
+    const p = {id: uid('ph'), nom:'', lot:'', heure: heureNow()};
+    await photoPut(p.id, dataUrl);
+    photoCache[p.id] = dataUrl;
+    jour(d).photos.push(p);
+    save(); renderPhotos(); renderLiens();
+    toast('📷 Photo ajoutée — nommez le produit');
+  }catch(e){ toast('⚠️ Photo illisible, réessayez'); }
+}
+
+/* ---- reconnaissance du n° de lot (Tesseract, chargé à la demande,
+        depuis le dossier ocr/ hébergé avec l'appli, sinon le CDN) ---- */
+let tessPromise = null;
+function chargerTesseract(src){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(!tessPromise) tessPromise = new Promise((res, rej)=>{
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = ()=>res(window.Tesseract);
+    s.onerror = ()=>{ tessPromise = null; s.remove(); rej(new Error('chargement impossible')); };
+    document.head.appendChild(s);
+  });
+  return tessPromise;
+}
+let ocrLocal = null;
+async function creerWorkerOCR(){
+  if(ocrLocal === null){
+    try{
+      const r = await fetch(new URL('ocr/worker.min.js', location.href), {method:'HEAD'});
+      ocrLocal = r.ok;
+    }catch(e){ ocrLocal = false; }
+  }
+  if(ocrLocal){
+    const base = new URL('ocr', location.href).href;
+    const T = await chargerTesseract(base + '/tesseract.min.js');
+    return T.createWorker('eng', 1, {workerPath: base + '/worker.min.js', corePath: base, langPath: base});
+  }
+  const T = await chargerTesseract('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+  return T.createWorker('eng');
+}
+function candidatsLot(txt){
+  const t = (txt || '').toUpperCase();
+  const out = [], vu = new Set();
+  const ajouter = c=>{
+    c = c.replace(/[^A-Z0-9\-\/\.]/g, '').replace(/^[\-\/\.]+|[\-\/\.]+$/g, '');
+    if(c.length>=3 && c.length<=16 && !vu.has(c)){ vu.add(c); out.push(c); }
+  };
+  const re = /(?:LOT|L0T|BATCH|CHARGE)\s*(?:N[°O0]?\s*)?[:.\-]?\s*([A-Z0-9][A-Z0-9\-\/\.]{2,15})/g;
+  let m; while((m = re.exec(t))) ajouter(m[1]);
+  for(const w of t.split(/[\s,;()]+/)){
+    const c = w.replace(/[^A-Z0-9\-\/\.]/g, '');
+    if(c.length>=5 && c.length<=14 && /\d/.test(c)
+       && !/^\d{1,2}[\/\.\-]\d{1,2}([\/\.\-]\d{2,4})?$/.test(c)
+       && !/^\d{1,2}[\/\.\-]\d{4}$/.test(c)
+       && !/^\d+[\.,]\d{1,2}$/.test(c)) ajouter(c);
+  }
+  return out.slice(0, 6);
+}
+async function extraireLot(p, row, btn){
+  if(!photoCache[p.id]) return;
+  const ancien = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Analyse…';
+  try{
+    const worker = await creerWorkerOCR();
+    const { data } = await worker.recognize(photoCache[p.id]);
+    await worker.terminate();
+    const cands = candidatsLot(data.text);
+    row.querySelectorAll('.lotchips').forEach(x=>x.remove());
+    const chips = document.createElement('div'); chips.className = 'lotchips';
+    if(!cands.length){
+      chips.innerHTML = '<span class="footnote" style="margin:0">Aucun numéro reconnu : saisissez-le à la main, ou reprenez la photo de plus près, bien à plat.</span>';
+    } else {
+      const lbl = document.createElement('span'); lbl.className = 'footnote'; lbl.style.margin = '0';
+      lbl.textContent = 'Touchez le bon numéro :';
+      chips.appendChild(lbl);
+      for(const c of cands){
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = c;
+        b.addEventListener('click', ()=>{ p.lot = c; save(); renderPhotos(); });
+        chips.appendChild(b);
+      }
+    }
+    row.appendChild(chips);
+  }catch(e){
+    alert('Extraction impossible ici : une connexion internet est nécessaire à la première utilisation. En attendant, saisissez le numéro à la main.');
+  }
+  btn.disabled = false; btn.textContent = ancien;
+}
+
+/* =====================================================================
+   ONGLET 🍳 PRODUCTION
+===================================================================== */
+function jourProd(){ return el('jourProd').value || aujourdhui(); }
+function compoCourante(){
+  return el('compoTexte').value.split('\n').map(s=>s.trim()).filter(Boolean);
+}
+let liensSel = {};   // norm(ingrédient) -> id de photo ('' = aucun)
+
+function produitParNom(nom){
+  const k = norm(nom);
+  return produits.find(p=>norm(p.nom)===k) || null;
+}
+function renderDlProduits(){
+  el('dlProduits').innerHTML = produits.map(p=>`<option value="${esc(p.nom)}">`).join('');
+}
+/* « je mets mon produit et tu me sors la compo » */
+function chargerCompo(){
+  const p = produitParNom(el('nomProduit').value);
+  if(p){
+    el('compoTexte').value = p.ingredients.join('\n');
+    el('compoInfo').textContent = '✅ Produit connu — composition retrouvée (' + p.ingredients.length + ' ingrédients). Modifiable si besoin.';
+  } else {
+    el('compoInfo').textContent = el('nomProduit').value.trim()
+      ? 'Nouveau produit : saisissez sa composition, elle sera enregistrée pour la prochaine fois.' : '';
+  }
+  renderLiens();
+}
+/* lien automatique ingrédient → photo du matin qui porte le même nom */
+function scoreMatch(ing, photoNom){
+  const a = norm(ing), b = norm(photoNom);
+  if(!a || !b) return 0;
+  if(a === b) return 3;
+  if(a.includes(b) || b.includes(a)) return 2;
+  const mots = new Set(a.split(' ').filter(w=>w.length>=4));
+  for(const w of b.split(' ')) if(mots.has(w)) return 1;
+  return 0;
+}
+function meilleurePhoto(ing, photos){
+  let best = null, bestScore = 0;
+  for(const p of photos){
+    const s = scoreMatch(ing, p.nom);
+    if(s > bestScore){ bestScore = s; best = p; }
+  }
+  return best;
+}
+function renderLiens(){
+  const compo = compoCourante();
+  const card = el('liensCard');
+  card.hidden = compo.length === 0;
+  if(compo.length === 0) return;
+
+  const photos = jour(jourProd()).photos.filter(p=>p.nom || p.lot || photoCache[p.id]);
+  el('liensVide').hidden = photos.length > 0;
+
+  const box = el('liensList');
+  box.innerHTML = '';
+  for(const ing of compo){
+    const k = norm(ing);
+    if(!(k in liensSel)){
+      const auto = meilleurePhoto(ing, photos);
+      liensSel[k] = auto ? auto.id : '';
+    }
+    /* la photo choisie a pu être supprimée */
+    if(liensSel[k] && !photos.some(p=>p.id===liensSel[k])) liensSel[k] = '';
+
+    const row = document.createElement('div'); row.className = 'lienrow';
+    const nom = document.createElement('div'); nom.className = 'ing'; nom.textContent = ing;
+    row.appendChild(nom);
+    const sel = document.createElement('select');
+    sel.innerHTML = '<option value="">— pas de photo —</option>' +
+      photos.map(p=>`<option value="${esc(p.id)}"${p.id===liensSel[k]?' selected':''}>📷 ${esc(p.nom||'(sans nom)')}${p.lot?' · lot '+esc(p.lot):''}</option>`).join('');
+    sel.className = liensSel[k] ? 'ok' : '';
+    sel.addEventListener('change', ()=>{ liensSel[k] = sel.value; sel.className = sel.value ? 'ok' : ''; });
+    row.appendChild(sel);
+    box.appendChild(row);
+  }
+}
+/* « tu enregistres les produits réalisés pour une prochaine fois » */
+function upsertProduit(nom, ingredients){
+  const p = produitParNom(nom);
+  if(p){ p.nom = nom.trim(); p.ingredients = ingredients; p.maj = aujourdhui(); return p; }
+  const nouveau = {id: uid('pr'), nom: nom.trim(), ingredients, maj: aujourdhui()};
+  produits.push(nouveau);
+  return nouveau;
+}
+function enregistrerProduction(){
+  const nom = el('nomProduit').value.trim();
+  const compo = compoCourante();
+  if(!nom){ toast('Indiquez le nom du produit réalisé'); el('nomProduit').focus(); return; }
+  if(!compo.length){ toast('Indiquez la composition (un ingrédient par ligne)'); el('compoTexte').focus(); return; }
+
+  const d = jourProd();
+  const produit = upsertProduit(nom, compo);
+  jour(d).productions.push({
+    id: uid('pd'), heure: heureNow(), produitId: produit.id, nom: produit.nom,
+    ingredients: compo.map(ing=>({nom: ing, photoId: liensSel[norm(ing)] || ''}))
+  });
+  save();
+  el('nomProduit').value = ''; el('compoTexte').value = ''; el('compoInfo').textContent = '';
+  liensSel = {};
+  renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
+  toast('✅ Production enregistrée — « ' + produit.nom + ' »');
+}
+function renderProdJour(){
+  const d = jourProd(), prods = jour(d).productions;
+  el('prodJourCard').hidden = prods.length === 0;
+  const box = el('prodJourList');
+  box.innerHTML = '';
+  const photos = jour(d).photos;
+  for(const pr of prods){
+    const lies = pr.ingredients.filter(i=>i.photoId && photos.some(p=>p.id===i.photoId)).length;
+    const row = document.createElement('div'); row.className = 'itemrow';
+    row.innerHTML = `<div class="grow"><strong>${esc(pr.nom)}</strong>
+      <div class="rowhint">${pr.heure ? 'à ' + esc(pr.heure) + ' — ' : ''}${pr.ingredients.length} ingrédients, ${lies} relié${lies>1?'s':''} aux photos</div></div>`;
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
+    bDel.title = 'Supprimer cette production'; bDel.textContent = '✕';
+    bDel.addEventListener('click', ()=>{
+      if(!confirm('Supprimer la production « ' + pr.nom + ' » de cette journée ?')) return;
+      const j = jour(d); j.productions = j.productions.filter(x=>x.id!==pr.id);
+      save(); renderProdJour(); renderHisto();
+    });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+}
+
+/* =====================================================================
+   ONGLET 📁 MES PRODUITS
+===================================================================== */
+let editId = null;
+function renderProduits(){
+  const box = el('produitsList');
+  box.innerHTML = '';
+  el('produitsVide').hidden = produits.length > 0;
+  const tri = [...produits].sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+  for(const p of tri){
+    const row = document.createElement('div'); row.className = 'itemrow';
+    const apercu = p.ingredients.slice(0,5).join(', ') + (p.ingredients.length>5 ? '…' : '');
+    row.innerHTML = `<div class="grow"><strong>${esc(p.nom)}</strong>
+      <div class="rowhint">${p.ingredients.length} ingrédients — ${esc(apercu)}</div></div>`;
+
+    const bProd = document.createElement('button'); bProd.className = 'small'; bProd.type = 'button';
+    bProd.textContent = '🍳 Produire';
+    bProd.addEventListener('click', ()=>{
+      el('nomProduit').value = p.nom;
+      chargerCompo();
+      activerOnglet('production');
+    });
+    row.appendChild(bProd);
+
+    const bEdit = document.createElement('button'); bEdit.className = 'small'; bEdit.type = 'button';
+    bEdit.textContent = '✏️';
+    bEdit.title = 'Modifier';
+    bEdit.addEventListener('click', ()=>{
+      editId = p.id;
+      el('editNom').value = p.nom;
+      el('editCompo').value = p.ingredients.join('\n');
+      el('editCard').hidden = false;
+      el('editCard').scrollIntoView({behavior:'smooth', block:'center'});
+    });
+    row.appendChild(bEdit);
+
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
+    bDel.title = 'Supprimer ce produit'; bDel.textContent = '✕';
+    bDel.addEventListener('click', ()=>{
+      if(!confirm('Supprimer « ' + p.nom + ' » de la bibliothèque ?\n(Les journées déjà enregistrées sont conservées.)')) return;
+      produits = produits.filter(x=>x.id!==p.id);
+      save(); renderProduits(); renderDlProduits();
+    });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+}
+
+/* =====================================================================
+   ONGLET 📅 HISTORIQUE + feuille de traçabilité
+===================================================================== */
+function renderHisto(){
+  const box = el('histoList');
+  box.innerHTML = '';
+  const jours = Object.keys(journal)
+    .filter(d=>journal[d].photos.length || journal[d].productions.length)
+    .sort().reverse();
+  el('histoVide').hidden = jours.length > 0;
+  for(const d of jours){
+    const j = journal[d];
+    const row = document.createElement('div'); row.className = 'itemrow';
+    const chips = j.productions.map(pr=>`<span class="chip">${esc(pr.nom)}</span>`).join('') +
+      (j.photos.length ? `<span class="chip gris">📷 ${j.photos.length} photo${j.photos.length>1?'s':''}</span>` : '');
+    row.innerHTML = `<div class="grow"><strong style="text-transform:capitalize">${esc(dateFr(d))}</strong>
+      <div class="chips">${chips || '<span class="chip gris">vide</span>'}</div></div>`;
+
+    const bPrint = document.createElement('button'); bPrint.className = 'small'; bPrint.type = 'button';
+    bPrint.textContent = '🖨 Feuille';
+    bPrint.title = 'Imprimer / enregistrer en PDF la feuille de traçabilité';
+    bPrint.addEventListener('click', ()=>imprimerJour(d));
+    row.appendChild(bPrint);
+
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
+    bDel.title = 'Supprimer cette journée'; bDel.textContent = '✕';
+    bDel.addEventListener('click', ()=>{
+      if(!confirm('Supprimer la journée du ' + dateFr(d) + ' (photos et productions) ?')) return;
+      for(const p of j.photos){ photoDel(p.id); delete photoCache[p.id]; }
+      delete journal[d];
+      save(); renderHisto(); renderPhotos(); renderProdJour();
+    });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+}
+async function imprimerJour(d){
+  await chargerPhotosJour(d);
+  const j = jour(d);
+  const photoById = {}; for(const p of j.photos) photoById[p.id] = p;
+
+  let html = `<h1>Feuille de traçabilité</h1>
+    <p class="sub"><span style="text-transform:capitalize">${esc(dateFr(d))}</span> — document à archiver (photos des étiquettes en annexe)</p>`;
+
+  if(j.photos.length){
+    html += `<h2>Produits photographiés le matin</h2>
+      <table><tr><th>Produit</th><th>N° de lot</th><th>Heure</th></tr>` +
+      j.photos.map(p=>`<tr><td>${esc(p.nom||'(sans nom)')}</td><td>${esc(p.lot||'—')}</td><td>${esc(p.heure||'')}</td></tr>`).join('') +
+      `</table>`;
+  }
+
+  if(j.productions.length){
+    html += `<h2>Productions du jour</h2>`;
+    for(const pr of j.productions){
+      html += `<h3>${esc(pr.nom)}${pr.heure ? ' — ' + esc(pr.heure) : ''}</h3>
+        <table><tr><th>Ingrédient</th><th>Photo reliée</th><th>N° de lot</th></tr>` +
+        pr.ingredients.map(i=>{
+          const p = i.photoId ? photoById[i.photoId] : null;
+          return `<tr><td>${esc(i.nom)}</td><td>${p ? '📷 ' + esc(p.nom||'(sans nom)') : '—'}</td><td>${p ? esc(p.lot||'—') : '—'}</td></tr>`;
+        }).join('') + `</table>`;
+    }
+  }
+
+  const cells = j.photos.filter(p=>photoCache[p.id])
+    .map(p=>`<div class="photocell"><img src="${photoCache[p.id]}" alt=""><div><strong>${esc(p.nom||'(sans nom)')}</strong>${p.lot?' — lot '+esc(p.lot):''}</div></div>`);
+  if(cells.length) html += `<h2>Annexe — photos des étiquettes</h2><div class="photogrid">${cells.join('')}</div>`;
+
+  html += `<div class="signature"><span>Date : </span><span>Signature : </span></div>`;
+
+  el('printArea').innerHTML = html;
+  try{ window.print(); }
+  catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez l\'application dans Safari ou Chrome.'); }
+}
+
+/* =====================================================================
+   SAUVEGARDE / RESTAURATION (fichier JSON, photos comprises)
+===================================================================== */
+async function exporter(){
+  const photos = {};
+  for(const d of Object.keys(journal)){
+    for(const p of journal[d].photos){
+      try{ const data = photoCache[p.id] || await photoGet(p.id); if(data) photos[p.id] = data; }catch(e){}
+    }
+  }
+  const blob = new Blob([JSON.stringify({app:'tracabilite', version:1, produits, journal, photos})],
+    {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tracabilite-' + aujourdhui() + '.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('⬇ Sauvegarde téléchargée');
+}
+async function importer(file){
+  try{
+    const data = JSON.parse(await file.text());
+    if(data.app !== 'tracabilite') throw new Error('mauvais fichier');
+    if(!confirm('Restaurer ce fichier ? Les données actuelles de l\'appareil seront remplacées.')) return;
+    produits = data.produits || [];
+    journal = data.journal || {};
+    for(const id of Object.keys(data.photos || {})){
+      await photoPut(id, data.photos[id]);
+      photoCache[id] = data.photos[id];
+    }
+    save();
+    renderTout();
+    toast('⬆ Données restaurées');
+  }catch(e){ alert('Fichier illisible : choisissez une sauvegarde créée par cette application (.json).'); }
+}
+
+/* =====================================================================
+   ONGLETS & DÉMARRAGE
+===================================================================== */
+function activerOnglet(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===id));
+  try{ localStorage.setItem('trac_tab', id); }catch(e){}
+}
+function renderTout(){
+  renderPhotos(); renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
+}
+
+document.addEventListener('DOMContentLoaded', async ()=>{
+  el('jourMatin').value = aujourdhui();
+  el('jourProd').value = aujourdhui();
+
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>activerOnglet(t.dataset.tab)));
+  let tab0 = 'matin';
+  try{ tab0 = localStorage.getItem('trac_tab') || 'matin'; }catch(e){}
+  activerOnglet(tab0);
+
+  /* photos du matin */
+  el('btnPhoto').addEventListener('click', ()=>el('photoInput').click());
+  el('photoInput').addEventListener('change', e=>{
+    const f = e.target.files && e.target.files[0];
+    if(f) ajouterPhoto(f);
+    e.target.value = '';
+  });
+  el('jourMatin').addEventListener('change', async ()=>{ await chargerPhotosJour(jourMatin()); renderPhotos(); });
+
+  /* production */
+  el('nomProduit').addEventListener('change', chargerCompo);
+  el('nomProduit').addEventListener('blur', chargerCompo);
+  el('compoTexte').addEventListener('input', renderLiens);
+  el('jourProd').addEventListener('change', async ()=>{
+    liensSel = {};
+    await chargerPhotosJour(jourProd());
+    renderLiens(); renderProdJour();
+  });
+  el('btnEnregistrerProd').addEventListener('click', enregistrerProduction);
+
+  /* bibliothèque */
+  el('btnEditSave').addEventListener('click', ()=>{
+    const p = produits.find(x=>x.id===editId);
+    if(!p) { el('editCard').hidden = true; return; }
+    const nom = el('editNom').value.trim();
+    const compo = el('editCompo').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(!nom || !compo.length){ toast('Nom et composition obligatoires'); return; }
+    p.nom = nom; p.ingredients = compo; p.maj = aujourdhui();
+    save();
+    el('editCard').hidden = true; editId = null;
+    renderProduits(); renderDlProduits();
+    toast('💾 Produit mis à jour');
+  });
+  el('btnEditCancel').addEventListener('click', ()=>{ el('editCard').hidden = true; editId = null; });
+
+  /* sauvegarde */
+  el('btnExport').addEventListener('click', exporter);
+  el('btnImport').addEventListener('click', ()=>el('importFile').click());
+  el('importFile').addEventListener('change', e=>{
+    const f = e.target.files && e.target.files[0];
+    if(f) importer(f);
+    e.target.value = '';
+  });
+
+  /* visionneuse */
+  el('photoView').addEventListener('click', ()=>{ el('photoView').hidden = true; });
+
+  await chargerPhotosJour(aujourdhui());
+  renderTout();
+
+  if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){
+    navigator.serviceWorker.register('tracabilite-sw.js').catch(()=>{});
+  }
+});
+</script>
+</body>
+</html>

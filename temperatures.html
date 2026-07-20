@@ -166,9 +166,18 @@
     #printArea th{background:#eee}
     #printArea td.num{text-align:center;white-space:nowrap}
     #printArea .nc{font-weight:800}
-    #printArea .small{font-size:9px;color:#444}
-    #printArea .signature{margin-top:24px;display:flex;justify-content:space-between;font-size:11px}
-    #printArea .signature span{border-top:1px solid #000;padding-top:4px;min-width:180px}
+    #printArea td.nc{background:#e5e5e5}
+    #printArea .small{font-size:9px;color:#444;font-weight:400}
+    #printArea .etab{margin:0 0 4px;font-size:12.5px;color:#000}
+    #printArea .legende{margin:9px 0 0;font-size:10px;color:#333}
+    #printArea .refs{margin:14px 0 0;font-size:8.5px;color:#444;line-height:1.45}
+    #printArea table.mois{font-size:9px}
+    #printArea table.mois th,#printArea table.mois td{padding:2px 4px}
+    #printArea table.mois td.vide{color:#bbb}
+    #printArea table.mois tr.jvide td{background:#fafafa;color:#bbb}
+    #printArea table.mois tr.jvide td.vide{background:#fafafa}
+    #printArea .signature{margin-top:22px;display:flex;justify-content:space-between;gap:24px;font-size:11px}
+    #printArea .signature span{border-top:1px solid #000;padding-top:4px;min-width:150px;flex:1}
   }
 </style>
 </head>
@@ -275,6 +284,24 @@
     </section>
 
     <section class="card">
+      <h2>🏢 Établissement</h2>
+      <p class="hint">Ces informations figurent en tête des feuilles de relevés : elles sont exigées par
+         les services de contrôle sanitaire (DDPP) pour identifier l'établissement contrôlé.</p>
+      <div class="field" style="margin-bottom:12px">
+        <label for="etabNom">Nom de l'établissement</label>
+        <input type="text" id="etabNom" placeholder="ex. Pâtisserie Dupont" autocomplete="off">
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label for="etabAdresse">Adresse</label>
+        <input type="text" id="etabAdresse" placeholder="ex. 12 rue des Lilas, 69000 Lyon" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="etabResp">Responsable des relevés</label>
+        <input type="text" id="etabResp" placeholder="ex. Sébastien Pettinati" autocomplete="off">
+      </div>
+    </section>
+
+    <section class="card">
       <h2>⚙️ Réglages</h2>
       <p class="hint">Heures de référence utilisées lors de l'import INKBIRD pour choisir le relevé
          du matin et celui du soir.</p>
@@ -332,6 +359,20 @@ const heureNow = () => { const d = new Date(); return String(d.getHours()).padSt
 const dateFr = iso => { try{ return new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }catch(e){ return iso; } };
 const fmtT = t => (t>0?'+':'') + String(Math.round(t*10)/10).replace('.',',');
 
+/* en-tête d'identification de l'établissement, imprimé en tête de chaque feuille */
+function enteteEtab(){
+  const l = [];
+  if((reglages.etab||'').trim()) l.push('<strong>' + esc(reglages.etab) + '</strong>');
+  if((reglages.adresse||'').trim()) l.push(esc(reglages.adresse));
+  return l.length ? '<p class="etab">' + l.join(' — ') + '</p>' : '';
+}
+/* oriente la page à l'impression : portrait pour le jour, paysage pour le mois */
+function setOrientation(mode){
+  let s = el('pageStyle');
+  if(!s){ s = document.createElement('style'); s.id = 'pageStyle'; document.head.appendChild(s); }
+  s.textContent = '@page{size:A4 ' + mode + ';margin:12mm}';
+}
+
 function toast(msg){
   const t = el('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), 2600);
@@ -351,7 +392,7 @@ const TYPES = {
   chaud:{cMin:63, cMax:95,  ico:'♨️'},
   autre:{cMin:0,  cMax:10,  ico:'🌡'}
 };
-let equipements = null, releves = {}, pdfFaits = {}, reglages = {hMatin:'09:00', hSoir:'17:00'};
+let equipements = null, releves = {}, pdfFaits = {}, reglages = {hMatin:'09:00', hSoir:'17:00', etab:'', adresse:'', resp:''};
 try{ equipements = JSON.parse(localStorage.getItem('tp_equipements')); }catch(e){}
 try{ releves = JSON.parse(localStorage.getItem('tp_releves')) || {}; }catch(e){}
 try{ pdfFaits = JSON.parse(localStorage.getItem('tp_pdfs')) || {}; }catch(e){}
@@ -511,16 +552,20 @@ function feuilleJourHTML(d){
       <td class="num">${ncs.length ? '<span class="nc">✘ NON CONFORME</span>' : '✔ conforme'}</td>
       <td>${esc(m.action||'')}</td></tr>`;
   }
-  return `<h1>Relevé des températures</h1>
-    <p class="sub"><span style="text-transform:capitalize">${esc(dateFr(d))}</span> — document à archiver
-    (plan de maîtrise sanitaire). Relevés issus des sondes INKBIRD ou saisis sur place ;
-    mini / maxi mesurés sur 24 h lorsque la sonde enregistre en continu.</p>
+  return `<h1>Relevé journalier des températures</h1>
+    ${enteteEtab()}
+    <p class="sub"><span style="text-transform:capitalize">${esc(dateFr(d))}</span> — relevés issus des sondes
+    INKBIRD ou saisis sur place ; mini / maxi mesurés sur 24 h lorsque la sonde enregistre en continu.</p>
     <table><tr><th>Équipement</th><th>Consigne</th><th>Matin</th><th>Soir</th>
     <th>Mini / maxi 24 h</th><th>Conformité</th><th>Action corrective</th></tr>${rows}</table>
-    <div class="signature"><span>Relevé par : </span><span>Signature : </span></div>`;
+    <p class="refs">Document du Plan de Maîtrise Sanitaire — à conserver et à présenter aux services de contrôle (DDPP).
+    Références : Règlement (CE) n° 852/2004 ; arrêté du 21 décembre 2009. Froid positif : 0 à +4 °C ;
+    froid négatif / surgelés : −18 °C au maximum. ✔ conforme · ✘ hors température réglementaire.</p>
+    <div class="signature"><span>Responsable : ${esc(reglages.resp||'')}</span><span>Date : </span><span>Visa / signature : </span></div>`;
 }
 function imprimerJour(d){
   if(!releves[d] || !Object.keys(releves[d]).length){ toast('Aucun relevé pour cette journée.'); return; }
+  setOrientation('portrait');
   el('printArea').innerHTML = feuilleJourHTML(d);
   pdfFaits[d] = true; save(); majBanner(); renderHisto();
   try{ window.print(); }
@@ -539,34 +584,66 @@ function imprimerMois(mois){ /* mois = 'AAAA-MM' */
     toast('Aucun relevé pour ce mois.'); return;
   }
   const nomMois = new Date(an, mo-1, 15).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+
+  /* en-têtes du tableau : une paire matin/soir par équipement, avec sa consigne */
   let head1 = '<tr><th rowspan="2">Jour</th>', head2 = '<tr>';
   for(const eq of equipements){
-    head1 += `<th colspan="2">${esc(eq.nom)}<br><span class="small">${fmtT(eq.cMin)} à ${fmtT(eq.cMax)} °C</span></th>`;
+    const ico = (TYPES[eq.type]||TYPES.autre).ico;
+    head1 += `<th colspan="2">${ico} ${esc(eq.nom)}<br><span class="small">consigne ${fmtT(eq.cMin)} à ${fmtT(eq.cMax)} °C</span></th>`;
     head2 += '<th>Matin</th><th>Soir</th>';
   }
   head1 += '</tr>'; head2 += '</tr>';
-  let rows = '', actions = [];
+
+  /* corps du tableau + collecte des anomalies et du bilan de conformité */
+  const nomJourCourt = iso => new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short'});
+  let rows = '', actions = [], nbRel = 0, nbNC = 0, joursRemplis = 0;
   for(const d of jours){
     const j = releves[d] || {};
-    let tr = `<td class="num">${d.slice(8)}</td>`;
+    const rempli = Object.keys(j).length > 0;
+    if(rempli) joursRemplis++;
+    let tr = `<td class="num">${nomJourCourt(d)} ${d.slice(8)}</td>`;
     for(const eq of equipements){
       const m = j[eq.id];
       for(const k of ['matin','soir']){
         if(m && m[k]){
+          nbRel++;
           const ok = conforme(m[k].t, m);
+          if(!ok) nbNC++;
           tr += `<td class="num${ok?'':' nc'}">${ok?'':'⚠ '}${fmtT(m[k].t)}</td>`;
-        }else tr += '<td class="num">—</td>';
+        }else tr += '<td class="num vide">—</td>';
       }
-      if(m && (m.action||'').trim()) actions.push(`<strong>${d.slice(8)}/${String(mo).padStart(2,'0')} — ${esc(m.nom)} :</strong> ${esc(m.action)}`);
+      if(m && (m.action||'').trim())
+        actions.push(`<strong>${d.slice(8)}/${String(mo).padStart(2,'0')} · ${esc(m.nom)} :</strong> ${esc(m.action)}`);
     }
-    rows += `<tr>${tr}</tr>`;
+    rows += `<tr${rempli?'':' class="jvide"'}>${tr}</tr>`;
   }
+  const tauxConf = nbRel ? Math.floor((nbRel-nbNC)/nbRel*100) : 0;
+
   let html = `<h1>Relevé mensuel des températures</h1>
-    <p class="sub"><span style="text-transform:capitalize">${esc(nomMois)}</span> — températures en °C,
-    document à archiver (plan de maîtrise sanitaire). ⚠ = hors consigne.</p>
-    <table>${head1}${head2}${rows}</table>`;
-  if(actions.length) html += `<h2>Actions correctives du mois</h2><p class="sub">${actions.join('<br>')}</p>`;
-  html += `<div class="signature"><span>Responsable : </span><span>Signature : </span></div>`;
+    ${enteteEtab()}
+    <p class="sub"><span style="text-transform:capitalize">${esc(nomMois)}</span> — relevés matin et soir,
+    températures exprimées en °C.</p>
+    <table class="mois">${head1}${head2}${rows}</table>
+    <p class="legende">✔ dans la consigne · <span class="nc">⚠ hors température réglementaire</span> · — pas de relevé.
+    &nbsp;<strong>Bilan du mois :</strong> ${nbRel} relevé${nbRel>1?'s':''} sur ${joursRemplis} jour${joursRemplis>1?'s':''} renseigné${joursRemplis>1?'s':''},
+    dont ${nbNC} hors consigne — conformité ${tauxConf} %.</p>`;
+
+  html += `<h2>Anomalies et actions correctives</h2>`;
+  html += actions.length
+    ? `<p class="sub">${actions.join('<br>')}</p>`
+    : `<p class="sub">Aucune anomalie signalée ce mois : l'ensemble des relevés est resté conforme aux températures réglementaires.</p>`;
+
+  html += `<p class="refs">Document du Plan de Maîtrise Sanitaire — à conserver et à présenter aux services de contrôle (DDPP).
+    Références réglementaires : Règlement (CE) n° 852/2004 relatif à l'hygiène des denrées alimentaires ;
+    arrêté du 21 décembre 2009 relatif aux températures de conservation. Froid positif : 0 à +4 °C ;
+    froid négatif, surgelés et glaces : −18 °C au maximum ; liaison chaude : +63 °C au minimum.</p>`;
+
+  html += `<div class="signature">
+    <span>Responsable : ${esc(reglages.resp||'')}</span>
+    <span>Date : </span>
+    <span>Visa / signature : </span></div>`;
+
+  setOrientation('landscape');
   el('printArea').innerHTML = html;
   try{ window.print(); }
   catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez l\'application dans Safari ou Chrome.'); }
@@ -823,6 +900,9 @@ function activerOnglet(id){
 function renderTout(){
   renderReleves(); renderEquip(); renderHisto(); majBanner();
   el('hMatin').value = reglages.hMatin; el('hSoir').value = reglages.hSoir;
+  el('etabNom').value = reglages.etab || '';
+  el('etabAdresse').value = reglages.adresse || '';
+  el('etabResp').value = reglages.resp || '';
 }
 
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -870,6 +950,9 @@ window.addEventListener('DOMContentLoaded', ()=>{
 
   el('hMatin').addEventListener('change', ()=>{ reglages.hMatin = el('hMatin').value || '09:00'; save(); });
   el('hSoir').addEventListener('change', ()=>{ reglages.hSoir = el('hSoir').value || '17:00'; save(); });
+  el('etabNom').addEventListener('change', ()=>{ reglages.etab = el('etabNom').value.trim(); save(); });
+  el('etabAdresse').addEventListener('change', ()=>{ reglages.adresse = el('etabAdresse').value.trim(); save(); });
+  el('etabResp').addEventListener('change', ()=>{ reglages.resp = el('etabResp').value.trim(); save(); });
 
   el('btnExport').addEventListener('click', exporter);
   el('btnImport').addEventListener('click', ()=>el('importFile').click());

@@ -392,11 +392,16 @@ const TYPES = {
   chaud:{cMin:63, cMax:95,  ico:'♨️'},
   autre:{cMin:0,  cMax:10,  ico:'🌡'}
 };
+/* établissement pré-rempli — s'affiche en tête des feuilles ; modifiable dans l'onglet Équipements */
+const ETAB_DEFAUT = {etab:'La Pause Sucrée', adresse:'18 boulevard de la République, 06510 Carros', resp:'Sébastien Pettinati'};
 let equipements = null, releves = {}, pdfFaits = {}, reglages = {hMatin:'09:00', hSoir:'17:00', etab:'', adresse:'', resp:''};
 try{ equipements = JSON.parse(localStorage.getItem('tp_equipements')); }catch(e){}
 try{ releves = JSON.parse(localStorage.getItem('tp_releves')) || {}; }catch(e){}
 try{ pdfFaits = JSON.parse(localStorage.getItem('tp_pdfs')) || {}; }catch(e){}
 try{ Object.assign(reglages, JSON.parse(localStorage.getItem('tp_reglages')) || {}); }catch(e){}
+/* premier usage (établissement encore vide) : on remplit avec les informations de La Pause Sucrée */
+if(!(reglages.etab||'').trim() && !(reglages.adresse||'').trim() && !(reglages.resp||'').trim())
+  Object.assign(reglages, ETAB_DEFAUT);
 
 /* premiers pas : les quatre sondes INKBIRD du laboratoire */
 if(!Array.isArray(equipements)){

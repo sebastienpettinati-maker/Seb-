@@ -1,0 +1,16 @@
+{
+  "name": "Relevé des températures",
+  "short_name": "Températures",
+  "description": "Relevés de températures des frigos et congélateurs : import des sondes INKBIRD, conformité HACCP, feuille du jour et feuille mensuelle en PDF.",
+  "lang": "fr",
+  "id": "temperatures",
+  "start_url": "./temperatures.html",
+  "scope": "./temperatures.html",
+  "display": "standalone",
+  "background_color": "#eff3f7",
+  "theme_color": "#2569a8",
+  "icons": [
+    { "src": "temperatures-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "temperatures-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

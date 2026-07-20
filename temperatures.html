@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relevé des températures — frigos &amp; congélateurs</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌡</text></svg>">
+<link rel="manifest" href="temperatures.webmanifest">
+<link rel="apple-touch-icon" href="temperatures-192.png">
+<meta name="theme-color" content="#2569a8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root{
+    --page:#eff3f7;
+    --surface-1:#fbfcfe;
+    --ink-1:#1e2733; --ink-2:#57667a; --ink-3:#8795a8;
+    --grid:#dbe3ec; --border:rgba(30,39,51,.08);
+    --accent:#2569a8; --accent-2:#3b82c4; --accent-soft:#e4eef8;
+    --grad:linear-gradient(135deg,#2569a8 0%,#3f8ecb 100%);
+    --zebra:rgba(60,100,150,.05);
+    --good:#0ca30c; --warn:#f4a814; --bad:#d03b3b;
+    --bad-bg:rgba(208,59,59,.09);
+    --shadow:0 1px 2px rgba(40,60,90,.05),0 10px 28px rgba(40,60,90,.07);
+    --serif:"Didot","Bodoni MT",Georgia,"Times New Roman",serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --page:#101720;
+      --surface-1:#18212c;
+      --ink-1:#e9f0f7; --ink-2:#a8b9cb; --ink-3:#7b8c9e;
+      --ink-3:#7b8c9e;
+      --grid:#2b3846; --border:rgba(255,255,255,.09);
+      --accent:#5ca4e0; --accent-2:#7ab6e8; --accent-soft:#1e3550;
+      --grad:linear-gradient(135deg,#2569a8 0%,#33699f 100%);
+      --zebra:rgba(255,255,255,.03);
+      --bad:#e05252; --bad-bg:rgba(224,82,82,.16);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 28px rgba(0,0,0,.28);
+    }
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--page);color:var(--ink-1);
+    font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased}
+
+  /* --- barre supérieure --- */
+  .top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;
+    background:var(--surface-1);border-bottom:1px solid var(--grid);padding:0 16px;min-height:58px}
+  .brand{font-family:var(--serif);font-weight:400;font-size:1.12rem;letter-spacing:.1em;white-space:nowrap}
+  nav.tabs{display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto}
+  .tab{display:flex;align-items:center;gap:7px;border:none;background:none;box-shadow:none;
+    padding:9px 14px;border-radius:999px;font:inherit;font-weight:600;color:var(--ink-2);
+    cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+  .tab:hover{background:var(--zebra);color:var(--ink-1)}
+  .tab.active{background:var(--accent-soft);color:var(--accent);font-weight:700}
+  .tab .ico{font-size:1.05rem;line-height:1}
+
+  /* --- structure --- */
+  .wrap{max-width:900px;margin:0 auto;padding:18px 18px 60px}
+  .panel{display:none}
+  .panel.active{display:block;animation:apparait .18s ease}
+  @keyframes apparait{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){.panel.active{animation:none}}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:18px;
+    padding:22px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 16px;
+    font-family:var(--serif);font-weight:400;font-size:1rem;letter-spacing:.13em;text-transform:uppercase}
+  .card h2::after{content:"";flex:1;height:1px;background:var(--grid);min-width:24px}
+  .hint{font-size:.85rem;color:var(--ink-2);margin:0 0 14px;max-width:80ch}
+  .footnote{font-size:.8rem;color:var(--ink-3)}
+
+  /* --- formulaires --- */
+  .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:.7rem;color:var(--ink-3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+  select,textarea,input[type=text],input[type=date],input[type=month],input[type=time],input[type=number]{
+    background:var(--surface-1);color:var(--ink-1);border:1.5px solid var(--grid);
+    border-radius:12px;padding:10px 12px;font:inherit;min-height:44px;
+    transition:border-color .15s, box-shadow .15s}
+  select:focus,textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  textarea{width:100%;min-height:80px;resize:vertical;line-height:1.6}
+  button{border:1.5px solid var(--grid);background:var(--surface-1);color:var(--ink-1);
+    border-radius:999px;padding:10px 18px;min-height:44px;font:inherit;font-weight:700;cursor:pointer;
+    transition:transform .12s, box-shadow .12s, border-color .12s, color .12s, filter .12s}
+  button:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px);
+    box-shadow:0 5px 14px rgba(37,105,168,.18)}
+  button:active{transform:translateY(0)}
+  button:focus-visible{outline:none;box-shadow:0 0 0 3px var(--accent-soft);border-color:var(--accent)}
+  button.primary{background:var(--grad);border:none;color:#fff;padding:12px 22px;
+    box-shadow:0 4px 14px rgba(37,105,168,.32)}
+  button.primary:hover{color:#fff;filter:brightness(1.07)}
+  button.small{padding:8px 14px;min-height:38px;font-size:.84rem}
+  button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 9px;min-height:0;font-size:1.05rem;box-shadow:none}
+  button.ghost:hover{color:var(--bad);background:var(--bad-bg);transform:none;box-shadow:none}
+  .recipe-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;align-items:center}
+
+  /* --- bandeau « feuille prête » --- */
+  .banner{border:1.5px solid var(--accent);background:var(--accent-soft)}
+  .banner p{margin:0 0 12px;font-weight:600;color:var(--accent)}
+
+  /* --- lignes de relevé --- */
+  .eqrow{padding:15px 0;border-bottom:1px solid var(--grid)}
+  .eqrow:last-child{border-bottom:none}
+  .eqhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .eqhead strong{font-size:1.02rem}
+  .eqhead .consigne{font-size:.8rem;color:var(--ink-3)}
+  .mesures{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;align-items:flex-start}
+  .mesure{display:flex;flex-direction:column;gap:5px}
+  .mesure .lab{font-size:.7rem;color:var(--ink-3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+  .twrap{display:flex;align-items:center;gap:7px}
+  .twrap .unite{color:var(--ink-3);font-weight:600}
+  input.temp{width:106px;text-align:center;font-weight:800;font-size:1.05rem}
+  input.temp.ok{border-color:var(--good)}
+  input.temp.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+  .heure{font-size:.74rem;color:var(--ink-3);min-height:1.1em}
+  .minmax{font-size:.78rem;color:var(--ink-3);margin-top:7px}
+  .minmax .nc{color:var(--bad);font-weight:700}
+  .actionbox{margin-top:10px}
+  .actionbox label{display:block;font-size:.78rem;font-weight:700;color:var(--bad);margin-bottom:5px}
+
+  /* --- listes (équipements, historique, import) --- */
+  .itemrow{display:flex;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--grid);flex-wrap:wrap}
+  .itemrow:last-child{border-bottom:none}
+  .itemrow .grow{flex:1;min-width:160px}
+  .itemrow .rowhint{font-size:.8rem;color:var(--ink-3)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chip{background:var(--accent-soft);color:var(--accent);border-radius:999px;
+    padding:3px 10px;font-size:.78rem;font-weight:600}
+  .chip.gris{background:var(--zebra);color:var(--ink-2)}
+  .chip.rouge{background:var(--bad-bg);color:var(--bad)}
+  details.more{margin-top:14px;font-size:.85rem;color:var(--ink-2)}
+  details.more summary{cursor:pointer;font-weight:600;color:var(--ink-2)}
+
+  /* --- toast --- */
+  #toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink-1);color:var(--page);padding:10px 20px;border-radius:999px;
+    font-weight:600;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:90}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* --- téléphone : onglets en bas --- */
+  @media(max-width:720px){
+    .top{min-height:52px}
+    nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface-1);
+      border-top:1px solid var(--grid);padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+      justify-content:space-around}
+    .tab{flex-direction:column;gap:2px;padding:6px 10px;font-size:.68rem}
+    .tab .ico{font-size:1.3rem}
+    .wrap{padding:14px 14px 110px}
+    .card{padding:16px;border-radius:16px}
+  }
+
+  /* --- impression : seule la feuille de relevés sort --- */
+  #printArea{display:none}
+  @media print{
+    body{background:#fff}
+    .top,.wrap,#toast{display:none !important}
+    #printArea{display:block;color:#000;font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+    #printArea h1{font-size:19px;margin:0 0 2px}
+    #printArea .sub{color:#333;margin:0 0 14px;font-size:11px}
+    #printArea h2{font-size:13px;margin:16px 0 6px;border-bottom:1.5px solid #000;padding-bottom:3px}
+    #printArea table{width:100%;border-collapse:collapse;margin-bottom:8px}
+    #printArea th,#printArea td{border:1px solid #999;padding:4px 6px;font-size:11px;text-align:left;vertical-align:top}
+    #printArea th{background:#eee}
+    #printArea td.num{text-align:center;white-space:nowrap}
+    #printArea .nc{font-weight:800}
+    #printArea .small{font-size:9px;color:#444}
+    #printArea .signature{margin-top:24px;display:flex;justify-content:space-between;font-size:11px}
+    #printArea .signature span{border-top:1px solid #000;padding-top:4px;min-width:180px}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">🌡 TEMPÉRATURES</div>
+  <nav class="tabs">
+    <button class="tab" data-tab="releves" type="button"><span class="ico">📝</span><span class="lbl">Relevés</span></button>
+    <button class="tab" data-tab="equipements" type="button"><span class="ico">❄️</span><span class="lbl">Équipements</span></button>
+    <button class="tab" data-tab="historique" type="button"><span class="ico">📅</span><span class="lbl">Historique</span></button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <!-- ==================== Onglet RELEVÉS ==================== -->
+  <section class="panel" data-panel="releves">
+
+    <section class="card banner" id="bannerCard" hidden>
+      <p id="bannerTexte"></p>
+      <div class="recipe-actions" style="margin-top:0">
+        <button class="primary" id="btnBannerPdf" type="button">📄 Enregistrer la feuille en PDF</button>
+        <button class="small" id="btnBannerIgnorer" type="button">Ignorer</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>📝 Relevés du jour</h2>
+      <p class="hint">Deux relevés par équipement et par jour, matin et soir — la conformité s'affiche
+         immédiatement. Saisissez à la main <strong>ou importez les fichiers de l'appli INKBIRD</strong>
+         ci-dessous : tout se remplit tout seul. Si une température sort de la consigne, notez
+         l'action corrective : elle apparaîtra sur la feuille.</p>
+      <div class="toolbar" style="margin-bottom:6px">
+        <div class="field"><label for="jourReleve">Journée</label><input type="date" id="jourReleve"></div>
+        <button class="primary" id="btnPdfJour" type="button" title="Imprimer / enregistrer en PDF la feuille du jour">📄 Feuille du jour (PDF)</button>
+      </div>
+      <div id="relevesList"></div>
+      <p class="footnote" id="relevesVide" hidden style="margin-bottom:0">Aucun équipement : ajoutez vos frigos et
+         congélateurs dans l'onglet ❄️ Équipements.</p>
+    </section>
+
+    <section class="card">
+      <h2>📥 Import depuis l'appli INKBIRD</h2>
+      <p class="hint">Dans l'appli INKBIRD : ouvrez une sonde, touchez la courbe 📈 puis
+         <strong>Exporter</strong> (fichier CSV), et enregistrez ou partagez le fichier vers cet appareil.
+         Choisissez ensuite les fichiers ici : les relevés du matin et du soir, le mini et le maxi de chaque
+         journée sont remplis automatiquement pour chaque équipement.</p>
+      <button class="primary" id="btnFichiers" type="button">📄 Choisir les fichiers exportés</button>
+      <input type="file" id="csvInput" accept=".csv,.txt,text/csv,text/plain" multiple hidden>
+      <div id="importMap" hidden style="margin-top:14px"></div>
+      <div class="recipe-actions" id="importActions" hidden>
+        <button class="primary" id="btnIntegrer" type="button">✅ Intégrer les relevés</button>
+        <button class="small" id="btnImportAnnuler" type="button">Annuler</button>
+      </div>
+      <p class="footnote" id="importInfo" style="margin:10px 0 0"></p>
+      <details class="more"><summary>Comment sont choisis les relevés ?</summary>
+        Pour chaque journée du fichier : le relevé du <strong>matin</strong> est la mesure la plus proche de
+        l'heure du matin (réglable dans l'onglet ❄️, 9h00 par défaut), celui du <strong>soir</strong> la plus
+        proche de l'heure du soir (17h00 par défaut). Le mini et le maxi des 24 h sont aussi conservés.
+        Les valeurs aberrantes envoyées par une sonde déconnectée (125 °C…) sont ignorées.
+      </details>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet ÉQUIPEMENTS ==================== -->
+  <section class="panel" data-panel="equipements">
+    <section class="card">
+      <h2>❄️ Mes équipements</h2>
+      <p class="hint">Vos frigos, chambres froides et congélateurs, avec leur consigne de température.
+         La conformité des relevés est vérifiée par rapport à ces consignes.</p>
+      <div id="equipList"></div>
+      <p class="footnote" id="equipVide" hidden style="margin-bottom:0">Aucun équipement pour l'instant.</p>
+      <div class="recipe-actions">
+        <button class="primary" id="btnEquipAjouter" type="button">➕ Ajouter un équipement</button>
+      </div>
+    </section>
+
+    <section class="card" id="equipForm" hidden>
+      <h2 id="equipFormTitre">➕ Nouvel équipement</h2>
+      <div class="toolbar">
+        <div class="field" style="flex:1;min-width:200px">
+          <label for="eqNom">Nom</label>
+          <input type="text" id="eqNom" placeholder="ex. chambre froide, surgélateur…" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="eqType">Type</label>
+          <select id="eqType">
+            <option value="frigo">❄️ Frigo / chambre froide (0 à +4 °C)</option>
+            <option value="congel">🧊 Congélateur (−35 à −18 °C)</option>
+            <option value="chaud">♨️ Maintien au chaud (+63 °C mini)</option>
+            <option value="autre">🌡 Autre (consigne libre)</option>
+          </select>
+        </div>
+      </div>
+      <div class="toolbar" style="margin-top:12px">
+        <div class="field"><label for="eqMin">Consigne mini (°C)</label><input type="number" id="eqMin" step="0.5" style="width:130px"></div>
+        <div class="field"><label for="eqMax">Consigne maxi (°C)</label><input type="number" id="eqMax" step="0.5" style="width:130px"></div>
+      </div>
+      <div class="recipe-actions">
+        <button class="primary" id="btnEquipSave" type="button">💾 Enregistrer</button>
+        <button id="btnEquipCancel" type="button">Annuler</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>⚙️ Réglages</h2>
+      <p class="hint">Heures de référence utilisées lors de l'import INKBIRD pour choisir le relevé
+         du matin et celui du soir.</p>
+      <div class="toolbar">
+        <div class="field"><label for="hMatin">Relevé du matin</label><input type="time" id="hMatin"></div>
+        <div class="field"><label for="hSoir">Relevé du soir</label><input type="time" id="hSoir"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>☁️ Sauvegarde</h2>
+      <p class="hint">Tout est enregistré sur cet appareil. Pour protéger ou transférer vos données
+         (équipements, relevés) :</p>
+      <div class="recipe-actions" style="margin-top:0">
+        <button class="small" id="btnExport" type="button">⬇ Sauvegarder (fichier)</button>
+        <button class="small" id="btnImport" type="button">⬆ Restaurer un fichier</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet HISTORIQUE ==================== -->
+  <section class="panel" data-panel="historique">
+    <section class="card">
+      <h2>📅 Historique des journées</h2>
+      <p class="hint">Chaque journée regroupe les relevés de tous les équipements. La feuille du jour
+         s'imprime ou s'enregistre en PDF — à archiver pour vos contrôles (plan de maîtrise sanitaire).</p>
+      <div id="histoList"></div>
+      <p class="footnote" id="histoVide" style="margin-bottom:0">Aucune journée enregistrée pour l'instant.</p>
+    </section>
+
+    <section class="card">
+      <h2>🗓 Feuille mensuelle</h2>
+      <p class="hint">Toutes les journées du mois sur une seule feuille — pratique pour l'archivage
+         et les contrôles.</p>
+      <div class="toolbar">
+        <div class="field"><label for="moisFeuille">Mois</label><input type="month" id="moisFeuille"></div>
+        <button class="primary" id="btnPdfMois" type="button">📄 Feuille du mois (PDF)</button>
+      </div>
+    </section>
+  </section>
+
+</main>
+
+<div id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+'use strict';
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const uid = p => (p||'x') + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const aujourdhui = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const heureNow = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+const dateFr = iso => { try{ return new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }catch(e){ return iso; } };
+const fmtT = t => (t>0?'+':'') + String(Math.round(t*10)/10).replace('.',',');
+
+function toast(msg){
+  const t = el('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* =====================================================================
+   DONNÉES (localStorage)
+   - equipements : [{id, nom, type, cMin, cMax}]
+   - releves     : { 'AAAA-MM-JJ': { eqId: { nom, cMin, cMax,
+                       matin:{t,heure}, soir:{t,heure}, tMin, tMax, action } } }
+   - pdfFaits    : { 'AAAA-MM-JJ': true } — feuilles déjà enregistrées en PDF
+   - reglages    : { hMatin, hSoir }
+===================================================================== */
+const TYPES = {
+  frigo:{cMin:0,  cMax:4,   ico:'❄️'},
+  congel:{cMin:-35, cMax:-18, ico:'🧊'},
+  chaud:{cMin:63, cMax:95,  ico:'♨️'},
+  autre:{cMin:0,  cMax:10,  ico:'🌡'}
+};
+let equipements = null, releves = {}, pdfFaits = {}, reglages = {hMatin:'09:00', hSoir:'17:00'};
+try{ equipements = JSON.parse(localStorage.getItem('tp_equipements')); }catch(e){}
+try{ releves = JSON.parse(localStorage.getItem('tp_releves')) || {}; }catch(e){}
+try{ pdfFaits = JSON.parse(localStorage.getItem('tp_pdfs')) || {}; }catch(e){}
+try{ Object.assign(reglages, JSON.parse(localStorage.getItem('tp_reglages')) || {}); }catch(e){}
+
+/* premiers pas : les quatre sondes INKBIRD du laboratoire */
+if(!Array.isArray(equipements)){
+  equipements = [
+    {id:uid('e'), nom:'chambre froide',   type:'frigo',  cMin:0,   cMax:4},
+    {id:uid('e'), nom:'chambre négative', type:'congel', cMin:-35, cMax:-18},
+    {id:uid('e'), nom:'surgélateur',      type:'congel', cMin:-35, cMax:-18},
+    {id:uid('e'), nom:'congel gâteau',    type:'congel', cMin:-35, cMax:-18}
+  ];
+}
+
+function save(){
+  try{
+    localStorage.setItem('tp_equipements', JSON.stringify(equipements));
+    localStorage.setItem('tp_releves', JSON.stringify(releves));
+    localStorage.setItem('tp_pdfs', JSON.stringify(pdfFaits));
+    localStorage.setItem('tp_reglages', JSON.stringify(reglages));
+  }catch(e){ toast('⚠ Mémoire pleine : faites une sauvegarde puis supprimez de vieilles journées.'); }
+}
+
+const jour = d => releves[d] = releves[d] || {};
+function mesure(d, eq){
+  const j = jour(d);
+  const m = j[eq.id] = j[eq.id] || {};
+  /* mémorise le nom et la consigne du moment : la feuille reste juste
+     même si l'équipement est renommé ou sa consigne modifiée plus tard */
+  m.nom = eq.nom; m.cMin = eq.cMin; m.cMax = eq.cMax;
+  return m;
+}
+function nettoie(d){
+  const j = releves[d]; if(!j) return;
+  for(const id of Object.keys(j)){
+    const m = j[id];
+    if(m.matin==null && m.soir==null && m.tMin==null && !(m.action||'').trim()) delete j[id];
+  }
+  if(!Object.keys(j).length) delete releves[d];
+}
+const conforme = (t, m) => t >= m.cMin && t <= m.cMax;
+function jourNonConformes(d){
+  const j = releves[d] || {}; let n = 0;
+  for(const id of Object.keys(j)){
+    const m = j[id];
+    for(const k of ['matin','soir']) if(m[k] && !conforme(m[k].t, m)) n++;
+  }
+  return n;
+}
+function jourNbReleves(d){
+  const j = releves[d] || {}; let n = 0;
+  for(const id of Object.keys(j)){ if(j[id].matin) n++; if(j[id].soir) n++; }
+  return n;
+}
+
+/* =====================================================================
+   ONGLET RELEVÉS — saisie du jour
+===================================================================== */
+function renderReleves(){
+  const d = el('jourReleve').value || aujourdhui();
+  const box = el('relevesList'); box.innerHTML = '';
+  el('relevesVide').hidden = equipements.length > 0;
+  const j = releves[d] || {};
+  for(const eq of equipements){
+    const m = j[eq.id] || {};
+    const row = document.createElement('div'); row.className = 'eqrow';
+    const ico = (TYPES[eq.type]||TYPES.autre).ico;
+    row.innerHTML = `<div class="eqhead"><strong>${ico} ${esc(eq.nom)}</strong>
+        <span class="consigne">consigne ${fmtT(eq.cMin)} à ${fmtT(eq.cMax)} °C</span></div>
+      <div class="mesures">
+        <div class="mesure"><span class="lab">Matin</span>
+          <div class="twrap"><input class="temp" type="number" step="0.1" inputmode="decimal" data-quand="matin" placeholder="—"><span class="unite">°C</span></div>
+          <span class="heure" data-h="matin"></span></div>
+        <div class="mesure"><span class="lab">Soir</span>
+          <div class="twrap"><input class="temp" type="number" step="0.1" inputmode="decimal" data-quand="soir" placeholder="—"><span class="unite">°C</span></div>
+          <span class="heure" data-h="soir"></span></div>
+      </div>
+      <div class="minmax" hidden></div>
+      <div class="actionbox" hidden>
+        <label>⚠ Température hors consigne — action corrective (obligatoire)</label>
+        <textarea placeholder="ex. porte mal fermée, produits déplacés, dépannage appelé…"></textarea>
+      </div>`;
+
+    const inputs = row.querySelectorAll('input.temp');
+    const actBox = row.querySelector('.actionbox');
+    const actTxt = row.querySelector('textarea');
+    const mmBox = row.querySelector('.minmax');
+
+    const colore = () => {
+      let horsConsigne = false;
+      inputs.forEach(inp => {
+        inp.classList.remove('ok','bad');
+        if(inp.value === '') return;
+        const t = parseFloat(inp.value);
+        if(isNaN(t)) return;
+        const ok = t >= eq.cMin && t <= eq.cMax;
+        inp.classList.add(ok ? 'ok' : 'bad');
+        if(!ok) horsConsigne = true;
+      });
+      actBox.hidden = !horsConsigne && !(actTxt.value||'').trim();
+    };
+
+    inputs.forEach(inp => {
+      const quand = inp.dataset.quand;
+      const hSpan = row.querySelector(`.heure[data-h=${quand}]`);
+      if(m[quand]){ inp.value = m[quand].t; hSpan.textContent = 'à ' + m[quand].heure; }
+      inp.addEventListener('input', colore);
+      inp.addEventListener('change', () => {
+        const mm = mesure(d, eq);
+        if(inp.value === '' || isNaN(parseFloat(inp.value))){
+          delete mm[quand]; hSpan.textContent = '';
+        }else{
+          mm[quand] = {t: Math.round(parseFloat(inp.value)*10)/10, heure: heureNow()};
+          hSpan.textContent = 'à ' + mm[quand].heure;
+        }
+        nettoie(d); save(); majBanner();
+      });
+    });
+
+    if(m.tMin != null && m.tMax != null){
+      mmBox.hidden = false;
+      const bad = v => (v < eq.cMin || v > eq.cMax) ? ' class="nc"' : '';
+      mmBox.innerHTML = `Sur 24 h (INKBIRD) : mini <span${bad(m.tMin)}>${fmtT(m.tMin)} °C</span>
+        · maxi <span${bad(m.tMax)}>${fmtT(m.tMax)} °C</span>`;
+    }
+
+    if(m.action){ actTxt.value = m.action; }
+    actTxt.addEventListener('change', () => {
+      const mm = mesure(d, eq);
+      mm.action = actTxt.value.trim();
+      nettoie(d); save();
+    });
+    colore();
+    box.appendChild(row);
+  }
+}
+
+/* =====================================================================
+   FEUILLE DU JOUR (impression / PDF)
+===================================================================== */
+function feuilleJourHTML(d){
+  const j = releves[d] || {};
+  /* équipements actuels d'abord (dans l'ordre), puis les anciens supprimés */
+  const ids = equipements.map(e=>e.id).filter(id=>j[id])
+    .concat(Object.keys(j).filter(id=>!equipements.some(e=>e.id===id)));
+  const cell = (m, k) => m[k] ? `<td class="num${conforme(m[k].t,m)?'':' nc'}">${conforme(m[k].t,m)?'':'⚠ '}${fmtT(m[k].t)} °C<br><span class="small">à ${m[k].heure}</span></td>` : '<td class="num">—</td>';
+  let rows = '';
+  for(const id of ids){
+    const m = j[id];
+    const ncs = ['matin','soir'].filter(k=>m[k] && !conforme(m[k].t,m));
+    const mm = (m.tMin!=null && m.tMax!=null) ? `${fmtT(m.tMin)} / ${fmtT(m.tMax)} °C` : '—';
+    rows += `<tr><td>${esc(m.nom||'(équipement supprimé)')}</td>
+      <td class="num">${fmtT(m.cMin)} à ${fmtT(m.cMax)} °C</td>
+      ${cell(m,'matin')}${cell(m,'soir')}
+      <td class="num">${mm}</td>
+      <td class="num">${ncs.length ? '<span class="nc">✘ NON CONFORME</span>' : '✔ conforme'}</td>
+      <td>${esc(m.action||'')}</td></tr>`;
+  }
+  return `<h1>Relevé des températures</h1>
+    <p class="sub"><span style="text-transform:capitalize">${esc(dateFr(d))}</span> — document à archiver
+    (plan de maîtrise sanitaire). Relevés issus des sondes INKBIRD ou saisis sur place ;
+    mini / maxi mesurés sur 24 h lorsque la sonde enregistre en continu.</p>
+    <table><tr><th>Équipement</th><th>Consigne</th><th>Matin</th><th>Soir</th>
+    <th>Mini / maxi 24 h</th><th>Conformité</th><th>Action corrective</th></tr>${rows}</table>
+    <div class="signature"><span>Relevé par : </span><span>Signature : </span></div>`;
+}
+function imprimerJour(d){
+  if(!releves[d] || !Object.keys(releves[d]).length){ toast('Aucun relevé pour cette journée.'); return; }
+  el('printArea').innerHTML = feuilleJourHTML(d);
+  pdfFaits[d] = true; save(); majBanner(); renderHisto();
+  try{ window.print(); }
+  catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez l\'application dans Safari ou Chrome.'); }
+}
+
+/* =====================================================================
+   FEUILLE MENSUELLE
+===================================================================== */
+function imprimerMois(mois){ /* mois = 'AAAA-MM' */
+  const [an, mo] = mois.split('-').map(Number);
+  const nbJours = new Date(an, mo, 0).getDate();
+  const jours = [];
+  for(let i=1;i<=nbJours;i++) jours.push(mois + '-' + String(i).padStart(2,'0'));
+  if(!jours.some(d=>releves[d] && Object.keys(releves[d]).length)){
+    toast('Aucun relevé pour ce mois.'); return;
+  }
+  const nomMois = new Date(an, mo-1, 15).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  let head1 = '<tr><th rowspan="2">Jour</th>', head2 = '<tr>';
+  for(const eq of equipements){
+    head1 += `<th colspan="2">${esc(eq.nom)}<br><span class="small">${fmtT(eq.cMin)} à ${fmtT(eq.cMax)} °C</span></th>`;
+    head2 += '<th>Matin</th><th>Soir</th>';
+  }
+  head1 += '</tr>'; head2 += '</tr>';
+  let rows = '', actions = [];
+  for(const d of jours){
+    const j = releves[d] || {};
+    let tr = `<td class="num">${d.slice(8)}</td>`;
+    for(const eq of equipements){
+      const m = j[eq.id];
+      for(const k of ['matin','soir']){
+        if(m && m[k]){
+          const ok = conforme(m[k].t, m);
+          tr += `<td class="num${ok?'':' nc'}">${ok?'':'⚠ '}${fmtT(m[k].t)}</td>`;
+        }else tr += '<td class="num">—</td>';
+      }
+      if(m && (m.action||'').trim()) actions.push(`<strong>${d.slice(8)}/${String(mo).padStart(2,'0')} — ${esc(m.nom)} :</strong> ${esc(m.action)}`);
+    }
+    rows += `<tr>${tr}</tr>`;
+  }
+  let html = `<h1>Relevé mensuel des températures</h1>
+    <p class="sub"><span style="text-transform:capitalize">${esc(nomMois)}</span> — températures en °C,
+    document à archiver (plan de maîtrise sanitaire). ⚠ = hors consigne.</p>
+    <table>${head1}${head2}${rows}</table>`;
+  if(actions.length) html += `<h2>Actions correctives du mois</h2><p class="sub">${actions.join('<br>')}</p>`;
+  html += `<div class="signature"><span>Responsable : </span><span>Signature : </span></div>`;
+  el('printArea').innerHTML = html;
+  try{ window.print(); }
+  catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez l\'application dans Safari ou Chrome.'); }
+}
+
+/* =====================================================================
+   BANDEAU « la feuille d'hier est prête »
+   → à chaque ouverture, l'appli propose d'elle-même le PDF des journées
+     passées qui ont des relevés mais pas encore de feuille enregistrée
+===================================================================== */
+function joursEnAttente(){
+  return Object.keys(releves)
+    .filter(d => d < aujourdhui() && jourNbReleves(d) > 0 && !pdfFaits[d])
+    .sort();
+}
+function majBanner(){
+  const attente = joursEnAttente();
+  el('bannerCard').hidden = !attente.length;
+  if(!attente.length) return;
+  const d = attente[attente.length-1];
+  el('bannerCard').dataset.jour = d;
+  el('bannerTexte').textContent = '📄 La feuille du ' + dateFr(d) + ' est prête' +
+    (attente.length > 1 ? ' (' + (attente.length-1) + ' autre' + (attente.length>2?'s':'') + ' journée' + (attente.length>2?'s':'') + ' en attente dans l\'historique)' : '') + '.';
+}
+
+/* =====================================================================
+   IMPORT DES FICHIERS INKBIRD (CSV)
+===================================================================== */
+let importLots = [];   /* [{fichier, releves:[{date,heure,minutes,t}], eqId}] */
+
+function parseDateHeure(s){
+  s = String(s||'').trim();
+  let m = s.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})/);        /* 2026-07-19 08:00 */
+  if(m) return {date:`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`, h:+m[4], mn:+m[5]};
+  m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2})/);                 /* 19/07/2026 08:00 */
+  if(m) return {date:`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`, h:+m[4], mn:+m[5]};
+  return null;
+}
+function parseCSV(texte){
+  const lignes = texte.split(/\r?\n/).filter(l=>l.trim());
+  if(!lignes.length) return [];
+  const sep = [';','\t',','].map(s=>({s, n:(lignes[0].split(s).length)})).sort((a,b)=>b.n-a.n)[0].s;
+  /* colonne de température : d'après l'en-tête, sinon première colonne numérique
+     qui n'est pas la date */
+  let tCol = -1, entete = lignes[0].split(sep);
+  entete.forEach((c,i)=>{ if(tCol<0 && /temp|℃|°\s*C/i.test(c) && !/humi/i.test(c)) tCol = i; });
+  const out = [];
+  for(const l of lignes){
+    const cols = l.split(sep).map(c=>c.replace(/^"|"$/g,'').trim());
+    const dh = parseDateHeure(cols[0]) || parseDateHeure(cols.join(' '));
+    if(!dh) continue;                                   /* en-tête ou ligne illisible */
+    let t = NaN;
+    if(tCol >= 0 && cols[tCol] !== undefined) t = parseFloat(cols[tCol].replace(',','.'));
+    if(isNaN(t)){
+      for(let i=1;i<cols.length;i++){
+        const v = parseFloat(cols[i].replace(',','.'));
+        if(!isNaN(v)){ t = v; break; }
+      }
+    }
+    if(isNaN(t)) continue;
+    if(t >= 120 || t <= -45) continue;                  /* sonde déconnectée (125 °C…) */
+    out.push({date:dh.date, h:dh.h, mn:dh.mn, t:Math.round(t*10)/10});
+  }
+  return out;
+}
+async function choisirFichiers(files){
+  importLots = [];
+  const box = el('importMap'); box.innerHTML = '';
+  for(const f of files){
+    let lignes = [];
+    try{ lignes = parseCSV(await f.text()); }catch(e){}
+    const lot = {fichier:f.name, releves:lignes, eqId:''};
+    /* pré-choix de l'équipement dont le nom apparaît dans le nom du fichier */
+    const nf = f.name.toLowerCase();
+    const eq = equipements.find(e => nf.includes(e.nom.toLowerCase()));
+    if(eq) lot.eqId = eq.id;
+    importLots.push(lot);
+
+    const row = document.createElement('div'); row.className = 'itemrow';
+    const sel = document.createElement('select');
+    sel.innerHTML = '<option value="">— quel équipement ? —</option>' +
+      equipements.map(e=>`<option value="${e.id}"${e.id===lot.eqId?' selected':''}>${esc(e.nom)}</option>`).join('');
+    sel.addEventListener('change', ()=>{ lot.eqId = sel.value; });
+    row.innerHTML = `<div class="grow"><strong>${esc(f.name)}</strong>
+      <div class="rowhint">${lignes.length ? lignes.length + ' mesures lisibles' : '⚠ aucune mesure lisible dans ce fichier'}</div></div>`;
+    row.appendChild(sel);
+    box.appendChild(row);
+  }
+  box.hidden = false; el('importActions').hidden = false; el('importInfo').textContent = '';
+}
+function heureEnMinutes(hhmm){ const p = String(hhmm||'').split(':'); return (+p[0]||0)*60 + (+p[1]||0); }
+function integrerImport(){
+  const cibleMatin = heureEnMinutes(reglages.hMatin), cibleSoir = heureEnMinutes(reglages.hSoir);
+  let nbJ = new Set(), nbR = 0, sansEq = 0;
+  for(const lot of importLots){
+    if(!lot.releves.length) continue;
+    const eq = equipements.find(e=>e.id===lot.eqId);
+    if(!eq){ sansEq++; continue; }
+    const parJour = {};
+    for(const r of lot.releves) (parJour[r.date] = parJour[r.date] || []).push(r);
+    for(const d of Object.keys(parJour)){
+      const mesures = parJour[d].sort((a,b)=>(a.h*60+a.mn)-(b.h*60+b.mn));
+      const m = mesure(d, eq);
+      m.tMin = Math.min(...mesures.map(r=>r.t));
+      m.tMax = Math.max(...mesures.map(r=>r.t));
+      const matin = mesures.filter(r=>r.h < 13), soir = mesures.filter(r=>r.h >= 13);
+      const plusProche = (arr, cible) => arr.reduce((a,b)=>
+        Math.abs(b.h*60+b.mn-cible) < Math.abs(a.h*60+a.mn-cible) ? b : a);
+      if(matin.length){
+        const r = plusProche(matin, cibleMatin);
+        m.matin = {t:r.t, heure:String(r.h).padStart(2,'0')+':'+String(r.mn).padStart(2,'0')};
+        nbR++;
+      }
+      if(soir.length){
+        const r = plusProche(soir, cibleSoir);
+        m.soir = {t:r.t, heure:String(r.h).padStart(2,'0')+':'+String(r.mn).padStart(2,'0')};
+        nbR++;
+      }
+      nbJ.add(d);
+    }
+  }
+  save(); annulerImport(); renderReleves(); renderHisto(); majBanner();
+  if(nbR){
+    toast('✅ ' + nbR + ' relevés intégrés sur ' + nbJ.size + ' journée' + (nbJ.size>1?'s':''));
+    el('importInfo').textContent = sansEq ? '⚠ ' + sansEq + ' fichier(s) ignoré(s) : équipement non choisi.' : '';
+  }else{
+    el('importInfo').textContent = '⚠ Rien à intégrer : vérifiez les fichiers et le choix des équipements.';
+  }
+}
+function annulerImport(){
+  importLots = [];
+  el('importMap').hidden = true; el('importMap').innerHTML = '';
+  el('importActions').hidden = true;
+  el('csvInput').value = '';
+}
+
+/* =====================================================================
+   ONGLET ÉQUIPEMENTS
+===================================================================== */
+let editEqId = null;
+function renderEquip(){
+  const box = el('equipList'); box.innerHTML = '';
+  el('equipVide').hidden = equipements.length > 0;
+  for(const eq of equipements){
+    const row = document.createElement('div'); row.className = 'itemrow';
+    const ico = (TYPES[eq.type]||TYPES.autre).ico;
+    row.innerHTML = `<div class="grow"><strong>${ico} ${esc(eq.nom)}</strong>
+      <div class="rowhint">consigne ${fmtT(eq.cMin)} à ${fmtT(eq.cMax)} °C</div></div>`;
+    const bEdit = document.createElement('button'); bEdit.className = 'small'; bEdit.type = 'button';
+    bEdit.textContent = '✏️ Modifier';
+    bEdit.addEventListener('click', ()=>{
+      editEqId = eq.id;
+      el('equipFormTitre').textContent = '✏️ Modifier l\'équipement';
+      el('eqNom').value = eq.nom; el('eqType').value = eq.type;
+      el('eqMin').value = eq.cMin; el('eqMax').value = eq.cMax;
+      el('equipForm').hidden = false; el('eqNom').focus();
+    });
+    row.appendChild(bEdit);
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
+    bDel.title = 'Supprimer cet équipement'; bDel.textContent = '✕';
+    bDel.addEventListener('click', ()=>{
+      if(!confirm('Supprimer « ' + eq.nom + ' » ? Les relevés déjà enregistrés restent dans l\'historique.')) return;
+      equipements = equipements.filter(e=>e.id!==eq.id);
+      save(); renderEquip(); renderReleves();
+    });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+}
+function equipSave(){
+  const nom = el('eqNom').value.trim();
+  if(!nom){ toast('Donnez un nom à l\'équipement.'); el('eqNom').focus(); return; }
+  const cMin = parseFloat(el('eqMin').value), cMax = parseFloat(el('eqMax').value);
+  if(isNaN(cMin) || isNaN(cMax) || cMin >= cMax){ toast('Vérifiez la consigne : mini < maxi.'); return; }
+  const data = {nom, type:el('eqType').value, cMin, cMax};
+  if(editEqId){
+    const eq = equipements.find(e=>e.id===editEqId);
+    if(eq) Object.assign(eq, data);
+  }else{
+    equipements.push(Object.assign({id:uid('e')}, data));
+  }
+  editEqId = null; el('equipForm').hidden = true;
+  save(); renderEquip(); renderReleves();
+  toast('💾 Équipement enregistré');
+}
+
+/* =====================================================================
+   ONGLET HISTORIQUE
+===================================================================== */
+function renderHisto(){
+  const box = el('histoList'); box.innerHTML = '';
+  const jours = Object.keys(releves).filter(d=>Object.keys(releves[d]).length).sort().reverse();
+  el('histoVide').hidden = jours.length > 0;
+  for(const d of jours){
+    const row = document.createElement('div'); row.className = 'itemrow';
+    const nb = jourNbReleves(d), nc = jourNonConformes(d);
+    const chips = `<span class="chip">${nb} relevé${nb>1?'s':''}</span>` +
+      (nc ? `<span class="chip rouge">⚠ ${nc} hors consigne</span>` : '') +
+      (pdfFaits[d] ? '<span class="chip gris">📄 feuille faite</span>' : '');
+    row.innerHTML = `<div class="grow"><strong style="text-transform:capitalize">${esc(dateFr(d))}</strong>
+      <div class="chips">${chips}</div></div>`;
+    const bPrint = document.createElement('button'); bPrint.className = 'small'; bPrint.type = 'button';
+    bPrint.textContent = '🖨 Feuille';
+    bPrint.title = 'Imprimer / enregistrer en PDF la feuille de relevés';
+    bPrint.addEventListener('click', ()=>imprimerJour(d));
+    row.appendChild(bPrint);
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
+    bDel.title = 'Supprimer cette journée'; bDel.textContent = '✕';
+    bDel.addEventListener('click', ()=>{
+      if(!confirm('Supprimer les relevés du ' + dateFr(d) + ' ?')) return;
+      delete releves[d]; delete pdfFaits[d];
+      save(); renderHisto(); renderReleves(); majBanner();
+    });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+}
+
+/* =====================================================================
+   SAUVEGARDE / RESTAURATION (fichier JSON)
+===================================================================== */
+function exporter(){
+  const blob = new Blob([JSON.stringify({app:'temperatures', version:1, equipements, releves, pdfFaits, reglages})],
+    {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'temperatures-' + aujourdhui() + '.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('⬇ Sauvegarde téléchargée');
+}
+async function importer(file){
+  try{
+    const data = JSON.parse(await file.text());
+    if(data.app !== 'temperatures') throw new Error('mauvais fichier');
+    if(!confirm('Restaurer ce fichier ? Les données actuelles de l\'appareil seront remplacées.')) return;
+    equipements = data.equipements || [];
+    releves = data.releves || {};
+    pdfFaits = data.pdfFaits || {};
+    Object.assign(reglages, data.reglages || {});
+    save(); renderTout();
+    toast('⬆ Données restaurées');
+  }catch(e){ alert('Fichier illisible : choisissez une sauvegarde créée par cette application (.json).'); }
+}
+
+/* =====================================================================
+   ONGLETS & DÉMARRAGE
+===================================================================== */
+function activerOnglet(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===id));
+  try{ localStorage.setItem('tp_tab', id); }catch(e){}
+}
+function renderTout(){
+  renderReleves(); renderEquip(); renderHisto(); majBanner();
+  el('hMatin').value = reglages.hMatin; el('hSoir').value = reglages.hSoir;
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  el('jourReleve').value = aujourdhui();
+  el('moisFeuille').value = aujourdhui().slice(0,7);
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>activerOnglet(t.dataset.tab)));
+  let tab0 = 'releves';
+  try{ tab0 = localStorage.getItem('tp_tab') || 'releves'; }catch(e){}
+  activerOnglet(tab0);
+
+  el('jourReleve').addEventListener('change', renderReleves);
+  el('btnPdfJour').addEventListener('click', ()=>imprimerJour(el('jourReleve').value || aujourdhui()));
+  el('btnPdfMois').addEventListener('click', ()=>{
+    const m = el('moisFeuille').value;
+    if(m) imprimerMois(m);
+  });
+
+  el('btnBannerPdf').addEventListener('click', ()=>imprimerJour(el('bannerCard').dataset.jour));
+  el('btnBannerIgnorer').addEventListener('click', ()=>{
+    pdfFaits[el('bannerCard').dataset.jour] = true;
+    save(); majBanner(); renderHisto();
+  });
+
+  el('btnFichiers').addEventListener('click', ()=>el('csvInput').click());
+  el('csvInput').addEventListener('change', e=>{
+    if(e.target.files.length) choisirFichiers([...e.target.files]);
+  });
+  el('btnIntegrer').addEventListener('click', integrerImport);
+  el('btnImportAnnuler').addEventListener('click', annulerImport);
+
+  el('btnEquipAjouter').addEventListener('click', ()=>{
+    editEqId = null;
+    el('equipFormTitre').textContent = '➕ Nouvel équipement';
+    el('eqNom').value = '';
+    el('eqType').value = 'frigo';
+    el('eqMin').value = TYPES.frigo.cMin; el('eqMax').value = TYPES.frigo.cMax;
+    el('equipForm').hidden = false; el('eqNom').focus();
+  });
+  el('eqType').addEventListener('change', ()=>{
+    const t = TYPES[el('eqType').value] || TYPES.autre;
+    el('eqMin').value = t.cMin; el('eqMax').value = t.cMax;
+  });
+  el('btnEquipSave').addEventListener('click', equipSave);
+  el('btnEquipCancel').addEventListener('click', ()=>{ editEqId = null; el('equipForm').hidden = true; });
+
+  el('hMatin').addEventListener('change', ()=>{ reglages.hMatin = el('hMatin').value || '09:00'; save(); });
+  el('hSoir').addEventListener('change', ()=>{ reglages.hSoir = el('hSoir').value || '17:00'; save(); });
+
+  el('btnExport').addEventListener('click', exporter);
+  el('btnImport').addEventListener('click', ()=>el('importFile').click());
+  el('importFile').addEventListener('change', e=>{
+    if(e.target.files[0]) importer(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  save();          /* enregistre les équipements pré-remplis au premier lancement */
+  renderTout();
+
+  if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){
+    navigator.serviceWorker.register('temperatures-sw.js').catch(()=>{});
+  }
+});
+</script>
+</body>
+</html>

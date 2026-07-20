@@ -1237,17 +1237,28 @@ function renderHisto(){
 async function imprimerJour(d){
   await chargerPhotosJour(d);
   const j = jour(d);
-  const photoById = {}; for(const p of j.photos) photoById[p.id] = p;
+  /* système de renvois : chaque marchandise du matin reçoit un numéro M1, M2…
+     repris dans les productions, et chaque marchandise liste en retour les
+     productions dans lesquelles elle est partie */
+  const photoById = {}, numM = {};
+  j.photos.forEach((p, i)=>{ photoById[p.id] = p; numM[p.id] = 'M' + (i+1); });
+  const usages = {};   // id de marchandise -> noms des productions qui l'utilisent
+  for(const pr of j.productions)
+    for(const i of pr.ingredients)
+      if(i.photoId && photoById[i.photoId])
+        (usages[i.photoId] = usages[i.photoId] || []).includes(pr.nom) || usages[i.photoId].push(pr.nom);
+  const fdate = iso => iso ? new Date(iso+'T12:00:00').toLocaleDateString('fr-FR') : '—';
 
   let html = `<h1>Feuille de traçabilité</h1>
-    <p class="sub"><span style="text-transform:capitalize">${esc(dateFr(d))}</span> — document à archiver (photos des étiquettes en annexe)</p>`;
+    <p class="sub"><span style="text-transform:capitalize">${esc(dateFr(d))}</span> — document à archiver.
+    Chaque marchandise porte un n° (M1, M2…) repris dans les productions ; photos des étiquettes en annexe.</p>`;
 
   if(j.photos.length){
-    html += `<h2>Produits photographiés le matin</h2>
-      <table><tr><th>Produit</th><th>N° de lot</th><th>DLC / DDM</th><th>Heure</th></tr>` +
-      j.photos.map(p=>`<tr><td>${esc(p.nom||'(sans nom)')}</td><td>${esc(p.lot||'—')}</td>
-        <td>${p.dlc ? esc(new Date(p.dlc+'T12:00:00').toLocaleDateString('fr-FR')) : '—'}</td>
-        <td>${esc(p.heure||'')}</td></tr>`).join('') +
+    html += `<h2>Marchandises du matin</h2>
+      <table><tr><th>N°</th><th>Marchandise</th><th>N° de lot</th><th>DLC / DDM</th><th>Utilisée dans</th></tr>` +
+      j.photos.map(p=>`<tr><td><strong>${numM[p.id]}</strong></td><td>${esc(p.nom||'(sans nom)')}</td>
+        <td>${esc(p.lot||'—')}</td><td>${fdate(p.dlc)}</td>
+        <td>${usages[p.id] ? esc(usages[p.id].join(', ')) : '<em>non utilisée ce jour</em>'}</td></tr>`).join('') +
       `</table>`;
   }
 
@@ -1255,19 +1266,21 @@ async function imprimerJour(d){
     html += `<h2>Productions du jour</h2>`;
     for(const pr of j.productions){
       const conserv = pr.dlc ? ' — ' + (pr.conservation==='congel' ? 'congélateur' : 'frigo') +
-        ' · DLC ' + new Date(pr.dlc+'T12:00:00').toLocaleDateString('fr-FR') : '';
+        ' · DLC ' + fdate(pr.dlc) : '';
       html += `<h3>${esc(pr.nom)}${pr.heure ? ' — ' + esc(pr.heure) : ''}${esc(conserv)}</h3>
-        <table><tr><th>Ingrédient</th><th>Photo reliée</th><th>N° de lot</th></tr>` +
+        <table><tr><th>Ingrédient</th><th>Marchandise reliée</th><th>N° de lot</th><th>DLC / DDM</th></tr>` +
         pr.ingredients.map(i=>{
           const p = i.photoId ? photoById[i.photoId] : null;
-          return `<tr><td>${esc(i.nom)}</td><td>${p ? '📷 ' + esc(p.nom||'(sans nom)') : '—'}</td><td>${p ? esc(p.lot||'—') : '—'}</td></tr>`;
+          return `<tr><td>${esc(i.nom)}</td>
+            <td>${p ? '<strong>' + numM[p.id] + '</strong> — ' + esc(p.nom||'(sans nom)') : '—'}</td>
+            <td>${p ? esc(p.lot||'—') : '—'}</td><td>${p ? fdate(p.dlc) : '—'}</td></tr>`;
         }).join('') + `</table>`;
     }
   }
 
   const cells = j.photos.filter(p=>photoCache[p.id])
-    .map(p=>`<div class="photocell"><img src="${photoCache[p.id]}" alt=""><div><strong>${esc(p.nom||'(sans nom)')}</strong>${p.lot?' — lot '+esc(p.lot):''}</div></div>`);
-  if(cells.length) html += `<h2>Annexe — photos des étiquettes</h2><div class="photogrid">${cells.join('')}</div>`;
+    .map(p=>`<div class="photocell"><img src="${photoCache[p.id]}" alt=""><div><strong>${numM[p.id]} · ${esc(p.nom||'(sans nom)')}</strong>${p.lot?' — lot '+esc(p.lot):''}${p.dlc?' — DLC '+fdate(p.dlc):''}</div></div>`);
+  if(cells.length) html += `<h2>Annexe — photos des étiquettes (M1, M2…)</h2><div class="photogrid">${cells.join('')}</div>`;
 
   html += `<div class="signature"><span>Date : </span><span>Signature : </span></div>`;
 

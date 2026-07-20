@@ -97,10 +97,6 @@
   button.ghost:hover{color:var(--bad);background:var(--bad-bg);transform:none;box-shadow:none}
   .recipe-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;align-items:center}
 
-  /* --- bandeau « feuille prête » --- */
-  .banner{border:1.5px solid var(--accent);background:var(--accent-soft)}
-  .banner p{margin:0 0 12px;font-weight:600;color:var(--accent)}
-
   /* --- lignes de relevé --- */
   .eqrow{padding:15px 0;border-bottom:1px solid var(--grid)}
   .eqrow:last-child{border-bottom:none}
@@ -188,7 +184,7 @@
   <nav class="tabs">
     <button class="tab" data-tab="releves" type="button"><span class="ico">📝</span><span class="lbl">Relevés</span></button>
     <button class="tab" data-tab="equipements" type="button"><span class="ico">❄️</span><span class="lbl">Équipements</span></button>
-    <button class="tab" data-tab="historique" type="button"><span class="ico">📅</span><span class="lbl">Historique</span></button>
+    <button class="tab" data-tab="historique" type="button"><span class="ico">🗓</span><span class="lbl">Feuille du mois</span></button>
   </nav>
 </header>
 
@@ -197,23 +193,15 @@
   <!-- ==================== Onglet RELEVÉS ==================== -->
   <section class="panel" data-panel="releves">
 
-    <section class="card banner" id="bannerCard" hidden>
-      <p id="bannerTexte"></p>
-      <div class="recipe-actions" style="margin-top:0">
-        <button class="primary" id="btnBannerPdf" type="button">📄 Enregistrer la feuille en PDF</button>
-        <button class="small" id="btnBannerIgnorer" type="button">Ignorer</button>
-      </div>
-    </section>
-
     <section class="card">
-      <h2>📝 Relevés du jour</h2>
-      <p class="hint">Deux relevés par équipement et par jour, matin et soir — la conformité s'affiche
-         immédiatement. Saisissez à la main <strong>ou importez les fichiers de l'appli INKBIRD</strong>
-         ci-dessous : tout se remplit tout seul. Si une température sort de la consigne, notez
-         l'action corrective : elle apparaîtra sur la feuille.</p>
+      <h2>📝 Saisie des relevés</h2>
+      <p class="hint">Notez les températures matin et soir — la conformité s'affiche immédiatement. Ces relevés
+         alimentent la <strong>feuille mensuelle</strong>, le seul document à archiver et à présenter au contrôle
+         sanitaire. Saisissez à la main <strong>ou importez les fichiers de l'appli INKBIRD</strong> ci-dessous :
+         tout se remplit tout seul. Si une température sort de la consigne, notez l'action corrective : elle
+         apparaîtra sur la feuille du mois.</p>
       <div class="toolbar" style="margin-bottom:6px">
         <div class="field"><label for="jourReleve">Journée</label><input type="date" id="jourReleve"></div>
-        <button class="primary" id="btnPdfJour" type="button" title="Imprimer / enregistrer en PDF la feuille du jour">📄 Feuille du jour (PDF)</button>
       </div>
       <div id="relevesList"></div>
       <p class="footnote" id="relevesVide" hidden style="margin-bottom:0">Aucun équipement : ajoutez vos frigos et
@@ -323,24 +311,24 @@
     </section>
   </section>
 
-  <!-- ==================== Onglet HISTORIQUE ==================== -->
+  <!-- ==================== Onglet FEUILLE MENSUELLE ==================== -->
   <section class="panel" data-panel="historique">
     <section class="card">
-      <h2>📅 Historique des journées</h2>
-      <p class="hint">Chaque journée regroupe les relevés de tous les équipements. La feuille du jour
-         s'imprime ou s'enregistre en PDF — à archiver pour vos contrôles (plan de maîtrise sanitaire).</p>
-      <div id="histoList"></div>
-      <p class="footnote" id="histoVide" style="margin-bottom:0">Aucune journée enregistrée pour l'instant.</p>
-    </section>
-
-    <section class="card">
       <h2>🗓 Feuille mensuelle</h2>
-      <p class="hint">Toutes les journées du mois sur une seule feuille — pratique pour l'archivage
-         et les contrôles.</p>
+      <p class="hint">Le document unique à archiver et à présenter au contrôle sanitaire : toutes les journées
+         du mois, tous les équipements, sur une seule feuille (identité de l'établissement, consignes, conformité,
+         anomalies et actions correctives, références réglementaires). Choisissez le mois et enregistrez-le en PDF.</p>
       <div class="toolbar">
         <div class="field"><label for="moisFeuille">Mois</label><input type="month" id="moisFeuille"></div>
         <button class="primary" id="btnPdfMois" type="button">📄 Feuille du mois (PDF)</button>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>📅 Journées enregistrées</h2>
+      <p class="hint">Récapitulatif des relevés déjà saisis (repris automatiquement dans la feuille du mois).</p>
+      <div id="histoList"></div>
+      <p class="footnote" id="histoVide" style="margin-bottom:0">Aucune journée enregistrée pour l'instant.</p>
     </section>
   </section>
 
@@ -383,8 +371,7 @@ function toast(msg){
    - equipements : [{id, nom, type, cMin, cMax}]
    - releves     : { 'AAAA-MM-JJ': { eqId: { nom, cMin, cMax,
                        matin:{t,heure}, soir:{t,heure}, tMin, tMax, action } } }
-   - pdfFaits    : { 'AAAA-MM-JJ': true } — feuilles déjà enregistrées en PDF
-   - reglages    : { hMatin, hSoir }
+   - reglages    : { hMatin, hSoir, etab, adresse, resp }
 ===================================================================== */
 const TYPES = {
   frigo:{cMin:0,  cMax:4,   ico:'❄️'},
@@ -394,10 +381,9 @@ const TYPES = {
 };
 /* établissement pré-rempli — s'affiche en tête des feuilles ; modifiable dans l'onglet Équipements */
 const ETAB_DEFAUT = {etab:'La Pause Sucrée', adresse:'18 boulevard de la République, 06510 Carros', resp:'Sébastien Pettinati'};
-let equipements = null, releves = {}, pdfFaits = {}, reglages = {hMatin:'09:00', hSoir:'17:00', etab:'', adresse:'', resp:''};
+let equipements = null, releves = {}, reglages = {hMatin:'09:00', hSoir:'17:00', etab:'', adresse:'', resp:''};
 try{ equipements = JSON.parse(localStorage.getItem('tp_equipements')); }catch(e){}
 try{ releves = JSON.parse(localStorage.getItem('tp_releves')) || {}; }catch(e){}
-try{ pdfFaits = JSON.parse(localStorage.getItem('tp_pdfs')) || {}; }catch(e){}
 try{ Object.assign(reglages, JSON.parse(localStorage.getItem('tp_reglages')) || {}); }catch(e){}
 /* premier usage (établissement encore vide) : on remplit avec les informations de La Pause Sucrée */
 if(!(reglages.etab||'').trim() && !(reglages.adresse||'').trim() && !(reglages.resp||'').trim())
@@ -417,7 +403,6 @@ function save(){
   try{
     localStorage.setItem('tp_equipements', JSON.stringify(equipements));
     localStorage.setItem('tp_releves', JSON.stringify(releves));
-    localStorage.setItem('tp_pdfs', JSON.stringify(pdfFaits));
     localStorage.setItem('tp_reglages', JSON.stringify(reglages));
   }catch(e){ toast('⚠ Mémoire pleine : faites une sauvegarde puis supprimez de vieilles journées.'); }
 }
@@ -514,7 +499,7 @@ function renderReleves(){
           mm[quand] = {t: Math.round(parseFloat(inp.value)*10)/10, heure: heureNow()};
           hSpan.textContent = 'à ' + mm[quand].heure;
         }
-        nettoie(d); save(); majBanner();
+        nettoie(d); save();
       });
     });
 
@@ -534,47 +519,6 @@ function renderReleves(){
     colore();
     box.appendChild(row);
   }
-}
-
-/* =====================================================================
-   FEUILLE DU JOUR (impression / PDF)
-===================================================================== */
-function feuilleJourHTML(d){
-  const j = releves[d] || {};
-  /* équipements actuels d'abord (dans l'ordre), puis les anciens supprimés */
-  const ids = equipements.map(e=>e.id).filter(id=>j[id])
-    .concat(Object.keys(j).filter(id=>!equipements.some(e=>e.id===id)));
-  const cell = (m, k) => m[k] ? `<td class="num${conforme(m[k].t,m)?'':' nc'}">${conforme(m[k].t,m)?'':'⚠ '}${fmtT(m[k].t)} °C<br><span class="small">à ${m[k].heure}</span></td>` : '<td class="num">—</td>';
-  let rows = '';
-  for(const id of ids){
-    const m = j[id];
-    const ncs = ['matin','soir'].filter(k=>m[k] && !conforme(m[k].t,m));
-    const mm = (m.tMin!=null && m.tMax!=null) ? `${fmtT(m.tMin)} / ${fmtT(m.tMax)} °C` : '—';
-    rows += `<tr><td>${esc(m.nom||'(équipement supprimé)')}</td>
-      <td class="num">${fmtT(m.cMin)} à ${fmtT(m.cMax)} °C</td>
-      ${cell(m,'matin')}${cell(m,'soir')}
-      <td class="num">${mm}</td>
-      <td class="num">${ncs.length ? '<span class="nc">✘ NON CONFORME</span>' : '✔ conforme'}</td>
-      <td>${esc(m.action||'')}</td></tr>`;
-  }
-  return `<h1>Relevé journalier des températures</h1>
-    ${enteteEtab()}
-    <p class="sub"><span style="text-transform:capitalize">${esc(dateFr(d))}</span> — relevés issus des sondes
-    INKBIRD ou saisis sur place ; mini / maxi mesurés sur 24 h lorsque la sonde enregistre en continu.</p>
-    <table><tr><th>Équipement</th><th>Consigne</th><th>Matin</th><th>Soir</th>
-    <th>Mini / maxi 24 h</th><th>Conformité</th><th>Action corrective</th></tr>${rows}</table>
-    <p class="refs">Document du Plan de Maîtrise Sanitaire — à conserver et à présenter aux services de contrôle (DDPP).
-    Références : Règlement (CE) n° 852/2004 ; arrêté du 21 décembre 2009. Froid positif : 0 à +4 °C ;
-    froid négatif / surgelés : −18 °C au maximum. ✔ conforme · ✘ hors température réglementaire.</p>
-    <div class="signature"><span>Responsable : ${esc(reglages.resp||'')}</span><span>Date : </span><span>Visa / signature : </span></div>`;
-}
-function imprimerJour(d){
-  if(!releves[d] || !Object.keys(releves[d]).length){ toast('Aucun relevé pour cette journée.'); return; }
-  setOrientation('portrait');
-  el('printArea').innerHTML = feuilleJourHTML(d);
-  pdfFaits[d] = true; save(); majBanner(); renderHisto();
-  try{ window.print(); }
-  catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez l\'application dans Safari ou Chrome.'); }
 }
 
 /* =====================================================================
@@ -652,26 +596,6 @@ function imprimerMois(mois){ /* mois = 'AAAA-MM' */
   el('printArea').innerHTML = html;
   try{ window.print(); }
   catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez l\'application dans Safari ou Chrome.'); }
-}
-
-/* =====================================================================
-   BANDEAU « la feuille d'hier est prête »
-   → à chaque ouverture, l'appli propose d'elle-même le PDF des journées
-     passées qui ont des relevés mais pas encore de feuille enregistrée
-===================================================================== */
-function joursEnAttente(){
-  return Object.keys(releves)
-    .filter(d => d < aujourdhui() && jourNbReleves(d) > 0 && !pdfFaits[d])
-    .sort();
-}
-function majBanner(){
-  const attente = joursEnAttente();
-  el('bannerCard').hidden = !attente.length;
-  if(!attente.length) return;
-  const d = attente[attente.length-1];
-  el('bannerCard').dataset.jour = d;
-  el('bannerTexte').textContent = '📄 La feuille du ' + dateFr(d) + ' est prête' +
-    (attente.length > 1 ? ' (' + (attente.length-1) + ' autre' + (attente.length>2?'s':'') + ' journée' + (attente.length>2?'s':'') + ' en attente dans l\'historique)' : '') + '.';
 }
 
 /* =====================================================================
@@ -770,7 +694,7 @@ function integrerImport(){
       nbJ.add(d);
     }
   }
-  save(); annulerImport(); renderReleves(); renderHisto(); majBanner();
+  save(); annulerImport(); renderReleves(); renderHisto();
   if(nbR){
     toast('✅ ' + nbR + ' relevés intégrés sur ' + nbJ.size + ' journée' + (nbJ.size>1?'s':''));
     el('importInfo').textContent = sansEq ? '⚠ ' + sansEq + ' fichier(s) ignoré(s) : équipement non choisi.' : '';
@@ -846,21 +770,15 @@ function renderHisto(){
     const row = document.createElement('div'); row.className = 'itemrow';
     const nb = jourNbReleves(d), nc = jourNonConformes(d);
     const chips = `<span class="chip">${nb} relevé${nb>1?'s':''}</span>` +
-      (nc ? `<span class="chip rouge">⚠ ${nc} hors consigne</span>` : '') +
-      (pdfFaits[d] ? '<span class="chip gris">📄 feuille faite</span>' : '');
+      (nc ? `<span class="chip rouge">⚠ ${nc} hors consigne</span>` : '');
     row.innerHTML = `<div class="grow"><strong style="text-transform:capitalize">${esc(dateFr(d))}</strong>
       <div class="chips">${chips}</div></div>`;
-    const bPrint = document.createElement('button'); bPrint.className = 'small'; bPrint.type = 'button';
-    bPrint.textContent = '🖨 Feuille';
-    bPrint.title = 'Imprimer / enregistrer en PDF la feuille de relevés';
-    bPrint.addEventListener('click', ()=>imprimerJour(d));
-    row.appendChild(bPrint);
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
     bDel.title = 'Supprimer cette journée'; bDel.textContent = '✕';
     bDel.addEventListener('click', ()=>{
       if(!confirm('Supprimer les relevés du ' + dateFr(d) + ' ?')) return;
-      delete releves[d]; delete pdfFaits[d];
-      save(); renderHisto(); renderReleves(); majBanner();
+      delete releves[d];
+      save(); renderHisto(); renderReleves();
     });
     row.appendChild(bDel);
     box.appendChild(row);
@@ -871,7 +789,7 @@ function renderHisto(){
    SAUVEGARDE / RESTAURATION (fichier JSON)
 ===================================================================== */
 function exporter(){
-  const blob = new Blob([JSON.stringify({app:'temperatures', version:1, equipements, releves, pdfFaits, reglages})],
+  const blob = new Blob([JSON.stringify({app:'temperatures', version:1, equipements, releves, reglages})],
     {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -887,7 +805,6 @@ async function importer(file){
     if(!confirm('Restaurer ce fichier ? Les données actuelles de l\'appareil seront remplacées.')) return;
     equipements = data.equipements || [];
     releves = data.releves || {};
-    pdfFaits = data.pdfFaits || {};
     Object.assign(reglages, data.reglages || {});
     save(); renderTout();
     toast('⬆ Données restaurées');
@@ -903,7 +820,7 @@ function activerOnglet(id){
   try{ localStorage.setItem('tp_tab', id); }catch(e){}
 }
 function renderTout(){
-  renderReleves(); renderEquip(); renderHisto(); majBanner();
+  renderReleves(); renderEquip(); renderHisto();
   el('hMatin').value = reglages.hMatin; el('hSoir').value = reglages.hSoir;
   el('etabNom').value = reglages.etab || '';
   el('etabAdresse').value = reglages.adresse || '';
@@ -919,16 +836,9 @@ window.addEventListener('DOMContentLoaded', ()=>{
   activerOnglet(tab0);
 
   el('jourReleve').addEventListener('change', renderReleves);
-  el('btnPdfJour').addEventListener('click', ()=>imprimerJour(el('jourReleve').value || aujourdhui()));
   el('btnPdfMois').addEventListener('click', ()=>{
     const m = el('moisFeuille').value;
     if(m) imprimerMois(m);
-  });
-
-  el('btnBannerPdf').addEventListener('click', ()=>imprimerJour(el('bannerCard').dataset.jour));
-  el('btnBannerIgnorer').addEventListener('click', ()=>{
-    pdfFaits[el('bannerCard').dataset.jour] = true;
-    save(); majBanner(); renderHisto();
   });
 
   el('btnFichiers').addEventListener('click', ()=>el('csvInput').click());

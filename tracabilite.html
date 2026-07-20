@@ -208,9 +208,10 @@
   <section class="panel" data-panel="matin">
     <section class="card">
       <h2>📷 Photos du matin</h2>
-      <p class="hint">En arrivant le matin, touchez chaque case et photographiez l'étiquette du produit correspondant —
-         le beurre dans la case Beurre, la crème dans la case Crème. La photo se range toute seule au bon endroit,
-         et l'étiquette est lue automatiquement : n° de lot et DLC pré-remplis. Une case verte ✅ = produit fait.</p>
+      <p class="hint">En arrivant le matin, touchez chaque case : prenez la photo de l'étiquette du produit correspondant
+         <strong>ou choisissez-la dans votre galerie</strong> — le beurre dans la case Beurre, la crème dans la case
+         Crème. La photo se range toute seule au bon endroit et l'étiquette est lue automatiquement : n° de lot et
+         DLC pré-remplis. Une case verte ✅ = produit fait.</p>
       <div class="toolbar" style="margin-bottom:14px">
         <div class="field"><label for="jourMatin">Journée</label><input type="date" id="jourMatin"></div>
       </div>
@@ -225,15 +226,22 @@
         </div>
       </details>
       <button class="primary bigphoto" id="btnPhoto" type="button">📷 Photographier un autre produit</button>
-      <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+      <input type="file" id="photoInput" accept="image/*" hidden>
       <div id="photosList" style="margin-top:8px"></div>
       <p class="footnote" id="photosVide" style="margin-bottom:0">Aucune photo pour cette journée.</p>
       <details class="more"><summary>Comment ça marche ?</summary>
-        Les photos restent sur cet appareil (elles ne sont envoyées nulle part). Dès la photo prise, l'étiquette est
-        lue automatiquement : le produit est reconnu (crème, beurre, mascarpone…), le numéro de lot et la DLC sont
-        extraits et pré-remplis — tout reste corrigeable à la main, et le bouton « 🔍 Relire » relance la lecture
-        (connexion internet nécessaire au moins la première fois). Le soir, dans l'onglet 🍳 Production, chaque
-        ingrédient de vos produits est relié automatiquement à la photo du matin qui porte le même nom.
+        En touchant une case (ou le bouton photo), votre téléphone propose de prendre la photo <em>ou</em> de la
+        choisir dans la galerie. L'étiquette est ensuite lue par un service de reconnaissance externe
+        (<a href="https://ocr.space" target="_blank" rel="noopener">OCR.space</a>, très fiable — seule la photo de
+        l'étiquette lui est envoyée, rien d'autre) : le produit est reconnu, le numéro de lot et la DLC sont
+        extraits et pré-remplis. Sans connexion, une lecture locale prend le relais. Tout reste corrigeable à la
+        main et « 🔍 Relire » relance la lecture.
+        <div class="field" style="margin-top:10px;max-width:340px">
+          <label for="ocrKeyInp">Clé OCR.space personnelle (facultatif — clé d'essai par défaut)</label>
+          <input type="text" id="ocrKeyInp" placeholder="ex. K81234567890123" autocomplete="off">
+        </div>
+        <p class="footnote" style="margin:6px 0 0">Si la lecture répond « service saturé », créez une clé gratuite
+        sur ocr.space (25 000 lectures/mois) et collez-la ici : elle reste sur cet appareil.</p>
       </details>
     </section>
   </section>
@@ -758,16 +766,41 @@ function identifierProduit(txt){
        soient lues bien plus vite. --- */
 let workerP = null;
 function workerOCR(){ if(!workerP) workerP = creerWorkerOCR(); return workerP; }
+/* --- lecture externe (OCR.space) : bien plus fiable sur les vraies
+       étiquettes ; la lecture locale reste en secours hors connexion.
+       Clé gratuite personnalisable (par défaut la clé publique d'essai). --- */
+function ocrKey(){ try{ return (localStorage.getItem('trac_ocrkey')||'').trim() || 'helloworld'; }catch(e){ return 'helloworld'; } }
+async function ocrExterne(dataUrl){
+  const fd = new FormData();
+  fd.append('apikey', ocrKey());
+  fd.append('base64Image', dataUrl);
+  fd.append('OCREngine', '2');
+  fd.append('scale', 'true');
+  fd.append('detectOrientation', 'true');
+  const r = await fetch('https://api.ocr.space/parse/image', {method:'POST', body: fd});
+  if(!r.ok) throw new Error('service indisponible');
+  const j = await r.json();
+  if(j.IsErroredOnProcessing || !Array.isArray(j.ParsedResults) || !j.ParsedResults.length)
+    throw new Error('lecture refusée');
+  const txt = j.ParsedResults.map(x=>x.ParsedText || '').join('\n');
+  if(!txt.trim()) throw new Error('rien lu');
+  return txt;
+}
+async function lireTexte(dataUrl){
+  try{ return await ocrExterne(dataUrl); }catch(e){}
+  const worker = await workerOCR();
+  const { data } = await worker.recognize(dataUrl);
+  return data.text;
+}
 const analyseEnCours = new Set();
 async function analysePhoto(p){
   if(!photoCache[p.id] || analyseEnCours.has(p.id)) return;
   analyseEnCours.add(p.id); renderPhotos();
   try{
-    const worker = await workerOCR();
-    const { data } = await worker.recognize(photoCache[p.id]);
-    const lots = candidatsLot(data.text);
-    const noms = identifierProduit(data.text);
-    const dlc = trouverDLC(data.text);
+    const texte = await lireTexte(photoCache[p.id]);
+    const lots = candidatsLot(texte);
+    const noms = identifierProduit(texte);
+    const dlc = trouverDLC(texte);
     p.ocr = {lots, noms};
     if(!p.nom && noms.length) p.nom = noms[0];
     if(!p.lot && lots.length) p.lot = lots[0];
@@ -1361,6 +1394,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     toast('↩ Liste d\'origine restaurée');
   });
   el('btnPhoto').addEventListener('click', ()=>{ pendingCase = null; el('photoInput').click(); });
+  try{ el('ocrKeyInp').value = localStorage.getItem('trac_ocrkey') || ''; }catch(e){}
+  el('ocrKeyInp').addEventListener('input', ()=>{
+    try{ localStorage.setItem('trac_ocrkey', el('ocrKeyInp').value.trim()); }catch(e){}
+  });
   el('photoInput').addEventListener('change', e=>{
     const f = e.target.files && e.target.files[0];
     if(f) ajouterPhoto(f);

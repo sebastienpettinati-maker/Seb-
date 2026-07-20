@@ -226,7 +226,7 @@
         </div>
       </details>
       <button class="primary bigphoto" id="btnPhoto" type="button">📷 Photographier un autre produit</button>
-      <input type="file" id="photoInput" accept="image/*" hidden>
+      <input type="file" id="photoInput" accept="image/*" multiple hidden>
       <div id="photosList" style="margin-top:8px"></div>
       <p class="footnote" id="photosVide" style="margin-bottom:0">Aucune photo pour cette journée.</p>
       <details class="more"><summary>Comment ça marche ?</summary>
@@ -1398,10 +1398,12 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   el('ocrKeyInp').addEventListener('input', ()=>{
     try{ localStorage.setItem('trac_ocrkey', el('ocrKeyInp').value.trim()); }catch(e){}
   });
-  el('photoInput').addEventListener('change', e=>{
-    const f = e.target.files && e.target.files[0];
-    if(f) ajouterPhoto(f);
+  el('photoInput').addEventListener('change', async e=>{
+    const fichiers = Array.from(e.target.files || []);
     e.target.value = '';
+    if(!fichiers.length) return;
+    if(fichiers.length > 1) toast('📷 ' + fichiers.length + ' photos ajoutées — lecture des étiquettes…');
+    for(const f of fichiers) await ajouterPhoto(f);   // la 1re prend la case touchée, les autres sont reconnues
   });
   el('jourMatin').addEventListener('change', async ()=>{ await chargerPhotosJour(jourMatin()); renderPhotos(); });
 

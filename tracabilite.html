@@ -97,6 +97,21 @@
   button.bigphoto{width:100%;justify-content:center;display:flex;align-items:center;gap:10px;
     font-size:1.05rem;padding:16px}
 
+  /* --- cases des produits à risque --- */
+  .cases{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;margin-bottom:14px}
+  .case{position:relative;border:2px dashed var(--grid);border-radius:14px;padding:10px 8px;
+    text-align:center;cursor:pointer;background:none;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;min-height:106px;
+    transition:border-color .15s, background .15s, transform .12s}
+  .case:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .case .cico{font-size:1.6rem;opacity:.45}
+  .case .cnom{font-size:.78rem;font-weight:700;color:var(--ink-2);line-height:1.25;overflow-wrap:anywhere}
+  .case .cinfo{font-size:.68rem;color:var(--ink-3)}
+  .case.faite{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+  .case.faite .cnom{color:var(--accent)}
+  .case img{width:50px;height:50px;object-fit:cover;border-radius:10px}
+  .case .coche{position:absolute;top:5px;right:8px;font-size:.9rem}
+
   /* --- photos du matin --- */
   .photorow{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--grid);flex-wrap:wrap}
   .photorow:last-child{border-bottom:none}
@@ -193,13 +208,23 @@
   <section class="panel" data-panel="matin">
     <section class="card">
       <h2>📷 Photos du matin</h2>
-      <p class="hint">Le matin, photographiez l'étiquette de chaque produit sorti ou ouvert, bien à plat et de près.
-         L'appli lit l'étiquette toute seule : nom du produit, n° de lot et DLC sont pré-remplis — vous n'avez
-         qu'à vérifier. C'est ce nom qui fait le lien avec vos productions du jour.</p>
+      <p class="hint">En arrivant le matin, touchez chaque case et photographiez l'étiquette du produit correspondant —
+         le beurre dans la case Beurre, la crème dans la case Crème. La photo se range toute seule au bon endroit,
+         et l'étiquette est lue automatiquement : n° de lot et DLC pré-remplis. Une case verte ✅ = produit fait.</p>
       <div class="toolbar" style="margin-bottom:14px">
         <div class="field"><label for="jourMatin">Journée</label><input type="date" id="jourMatin"></div>
       </div>
-      <button class="primary bigphoto" id="btnPhoto" type="button">📷 Photographier un produit</button>
+      <div id="casesGrid" class="cases"></div>
+      <details class="more" style="margin:0 0 14px">
+        <summary>✏️ Modifier la liste des produits à risque</summary>
+        <p class="footnote" style="margin:8px 0 6px">Un produit par ligne — ce sont les cases affichées chaque matin.</p>
+        <textarea id="casesTexte" style="min-height:140px"></textarea>
+        <div class="recipe-actions" style="margin-top:8px">
+          <button class="small" id="btnCasesSave" type="button">💾 Enregistrer la liste</button>
+          <button class="small" id="btnCasesDefaut" type="button">↩ Liste d'origine</button>
+        </div>
+      </details>
+      <button class="primary bigphoto" id="btnPhoto" type="button">📷 Photographier un autre produit</button>
       <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
       <div id="photosList" style="margin-top:8px"></div>
       <p class="footnote" id="photosVide" style="margin-bottom:0">Aucune photo pour cette journée.</p>
@@ -236,6 +261,9 @@
         <textarea id="compoTexte" placeholder="ex.&#10;Mascarpone&#10;Œufs&#10;Sucre&#10;Café&#10;Biscuits cuillère"></textarea>
       </div>
       <p class="footnote" id="compoInfo" style="margin:6px 0 0"></p>
+      <div class="recipe-actions">
+        <button class="small" id="btnRecette" type="button" title="Chercher la recette sur Marmiton et les autres sites de cuisine">🌐 Chercher la recette sur internet</button>
+      </div>
     </section>
 
     <section class="card" id="liensCard" hidden>
@@ -434,6 +462,58 @@ function voirPhoto(id){
 ===================================================================== */
 function jourMatin(){ return el('jourMatin').value || aujourdhui(); }
 
+/* ---- cases des produits à risque : la liste affichée chaque matin ----
+   Produits sensibles pour la traçabilité (laitages frais, ovoproduits,
+   viandes, charcuterie, poisson) ; liste modifiable et enregistrée. */
+const CASES_DEFAUT = ['Beurre','Crème liquide','Crème fraîche','Lait','Œufs','Mascarpone',
+  'Fromage râpé','Mozzarella','Jambon','Lardons','Poulet','Bœuf haché','Saumon','Gélatine'];
+let casesRisque = null;
+try{ casesRisque = JSON.parse(localStorage.getItem('trac_cases')); }catch(e){}
+if(!Array.isArray(casesRisque) || !casesRisque.length) casesRisque = [...CASES_DEFAUT];
+function saveCases(){ try{ localStorage.setItem('trac_cases', JSON.stringify(casesRisque)); }catch(e){} }
+let pendingCase = null;
+
+function photoPourCase(nomCase, photos){
+  let best = null, bestScore = 1;
+  for(const p of photos){
+    const s = scoreMatch(nomCase, p.nom);
+    if(s > bestScore){ bestScore = s; best = p; }
+  }
+  return best;
+}
+function renderCases(){
+  const box = el('casesGrid'); if(!box) return;
+  const photos = jour(jourMatin()).photos;
+  box.innerHTML = '';
+  for(const nomCase of casesRisque){
+    const p = photoPourCase(nomCase, photos);
+    const c = document.createElement('div'); c.className = 'case' + (p ? ' faite' : '');
+    c.setAttribute('role','button'); c.tabIndex = 0;
+    if(p){
+      c.title = 'Voir la photo de ' + nomCase;
+      const coche = document.createElement('span'); coche.className = 'coche'; coche.textContent = '✅';
+      c.appendChild(coche);
+      if(photoCache[p.id]){
+        const im = document.createElement('img'); im.src = photoCache[p.id]; im.alt = nomCase;
+        c.appendChild(im);
+      } else {
+        const ic = document.createElement('div'); ic.className = 'cico'; ic.textContent = '📦'; c.appendChild(ic);
+      }
+      const nm = document.createElement('div'); nm.className = 'cnom'; nm.textContent = nomCase; c.appendChild(nm);
+      const info = document.createElement('div'); info.className = 'cinfo';
+      info.textContent = p.lot ? 'lot ' + p.lot : '…';
+      c.appendChild(info);
+      c.addEventListener('click', ()=>voirPhoto(p.id));
+    } else {
+      c.title = 'Photographier ' + nomCase;
+      const ic = document.createElement('div'); ic.className = 'cico'; ic.textContent = '📷'; c.appendChild(ic);
+      const nm = document.createElement('div'); nm.className = 'cnom'; nm.textContent = nomCase; c.appendChild(nm);
+      c.addEventListener('click', ()=>{ pendingCase = nomCase; el('photoInput').click(); });
+    }
+    box.appendChild(c);
+  }
+}
+
 function dlIngredients(){
   /* noms déjà connus : ingrédients des produits + noms de photos passés */
   const vus = new Set(), out = [];
@@ -444,6 +524,7 @@ function dlIngredients(){
 }
 
 function renderPhotos(){
+  renderCases();
   const d = jourMatin(), box = el('photosList');
   const photos = jour(d).photos;
   box.innerHTML = '';
@@ -544,13 +625,15 @@ async function ajouterPhoto(file){
   const d = jourMatin();
   try{
     const dataUrl = await lirePhoto(file);
-    const p = {id: uid('ph'), nom:'', lot:'', dlc:'', heure: heureNow()};
+    const p = {id: uid('ph'), nom: pendingCase || '', lot:'', dlc:'', heure: heureNow()};
+    pendingCase = null;
     await photoPut(p.id, dataUrl);
     photoCache[p.id] = dataUrl;
     jour(d).photos.push(p);
     save(); renderPhotos(); renderLiens();
-    analysePhoto(p);   // lecture automatique : produit, n° de lot, DLC
-  }catch(e){ toast('⚠️ Photo illisible, réessayez'); }
+    if(p.nom) toast('✅ ' + p.nom + ' — photo rangée dans sa case');
+    analysePhoto(p);   // lecture automatique : produit (si case vide), n° de lot, DLC
+  }catch(e){ pendingCase = null; toast('⚠️ Photo illisible, réessayez'); }
 }
 
 /* ---- reconnaissance du n° de lot (Tesseract, chargé à la demande,
@@ -794,6 +877,77 @@ function trouverCompoClassique(nom){
 }
 
 /* =====================================================================
+   RECETTE CHERCHÉE SUR INTERNET
+   Quand le produit n'est ni dans « Mes produits » ni dans la base
+   classique, l'appli va chercher toute seule la recette sur les grands
+   sites de cuisine (Marmiton, CuisineAZ, 750g…) et en tire la liste
+   d'ingrédients, nettoyée des quantités.
+===================================================================== */
+const SITES_RECETTES = /^https?:\/\/(www\.)?(marmiton\.org|cuisineaz\.com|750g\.com|journaldesfemmes\.fr|meilleurduchef\.com|cuisine\.journaldesfemmes\.fr)\//;
+function nettoyerIngredient(s){
+  s = String(s).replace(/\s+/g,' ').trim();
+  s = s.replace(/\(.*?\)/g,' ').replace(/\s+/g,' ').trim();
+  s = s.replace(/^[\d\s\/,.½¼¾+xX*-]+/,'');
+  s = s.replace(/^(kg|g|gr|grammes?|l|litres?|cl|ml|c\.? ?à ?[sc]\.?|cuill[eè]res? à (?:soupe|caf[ée])|cuill[eè]res?|sachets?|paquets?|pinc[ée]es?|tranches?|verres?|bo[iî]tes?|briques?|pots?|gousses?|brins?|feuilles?|noix|bouquets?|zestes?|morceaux?|filets?|belles?|petites?|petits?|grosses?|gros|grandes?|grands?|demi|quelques)\b\s*/i,'');
+  s = s.replace(/^(?:de |d['’]\s*|du |des )/i,'').trim();
+  if(!s || s.length > 60) return '';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+async function chercherRecetteEnLigne(nom){
+  const proxy = u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u);
+  const fetchTxt = async u => {
+    const r = await fetch(proxy(u));
+    if(!r.ok) throw new Error('indisponible');
+    return r.text();
+  };
+  /* 1 — trouver des pages de recette */
+  let urls = [];
+  try{
+    const ddg = await fetchTxt('https://html.duckduckgo.com/html/?q=' + encodeURIComponent('recette ' + nom));
+    const re = /href="([^"]+)"/g; let m;
+    while((m = re.exec(ddg)) && urls.length < 5){
+      let u = m[1];
+      const w = /uddg=([^&"]+)/.exec(u);
+      if(w){ try{ u = decodeURIComponent(w[1]); }catch(e){} }
+      if(SITES_RECETTES.test(u) && !urls.includes(u)) urls.push(u);
+    }
+  }catch(e){}
+  if(!urls.length){
+    try{
+      const mm = await fetchTxt('https://www.marmiton.org/recettes/recherche.aspx?aqt=' + encodeURIComponent(nom));
+      const re = /href="(\/recettes\/recette_[^"]+)"/g; let m;
+      while((m = re.exec(mm)) && urls.length < 3) urls.push('https://www.marmiton.org' + m[1]);
+    }catch(e){}
+  }
+  /* 2 — extraire la liste d'ingrédients (données structurées des pages) */
+  for(const u of urls.slice(0, 3)){
+    try{
+      const html = await fetchTxt(u);
+      const re = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi; let m;
+      while((m = re.exec(html))){
+        try{
+          const plats = [];
+          (function aplatir(o){
+            if(Array.isArray(o)) o.forEach(aplatir);
+            else if(o && typeof o === 'object'){ plats.push(o); Object.values(o).forEach(aplatir); }
+          })(JSON.parse(m[1]));
+          for(const o of plats){
+            if(Array.isArray(o.recipeIngredient) && o.recipeIngredient.length){
+              const ing = o.recipeIngredient.map(nettoyerIngredient).filter(Boolean);
+              const vus = new Set();
+              const propres = ing.filter(i=>{ const k = norm(i); if(vus.has(k)) return false; vus.add(k); return true; });
+              if(propres.length >= 2)
+                return {ingredients: propres, source: u.replace(/^https?:\/\/(www\.)?/,'').split('/')[0]};
+            }
+          }
+        }catch(e){}
+      }
+    }catch(e){}
+  }
+  return null;
+}
+
+/* =====================================================================
    ONGLET 🍳 PRODUCTION
 ===================================================================== */
 function jourProd(){ return el('jourProd').value || aujourdhui(); }
@@ -831,10 +985,48 @@ function chargerCompo(){
     if(classique && !libre){
       zone.value = classique.join('\n'); derniereAuto = zone.value;
       el('compoInfo').textContent = '💡 Composition classique proposée pour ce genre de produit — vérifiez et ajustez, elle sera enregistrée pour la prochaine fois.';
+    } else if(el('nomProduit').value.trim() && !libre){
+      rechercherRecette();   // inconnu partout : l'appli va chercher la recette sur internet
     } else {
       el('compoInfo').textContent = el('nomProduit').value.trim()
         ? 'Nouveau produit : saisissez sa composition, elle sera enregistrée pour la prochaine fois.' : '';
     }
+  }
+  renderLiens();
+}
+/* recherche de la recette sur internet — automatique, ou forcée au bouton 🌐.
+   Chaque nom n'est cherché qu'une fois (mémoire de session), et une
+   composition saisie à la main n'est jamais écrasée par le résultat. */
+let rechercheJeton = 0;
+const recettesTrouvees = {};   // norm(nom) -> résultat, ou null si déjà cherché sans succès
+async function rechercherRecette(force){
+  const nom = el('nomProduit').value.trim();
+  if(!nom){ toast('Indiquez d\'abord le nom du produit'); return; }
+  const cle = norm(nom);
+  const jeton = ++rechercheJeton;
+  let res;
+  if(!force && cle in recettesTrouvees){
+    res = recettesTrouvees[cle];
+  } else {
+    el('compoInfo').textContent = '🌐 Recherche de la recette de « ' + nom + ' » sur les sites de cuisine…';
+    el('btnRecette').disabled = true;
+    try{ res = await chercherRecetteEnLigne(nom); }catch(e){ res = null; }
+    el('btnRecette').disabled = false;
+    recettesTrouvees[cle] = res;
+    if(jeton !== rechercheJeton) return;   // le nom a changé entre-temps
+  }
+  const zone = el('compoTexte');
+  const libre = zone.value.trim() && zone.value !== derniereAuto;
+  if(res && (force || !libre)){
+    zone.value = res.ingredients.join('\n');
+    derniereAuto = zone.value;
+    el('compoInfo').textContent = '🌐 Recette trouvée sur ' + res.source + ' (' + res.ingredients.length +
+      ' ingrédients) — vérifiez et ajustez, elle sera enregistrée pour la prochaine fois.';
+  } else if(res){
+    el('compoInfo').textContent = '🌐 Recette trouvée sur ' + res.source +
+      ' — votre saisie est conservée (touchez le bouton 🌐 pour la remplacer).';
+  } else {
+    el('compoInfo').textContent = 'Recette introuvable sur internet : saisissez la composition à la main (un ingrédient par ligne).';
   }
   renderLiens();
 }
@@ -1142,7 +1334,20 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   activerOnglet(tab0);
 
   /* photos du matin */
-  el('btnPhoto').addEventListener('click', ()=>el('photoInput').click());
+  el('casesTexte').value = casesRisque.join('\n');
+  el('btnCasesSave').addEventListener('click', ()=>{
+    const liste = el('casesTexte').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(!liste.length){ toast('La liste ne peut pas être vide'); return; }
+    casesRisque = liste; saveCases(); renderCases();
+    toast('💾 Liste des produits à risque enregistrée');
+  });
+  el('btnCasesDefaut').addEventListener('click', ()=>{
+    casesRisque = [...CASES_DEFAUT]; saveCases();
+    el('casesTexte').value = casesRisque.join('\n');
+    renderCases();
+    toast('↩ Liste d\'origine restaurée');
+  });
+  el('btnPhoto').addEventListener('click', ()=>{ pendingCase = null; el('photoInput').click(); });
   el('photoInput').addEventListener('change', e=>{
     const f = e.target.files && e.target.files[0];
     if(f) ajouterPhoto(f);
@@ -1159,6 +1364,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   });
   el('nomProduit').addEventListener('change', chargerCompo);
   el('nomProduit').addEventListener('blur', chargerCompo);
+  el('btnRecette').addEventListener('click', ()=>rechercherRecette(true));
   el('compoTexte').addEventListener('input', renderLiens);
   el('jourProd').addEventListener('change', async ()=>{
     liensSel = {};

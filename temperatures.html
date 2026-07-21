@@ -184,7 +184,7 @@
   <nav class="tabs">
     <button class="tab" data-tab="releves" type="button"><span class="ico">📝</span><span class="lbl">Relevés</span></button>
     <button class="tab" data-tab="equipements" type="button"><span class="ico">❄️</span><span class="lbl">Équipements</span></button>
-    <button class="tab" data-tab="historique" type="button"><span class="ico">🗓</span><span class="lbl">Feuille du mois</span></button>
+    <button class="tab" data-tab="historique" type="button"><span class="ico">🗓</span><span class="lbl">Feuilles PDF</span></button>
   </nav>
 </header>
 
@@ -315,9 +315,9 @@
   <section class="panel" data-panel="historique">
     <section class="card">
       <h2>🗓 Feuille mensuelle</h2>
-      <p class="hint">Le document unique à archiver et à présenter au contrôle sanitaire : toutes les journées
-         du mois, tous les équipements, sur une seule feuille (identité de l'établissement, consignes, conformité,
-         anomalies et actions correctives, références réglementaires). Choisissez le mois et enregistrez-le en PDF.</p>
+      <p class="hint">Toutes les journées du mois, tous les équipements, sur une seule feuille (identité de
+         l'établissement, consignes, conformité, anomalies et actions correctives, références réglementaires) —
+         à archiver et à présenter au contrôle sanitaire. Choisissez le mois et enregistrez-le en PDF.</p>
       <div class="toolbar">
         <div class="field"><label for="moisFeuille">Mois</label><input type="month" id="moisFeuille"></div>
         <button class="primary" id="btnPdfMois" type="button">📄 Feuille du mois (PDF)</button>
@@ -325,7 +325,18 @@
     </section>
 
     <section class="card">
-      <h2>📅 Journées enregistrées</h2>
+      <h2>📅 Feuille annuelle</h2>
+      <p class="hint">Synthèse de l'année entière : pour chaque mois et chaque équipement, les températures
+         mini / maxi observées et les mois comportant une non-conformité, avec le bilan annuel de conformité et
+         le récapitulatif des actions correctives. Pratique pour le bilan de fin d'année et l'archivage.</p>
+      <div class="toolbar">
+        <div class="field"><label for="anFeuille">Année</label><input type="number" id="anFeuille" min="2020" max="2100" step="1" style="width:130px"></div>
+        <button class="primary" id="btnPdfAn" type="button">📄 Feuille de l'année (PDF)</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>📆 Journées enregistrées</h2>
       <p class="hint">Récapitulatif des relevés déjà saisis (repris automatiquement dans la feuille du mois).</p>
       <div id="histoList"></div>
       <p class="footnote" id="histoVide" style="margin-bottom:0">Aucune journée enregistrée pour l'instant.</p>
@@ -599,6 +610,100 @@ function imprimerMois(mois){ /* mois = 'AAAA-MM' */
 }
 
 /* =====================================================================
+   FEUILLE ANNUELLE — synthèse mois par mois, par équipement
+===================================================================== */
+function imprimerAnnee(an){
+  an = Number(an);
+  if(!an){ toast('Choisissez une année.'); return; }
+  const pfx = an + '-';
+  /* journées de l'année qui portent au moins un relevé, groupées par mois */
+  const parMois = {};
+  for(let mo=1;mo<=12;mo++) parMois[mo] = [];
+  for(const d of Object.keys(releves)){
+    if(!d.startsWith(pfx) || !Object.keys(releves[d]).length) continue;
+    parMois[Number(d.slice(5,7))].push(d);
+  }
+  if(!Object.values(parMois).some(a=>a.length)){ toast('Aucun relevé pour cette année.'); return; }
+
+  const nomMoisLong = mo => new Date(an, mo-1, 15).toLocaleDateString('fr-FR',{month:'long'});
+
+  /* en-têtes : mini / maxi par équipement, avec la consigne rappelée */
+  let head1 = '<tr><th rowspan="2">Mois</th>', head2 = '<tr>';
+  for(const eq of equipements){
+    const ico = (TYPES[eq.type]||TYPES.autre).ico;
+    head1 += `<th colspan="2">${ico} ${esc(eq.nom)}<br><span class="small">consigne ${fmtT(eq.cMin)} à ${fmtT(eq.cMax)} °C</span></th>`;
+    head2 += '<th>Mini</th><th>Maxi</th>';
+  }
+  head1 += '</tr>'; head2 += '</tr>';
+
+  /* corps : une ligne par mois ; mini / maxi et non-conformités par équipement */
+  let rows = '', nbRel = 0, nbNC = 0, moisRemplis = 0;
+  for(let mo=1;mo<=12;mo++){
+    const jours = parMois[mo];
+    if(jours.length) moisRemplis++;
+    let tr = `<td class="num" style="text-transform:capitalize">${nomMoisLong(mo)}</td>`;
+    for(const eq of equipements){
+      const vals = []; let ncMois = 0;
+      for(const d of jours){
+        const m = releves[d][eq.id]; if(!m) continue;
+        for(const k of ['matin','soir']){
+          if(m[k]){ nbRel++; vals.push(m[k].t); if(!conforme(m[k].t, m)){ nbNC++; ncMois++; } }
+        }
+      }
+      if(vals.length){
+        const cls = ncMois ? ' nc' : '';
+        tr += `<td class="num${cls}">${fmtT(Math.min(...vals))}</td>`
+            + `<td class="num${cls}">${ncMois?'⚠ ':''}${fmtT(Math.max(...vals))}</td>`;
+      }else{
+        tr += '<td class="num vide">—</td><td class="num vide">—</td>';
+      }
+    }
+    rows += `<tr${jours.length?'':' class="jvide"'}>${tr}</tr>`;
+  }
+  const tauxConf = nbRel ? Math.floor((nbRel-nbNC)/nbRel*100) : 0;
+
+  /* actions correctives de toute l'année, dans l'ordre chronologique */
+  const actions = [];
+  const joursAnnee = Object.keys(releves).filter(d=>d.startsWith(pfx)).sort();
+  for(const d of joursAnnee){
+    for(const id of Object.keys(releves[d])){
+      const m = releves[d][id];
+      if((m.action||'').trim())
+        actions.push(`<strong>${d.slice(8)}/${d.slice(5,7)} · ${esc(m.nom)} :</strong> ${esc(m.action)}`);
+    }
+  }
+
+  let html = `<h1>Relevé annuel des températures — synthèse</h1>
+    ${enteteEtab()}
+    <p class="sub">Année ${an} — synthèse mensuelle des températures mini / maxi observées et des non-conformités,
+    par équipement.</p>
+    <table class="mois">${head1}${head2}${rows}</table>
+    <p class="legende">Mini / maxi observés sur le mois · <span class="nc">⚠ mois comportant au moins un relevé hors consigne</span> · — pas de relevé.
+    &nbsp;<strong>Bilan de l'année :</strong> ${nbRel} relevé${nbRel>1?'s':''} sur ${moisRemplis} mois renseigné${moisRemplis>1?'s':''},
+    dont ${nbNC} hors consigne — conformité ${tauxConf} %.</p>`;
+
+  html += `<h2>Anomalies et actions correctives de l'année</h2>`;
+  html += actions.length
+    ? `<p class="sub">${actions.join('<br>')}</p>`
+    : `<p class="sub">Aucune anomalie signalée cette année : l'ensemble des relevés est resté conforme aux températures réglementaires.</p>`;
+
+  html += `<p class="refs">Document du Plan de Maîtrise Sanitaire — à conserver et à présenter aux services de contrôle (DDPP).
+    Références réglementaires : Règlement (CE) n° 852/2004 relatif à l'hygiène des denrées alimentaires ;
+    arrêté du 21 décembre 2009 relatif aux températures de conservation. Froid positif : 0 à +4 °C ;
+    froid négatif, surgelés et glaces : −18 °C au maximum ; liaison chaude : +63 °C au minimum.</p>`;
+
+  html += `<div class="signature">
+    <span>Responsable : ${esc(reglages.resp||'')}</span>
+    <span>Date : </span>
+    <span>Visa / signature : </span></div>`;
+
+  setOrientation('landscape');
+  el('printArea').innerHTML = html;
+  try{ window.print(); }
+  catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez l\'application dans Safari ou Chrome.'); }
+}
+
+/* =====================================================================
    IMPORT DES FICHIERS INKBIRD (CSV)
 ===================================================================== */
 let importLots = [];   /* [{fichier, releves:[{date,heure,minutes,t}], eqId}] */
@@ -830,6 +935,7 @@ function renderTout(){
 window.addEventListener('DOMContentLoaded', ()=>{
   el('jourReleve').value = aujourdhui();
   el('moisFeuille').value = aujourdhui().slice(0,7);
+  el('anFeuille').value = aujourdhui().slice(0,4);
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>activerOnglet(t.dataset.tab)));
   let tab0 = 'releves';
   try{ tab0 = localStorage.getItem('tp_tab') || 'releves'; }catch(e){}
@@ -839,6 +945,10 @@ window.addEventListener('DOMContentLoaded', ()=>{
   el('btnPdfMois').addEventListener('click', ()=>{
     const m = el('moisFeuille').value;
     if(m) imprimerMois(m);
+  });
+  el('btnPdfAn').addEventListener('click', ()=>{
+    const a = el('anFeuille').value;
+    if(a) imprimerAnnee(a);
   });
 
   el('btnFichiers').addEventListener('click', ()=>el('csvInput').click());

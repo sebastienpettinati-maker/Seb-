@@ -716,6 +716,19 @@ function parseDateHeure(s){
   if(m) return {date:`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`, h:+m[4], mn:+m[5]};
   return null;
 }
+/* lecture d'un fichier en gérant l'encodage : les exports INKBIRD sont souvent
+   en UTF-16 (avec BOM) — un simple .text() les lirait en UTF-8 et les rendrait
+   illisibles. On détecte le BOM (ou les octets nuls) et on décode correctement. */
+async function lireTexte(file){
+  const buf = new Uint8Array(await file.arrayBuffer());
+  try{
+    if(buf.length>=2 && buf[0]===0xFF && buf[1]===0xFE) return new TextDecoder('utf-16le').decode(buf);
+    if(buf.length>=2 && buf[0]===0xFE && buf[1]===0xFF) return new TextDecoder('utf-16be').decode(buf);
+    if(buf.length>=4 && buf[1]===0x00 && buf[3]===0x00) return new TextDecoder('utf-16le').decode(buf);
+    if(buf.length>=4 && buf[0]===0x00 && buf[2]===0x00) return new TextDecoder('utf-16be').decode(buf);
+    return new TextDecoder('utf-8').decode(buf);
+  }catch(e){ return new TextDecoder('utf-8').decode(buf); }
+}
 function parseCSV(texte){
   const lignes = texte.split(/\r?\n/).filter(l=>l.trim());
   if(!lignes.length) return [];
@@ -748,7 +761,7 @@ async function choisirFichiers(files){
   const box = el('importMap'); box.innerHTML = '';
   for(const f of files){
     let lignes = [];
-    try{ lignes = parseCSV(await f.text()); }catch(e){}
+    try{ lignes = parseCSV(await lireTexte(f)); }catch(e){}
     const lot = {fichier:f.name, releves:lignes, eqId:''};
     /* pré-choix de l'équipement dont le nom apparaît dans le nom du fichier */
     const nf = f.name.toLowerCase();
@@ -783,19 +796,20 @@ function integrerImport(){
       const m = mesure(d, eq);
       m.tMin = Math.min(...mesures.map(r=>r.t));
       m.tMax = Math.max(...mesures.map(r=>r.t));
-      const matin = mesures.filter(r=>r.h < 13), soir = mesures.filter(r=>r.h >= 13);
-      const plusProche = (arr, cible) => arr.reduce((a,b)=>
-        Math.abs(b.h*60+b.mn-cible) < Math.abs(a.h*60+a.mn-cible) ? b : a);
-      if(matin.length){
-        const r = plusProche(matin, cibleMatin);
-        m.matin = {t:r.t, heure:String(r.h).padStart(2,'0')+':'+String(r.mn).padStart(2,'0')};
-        nbR++;
+      const tmin = r => r.h*60 + r.mn;
+      const enHM = r => String(r.h).padStart(2,'0')+':'+String(r.mn).padStart(2,'0');
+      const plusProche = cible => mesures.reduce((a,b)=>
+        Math.abs(tmin(b)-cible) < Math.abs(tmin(a)-cible) ? b : a);
+      let rMatin = plusProche(cibleMatin), rSoir = plusProche(cibleSoir);
+      /* si les deux heures de référence tombent sur le même relevé, on prend les
+         deux extrêmes de la journée : indispensable pour les sondes qui enregistrent
+         deux fois par jour à heures fixes (ex. 00:00 et 12:00) */
+      if(rMatin === rSoir){
+        if(mesures.length >= 2){ rMatin = mesures[0]; rSoir = mesures[mesures.length-1]; }
+        else rSoir = null;
       }
-      if(soir.length){
-        const r = plusProche(soir, cibleSoir);
-        m.soir = {t:r.t, heure:String(r.h).padStart(2,'0')+':'+String(r.mn).padStart(2,'0')};
-        nbR++;
-      }
+      m.matin = {t:rMatin.t, heure:enHM(rMatin)}; nbR++;
+      if(rSoir){ m.soir = {t:rSoir.t, heure:enHM(rSoir)}; nbR++; }
       nbJ.add(d);
     }
   }

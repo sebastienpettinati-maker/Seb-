@@ -1,7 +1,7 @@
 /* Service worker de l'application de relevés de températures — cache hors-ligne.
    Stratégie : réseau d'abord pour la page (pour recevoir les mises à jour),
    cache en secours (fonctionnement 100 % hors-ligne une fois visitée). */
-const CACHE = 'temperatures-v1';
+const CACHE = 'temperatures-v2';
 const FICHIERS = ['./temperatures.html', './temperatures.webmanifest', './temperatures-192.png', './temperatures-512.png'];
 
 self.addEventListener('install', e => {

@@ -375,9 +375,13 @@
     </section>
 
     <section class="card">
-      <h2>☁️ Sauvegarde Google Drive</h2>
-      <p class="hint">Envoyez automatiquement la feuille PDF de chaque journée dans un dossier « Traçabilité » de
-         votre Google Drive. À configurer une seule fois (voir « Première installation » ci-dessous).</p>
+      <h2>☁️ Enregistrer sur Google Drive</h2>
+      <p class="hint"><strong>Depuis le téléphone, le plus simple :</strong> dans la liste ci-dessus, touchez
+         « 📤 Enregistrer sur Drive » sur une journée — le menu de partage du téléphone s'ouvre, choisissez
+         <strong>Drive</strong> et le dossier voulu. Aucune installation.</p>
+      <p class="hint" style="margin-top:0"><strong>Automatique chaque jour (facultatif) :</strong> pour que la feuille
+         parte toute seule à chaque production, collez ci-dessous l'adresse d'un petit script Google. Cette
+         installation-là se fait <strong>une fois sur un ordinateur</strong> (voir « Première installation »).</p>
       <div class="toolbar">
         <div class="field" style="flex:1;min-width:260px">
           <label for="driveUrl">Adresse du script Google (se termine par /exec)</label>
@@ -1324,6 +1328,12 @@ function renderHisto(){
     row.innerHTML = `<div class="grow"><strong style="text-transform:capitalize">${esc(dateFr(d))}</strong>
       <div class="chips">${chips || '<span class="chip gris">vide</span>'}</div></div>`;
 
+    const bShare = document.createElement('button'); bShare.className = 'small'; bShare.type = 'button';
+    bShare.textContent = '📤 Enregistrer sur Drive';
+    bShare.title = 'Envoyer le PDF vers Google Drive (ou Mail…) depuis le téléphone';
+    bShare.addEventListener('click', ()=>partagerPDF(d));
+    row.appendChild(bShare);
+
     const bPdf = document.createElement('button'); bPdf.className = 'small'; bPdf.type = 'button';
     bPdf.textContent = '⬇ PDF';
     bPdf.title = 'Télécharger la feuille de traçabilité du jour en PDF';
@@ -1537,6 +1547,29 @@ async function telechargerPDF(d){
     toast('⬇ PDF téléchargé');
     driveAutoJour(d);
   }catch(e){ toast('⚠️ Création du PDF impossible'); }
+}
+/* partage natif du téléphone : envoie le PDF vers Google Drive, Mail, etc.
+   sans aucune installation. Repli sur le téléchargement si indisponible. */
+async function partagerPDF(d){
+  toast('📄 Préparation du PDF…');
+  let bytes;
+  try{ bytes = await pdfRecap(d); }catch(e){ toast('⚠️ Création du PDF impossible'); return; }
+  const fichier = new File([bytes], nomPDF(d), {type:'application/pdf'});
+  if(navigator.canShare && navigator.canShare({files:[fichier]})){
+    try{
+      await navigator.share({files:[fichier], title: nomPDF(d), text:'Feuille de traçabilité — ' + dateFr(d)});
+      toast('📤 Envoyé — choisissez « Drive »');
+    }catch(e){ /* partage annulé par l'utilisateur */ }
+    driveAutoJour(d);
+    return;
+  }
+  // navigateur sans partage de fichiers (souvent sur ordinateur) : téléchargement
+  const blob = new Blob([bytes], {type:'application/pdf'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nomPDF(d); a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('⬇ PDF téléchargé — ouvrez-le puis « Enregistrer dans Drive »');
+  driveAutoJour(d);
 }
 
 /* =====================================================================

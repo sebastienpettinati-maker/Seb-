@@ -545,17 +545,31 @@
             <li>Ouvrez <strong>script.google.com</strong> (connecté à votre compte Google) et cliquez sur <strong>Nouveau projet</strong>.</li>
             <li>Effacez le contenu et collez le code ci-dessous, puis enregistrez (💾).</li>
             <li>Cliquez sur <strong>Déployer → Nouveau déploiement → ⚙ Application Web</strong> ;
-                « Exécuter en tant que » : <strong>Moi</strong> ; « Qui a accès » : <strong>Tout le monde</strong> ; puis <strong>Déployer</strong> et autorisez l'accès.</li>
-            <li>Copiez l'<strong>URL de l'application Web</strong> (elle se termine par <code>/exec</code>) et collez-la dans le champ ci-dessus, puis cliquez sur « Tester ».</li>
+                « Exécuter en tant que » : <strong>Moi</strong> ; « Qui a accès » : <strong>Tout le monde</strong> (indispensable) ; puis <strong>Déployer</strong>.</li>
+            <li><strong>Autorisez l'accès</strong> quand Google le demande. Si un écran « Google n'a pas validé cette application » apparaît,
+                touchez <strong>Paramètres avancés → Accéder au projet (non sécurisé)</strong> : c'est <em>votre</em> script, sans risque.</li>
+            <li>Copiez l'<strong>URL de l'application Web</strong> (elle se termine par <code>/exec</code>) et collez-la dans le champ ci-dessus, puis cliquez sur « Tester ».
+                Astuce : en ouvrant cette adresse dans le navigateur, vous devez voir <code>{"ok":true…}</code> — sinon le déploiement est à refaire.</li>
+            <li>Après toute modification du script, refaites <strong>Déployer → Gérer les déploiements → ✏️ → Version : Nouvelle version → Déployer</strong> (l'URL ne change pas).</li>
           </ol>
-<pre>function doPost(e) {
-  var d = JSON.parse(e.postData.contents);
-  var it = DriveApp.getFoldersByName('Glacerie');
-  var dossier = it.hasNext() ? it.next() : DriveApp.createFolder('Glacerie');
-  var anciens = dossier.getFilesByName(d.nom);
-  while (anciens.hasNext()) anciens.next().setTrashed(true);
-  dossier.createFile(d.nom, d.contenu, 'text/html');
-  return ContentService.createTextOutput('{"ok":true}')
+<pre>function doGet() {
+  return reponse({ ok: true, message: 'Script Glacerie pret' });
+}
+function doPost(e) {
+  try {
+    var d = JSON.parse(e.postData.contents);
+    var it = DriveApp.getFoldersByName('Glacerie');
+    var dossier = it.hasNext() ? it.next() : DriveApp.createFolder('Glacerie');
+    var anciens = dossier.getFilesByName(d.nom);
+    while (anciens.hasNext()) anciens.next().setTrashed(true);
+    dossier.createFile(d.nom, d.contenu, 'text/html');
+    return reponse({ ok: true });
+  } catch (err) {
+    return reponse({ ok: false, erreur: String(err) });
+  }
+}
+function reponse(o) {
+  return ContentService.createTextOutput(JSON.stringify(o))
     .setMimeType(ContentService.MimeType.JSON);
 }</pre>
           <p class="footnote">Le script tourne sur votre compte Google et écrit uniquement dans votre Drive : personne d'autre n'y a accès.
@@ -2200,13 +2214,28 @@ async function envoyerDrive(fichiers){
         headers:{'Content-Type':'text/plain;charset=utf-8'},
         body: JSON.stringify({app:'glacerie', nom:f.nom, contenu:f.contenu}),
       });
-      if(!r.ok) throw new Error('HTTP '+r.status);
+      const d = await r.json().catch(()=>null);
+      if(!d || !d.ok) throw new Error(d && d.erreur ? d.erreur : 'réponse inattendue');
     }
     driveStatus(`${fichiers.length} fichier${fichiers.length>1?'s':''} envoyé${fichiers.length>1?'s':''} sur votre Drive (dossier « Glacerie ») à ${new Date().toLocaleTimeString('fr-FR')}.`);
     return true;
   }catch(e){
-    driveStatus('Envoi impossible : vérifiez l’adresse du script et votre connexion internet.', true);
+    driveStatus('Envoi impossible. Vérifiez que le déploiement est en « Qui a accès : Tout le monde », que vous avez autorisé l’accès à votre Drive, et votre connexion internet.', true);
     return false;
+  }
+}
+async function testerDrive(){
+  if(!driveCfg.url || !driveCfg.url.includes('script.google')){
+    driveStatus('Collez d’abord l’adresse du script (elle se termine par /exec).', true); return;
+  }
+  driveStatus('Test en cours…');
+  try{
+    const r = await fetch(driveCfg.url, {method:'GET'});
+    const d = await r.json().catch(()=>null);
+    if(d && d.ok) driveStatus('Connexion réussie — votre Drive est prêt à recevoir les documents.');
+    else driveStatus('Le script répond mais signale une erreur : redéployez-le en « Nouvelle version ».', true);
+  }catch(e){
+    driveStatus('Connexion impossible. Vérifiez que le déploiement est en « Qui a accès : Tout le monde » et que l’accès à votre Drive a bien été autorisé.', true);
   }
 }
 function driveAuto(fichiers){
@@ -2475,10 +2504,7 @@ function init(){
   el('driveAuto').checked = driveCfg.auto !== false;
   el('driveUrl').addEventListener('input',()=>{ driveCfg.url = el('driveUrl').value.trim(); persistDrive(); });
   el('driveAuto').addEventListener('change',()=>{ driveCfg.auto = el('driveAuto').checked; persistDrive(); });
-  el('btnDriveTest').addEventListener('click',()=>{
-    envoyerDrive([{nom:'test-connexion-glacerie.html',
-      contenu:docAutonome('Test de connexion','<h1>Connexion réussie 🍨</h1><p>Votre calculateur de glacerie peut enregistrer ses documents dans ce Drive.</p>')}]);
-  });
+  el('btnDriveTest').addEventListener('click', testerDrive);
   el('btnDriveNow').addEventListener('click',()=>{
     envoyerDrive([docRecette(), docTracabilite(), docEtiquettes()]);
   });

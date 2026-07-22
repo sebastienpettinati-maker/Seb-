@@ -148,8 +148,19 @@
 
   /* --- visionneuse photo --- */
   #photoView{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.85);
-    display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
-  #photoView img{max-width:100%;max-height:100%;border-radius:10px}
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px}
+  #photoView img{max-width:100%;max-height:76vh;border-radius:10px;object-fit:contain}
+  .photoview-actions{display:flex;gap:12px}
+  .photoview-actions button{background:var(--surface-1)}
+  #photoViewDel{color:var(--bad);border-color:var(--bad)}
+
+  /* --- feuille de choix appareil / galerie --- */
+  #choixSource{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);
+    display:flex;align-items:flex-end;justify-content:center}
+  .choixbox{background:var(--surface-1);width:100%;max-width:520px;border-radius:20px 20px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;
+    box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+  .choixtitre{font-weight:700;text-align:center;color:var(--ink-2)}
 
   /* --- toast --- */
   #toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);
@@ -225,7 +236,11 @@
           <button class="small" id="btnCasesDefaut" type="button">↩ Liste d'origine</button>
         </div>
       </details>
-      <button class="primary bigphoto" id="btnPhoto" type="button">📷 Photographier un autre produit</button>
+      <div class="recipe-actions" style="margin-top:8px">
+        <button class="primary bigphoto" id="btnCamera" type="button" style="flex:1;min-width:150px">📸 Prendre une photo</button>
+        <button class="bigphoto" id="btnGalerie" type="button" style="flex:1;min-width:150px">🖼 Depuis la galerie</button>
+      </div>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
       <input type="file" id="photoInput" accept="image/*" multiple hidden>
       <div id="photosList" style="margin-top:8px"></div>
       <p class="footnote" id="photosVide" style="margin-bottom:0">Aucune photo pour cette journée.</p>
@@ -361,7 +376,21 @@
 
 </main>
 
-<div id="photoView" hidden><img id="photoViewImg" alt="Photo agrandie"></div>
+<div id="photoView" hidden>
+  <img id="photoViewImg" alt="Photo agrandie">
+  <div class="photoview-actions">
+    <button id="photoViewDel" type="button">🗑 Supprimer</button>
+    <button id="photoViewClose" type="button">Fermer</button>
+  </div>
+</div>
+<div id="choixSource" hidden>
+  <div class="choixbox">
+    <div class="choixtitre" id="choixTitre">Ajouter une photo</div>
+    <button class="primary bigphoto" id="choixCamera" type="button">📸 Prendre une photo</button>
+    <button class="bigphoto" id="choixGalerie" type="button">🖼 Choisir dans la galerie</button>
+    <button class="small" id="choixAnnuler" type="button" style="align-self:center">Annuler</button>
+  </div>
+</div>
 <div id="toast"></div>
 <div id="printArea"></div>
 
@@ -459,10 +488,28 @@ async function chargerPhotosJour(d){
     }
   }
 }
+let photoVueId = null;
 function voirPhoto(id){
   if(!photoCache[id]) return;
+  photoVueId = id;
   el('photoViewImg').src = photoCache[id];
   el('photoView').hidden = false;
+}
+/* feuille de choix : prendre une photo (appareil) ou en choisir dans la galerie */
+function ouvrirChoixSource(nomCase){
+  pendingCase = nomCase || null;
+  el('choixTitre').textContent = nomCase ? '📦 ' + nomCase : 'Ajouter une photo';
+  el('choixSource').hidden = false;
+}
+/* suppression d'une photo incorrecte : depuis la liste, une case ou la visionneuse */
+function supprimerPhoto(id){
+  if(!confirm('Supprimer cette photo ?')) return;
+  photoDel(id); delete photoCache[id];
+  const j = jour(jourMatin()); j.photos = j.photos.filter(x=>x.id!==id);
+  save();
+  el('photoView').hidden = true; photoVueId = null;
+  renderPhotos(); renderLiens();
+  toast('🗑 Photo supprimée');
 }
 
 /* =====================================================================
@@ -516,7 +563,7 @@ function renderCases(){
       c.title = 'Photographier ' + nomCase;
       const ic = document.createElement('div'); ic.className = 'cico'; ic.textContent = '📷'; c.appendChild(ic);
       const nm = document.createElement('div'); nm.className = 'cnom'; nm.textContent = nomCase; c.appendChild(nm);
-      c.addEventListener('click', ()=>{ pendingCase = nomCase; el('photoInput').click(); });
+      c.addEventListener('click', ()=>ouvrirChoixSource(nomCase));
     }
     box.appendChild(c);
   }
@@ -583,12 +630,7 @@ function renderPhotos(){
 
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
     bDel.title = 'Supprimer cette photo'; bDel.textContent = '✕';
-    bDel.addEventListener('click', ()=>{
-      if(!confirm('Supprimer cette photo ?')) return;
-      photoDel(p.id); delete photoCache[p.id];
-      const j = jour(d); j.photos = j.photos.filter(x=>x.id!==p.id);
-      save(); renderPhotos(); renderLiens();
-    });
+    bDel.addEventListener('click', ()=>supprimerPhoto(p.id));
     meta.appendChild(bDel);
     fields.appendChild(meta);
 
@@ -1393,18 +1435,32 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     renderCases();
     toast('↩ Liste d\'origine restaurée');
   });
-  el('btnPhoto').addEventListener('click', ()=>{ pendingCase = null; el('photoInput').click(); });
+  el('btnCamera').addEventListener('click', ()=>{ pendingCase = null; el('cameraInput').click(); });
+  el('btnGalerie').addEventListener('click', ()=>{ pendingCase = null; el('photoInput').click(); });
   try{ el('ocrKeyInp').value = localStorage.getItem('trac_ocrkey') || ''; }catch(e){}
   el('ocrKeyInp').addEventListener('input', ()=>{
     try{ localStorage.setItem('trac_ocrkey', el('ocrKeyInp').value.trim()); }catch(e){}
   });
-  el('photoInput').addEventListener('change', async e=>{
-    const fichiers = Array.from(e.target.files || []);
-    e.target.value = '';
-    if(!fichiers.length) return;
+  async function traiterFichiers(liste){
+    const fichiers = Array.from(liste || []);
+    if(!fichiers.length){ pendingCase = null; return; }
     if(fichiers.length > 1) toast('📷 ' + fichiers.length + ' photos ajoutées — lecture des étiquettes…');
     for(const f of fichiers) await ajouterPhoto(f);   // la 1re prend la case touchée, les autres sont reconnues
+  }
+  el('cameraInput').addEventListener('change', e=>{ traiterFichiers(e.target.files); e.target.value = ''; });
+  el('photoInput').addEventListener('change', e=>{ traiterFichiers(e.target.files); e.target.value = ''; });
+
+  /* feuille de choix appareil / galerie (depuis une case) */
+  el('choixCamera').addEventListener('click', ()=>{ el('choixSource').hidden = true; el('cameraInput').click(); });
+  el('choixGalerie').addEventListener('click', ()=>{ el('choixSource').hidden = true; el('photoInput').click(); });
+  el('choixAnnuler').addEventListener('click', ()=>{ el('choixSource').hidden = true; pendingCase = null; });
+  el('choixSource').addEventListener('click', e=>{
+    if(e.target === el('choixSource')){ el('choixSource').hidden = true; pendingCase = null; }
   });
+
+  /* visionneuse : fermer / supprimer */
+  el('photoViewClose').addEventListener('click', e=>{ e.stopPropagation(); el('photoView').hidden = true; });
+  el('photoViewDel').addEventListener('click', e=>{ e.stopPropagation(); if(photoVueId) supprimerPhoto(photoVueId); });
   el('jourMatin').addEventListener('change', async ()=>{ await chargerPhotosJour(jourMatin()); renderPhotos(); });
 
   /* production */

@@ -391,6 +391,11 @@
           <input type="checkbox" id="driveAuto" checked> Envoi automatique chaque jour
         </label>
       </div>
+      <div class="field" style="margin-top:10px">
+        <label for="driveFolder">Lien du dossier Drive de destination (facultatif — sinon un dossier « Traçabilité » est créé)</label>
+        <input type="text" id="driveFolder" placeholder="https://drive.google.com/drive/folders/…" autocomplete="off">
+        <span class="footnote" id="driveFolderInfo" style="margin-top:4px"></span>
+      </div>
       <div class="recipe-actions" style="margin-top:8px">
         <button class="small" id="btnDriveTest" type="button">Tester la connexion</button>
         <button class="small" id="btnDriveNow" type="button">☁️ Envoyer la journée d'aujourd'hui</button>
@@ -1575,9 +1580,15 @@ async function partagerPDF(d){
 /* =====================================================================
    GOOGLE DRIVE — envoi automatique de la feuille PDF (script /exec)
 ===================================================================== */
-let driveCfg = {url:'', auto:true};
+let driveCfg = {url:'', auto:true, dossier:''};
 try{ driveCfg = Object.assign(driveCfg, JSON.parse(localStorage.getItem('trac_drive'))||{}); }catch(e){}
 function persistDrive(){ try{ localStorage.setItem('trac_drive', JSON.stringify(driveCfg)); }catch(e){} }
+/* identifiant du dossier extrait de son lien Drive (…/folders/ID… ou ?id=ID) */
+function dossierId(lien){
+  const s = String(lien||'');
+  const m = s.match(/\/folders\/([-\w]{10,})/) || s.match(/[?&]id=([-\w]{10,})/) || s.match(/^([-\w]{25,})$/);
+  return m ? m[1] : '';
+}
 function driveStatus(msg, err){
   const s = el('driveStatus'); if(!s) return;
   s.innerHTML = err ? '<strong style="color:var(--bad)">✗ ' + esc(msg) + '</strong>' : '✓ ' + esc(msg);
@@ -1597,7 +1608,8 @@ async function envoyerDrivePDF(d, silencieux){
     const bytes = await pdfRecap(d);
     const r = await fetch(driveCfg.url, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({app:'tracabilite', nom: nomPDF(d), type:'application/pdf', encodage:'base64', contenu: base64Octets(bytes)})
+      body: JSON.stringify({app:'tracabilite', nom: nomPDF(d), type:'application/pdf', encodage:'base64',
+        dossierId: dossierId(driveCfg.dossier), contenu: base64Octets(bytes)})
     });
     if(!r.ok) throw new Error('HTTP ' + r.status);
     driveStatus(nomPDF(d) + ' envoyé sur votre Drive (dossier « Traçabilité ») à ' + new Date().toLocaleTimeString('fr-FR') + '.');
@@ -1613,8 +1625,13 @@ function driveAutoJour(d){ if(driveCfg.auto && driveCfg.url) envoyerDrivePDF(d, 
 const CODE_APPS_SCRIPT =
 `function doPost(e) {
   var d = JSON.parse(e.postData.contents);
-  var dossiers = DriveApp.getFoldersByName('Traçabilité');
-  var dossier = dossiers.hasNext() ? dossiers.next() : DriveApp.createFolder('Traçabilité');
+  var dossier;
+  if (d.dossierId) {
+    dossier = DriveApp.getFolderById(d.dossierId);           // votre dossier précis
+  } else {
+    var dossiers = DriveApp.getFoldersByName('Traçabilité');
+    dossier = dossiers.hasNext() ? dossiers.next() : DriveApp.createFolder('Traçabilité');
+  }
   var octets = Utilities.base64Decode(d.contenu);
   var blob = Utilities.newBlob(octets, d.type || 'application/pdf', d.nom);
   // remplace le fichier du même nom s'il existe déjà (une version par jour)
@@ -1771,8 +1788,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   /* Google Drive */
   el('driveUrl').value = driveCfg.url || '';
   el('driveAuto').checked = driveCfg.auto !== false;
+  el('driveFolder').value = driveCfg.dossier || '';
+  const majDossierInfo = ()=>{
+    const id = dossierId(driveCfg.dossier);
+    el('driveFolderInfo').innerHTML = driveCfg.dossier
+      ? (id ? '✓ Dossier reconnu — les feuilles y seront déposées.'
+            : '<strong style="color:var(--bad)">Lien non reconnu : collez l\'adresse du dossier (…/folders/…).</strong>')
+      : '';
+  };
+  majDossierInfo();
   el('driveUrl').addEventListener('input', ()=>{ driveCfg.url = el('driveUrl').value.trim(); persistDrive(); renderHisto(); });
   el('driveAuto').addEventListener('change', ()=>{ driveCfg.auto = el('driveAuto').checked; persistDrive(); });
+  el('driveFolder').addEventListener('input', ()=>{ driveCfg.dossier = el('driveFolder').value.trim(); persistDrive(); majDossierInfo(); });
   el('btnDriveTest').addEventListener('click', ()=>envoyerDrivePDF(aujourdhui(), false));
   el('btnDriveNow').addEventListener('click', ()=>envoyerDrivePDF(aujourdhui(), false));
   el('btnDriveCode').addEventListener('click', async ()=>{

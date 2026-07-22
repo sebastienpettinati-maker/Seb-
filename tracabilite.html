@@ -368,9 +368,41 @@
     <section class="card">
       <h2>📅 Historique des journées</h2>
       <p class="hint">Chaque journée regroupe les photos du matin et les productions enregistrées, avec leurs liens.
-         La feuille de traçabilité s'imprime ou s'enregistre en PDF — à archiver pour vos contrôles.</p>
+         Touchez « ⬇ PDF » pour télécharger directement la feuille de traçabilité du jour — à archiver pour vos
+         contrôles.</p>
       <div id="histoList"></div>
       <p class="footnote" id="histoVide" style="margin-bottom:0">Aucune journée enregistrée pour l'instant.</p>
+    </section>
+
+    <section class="card">
+      <h2>☁️ Sauvegarde Google Drive</h2>
+      <p class="hint">Envoyez automatiquement la feuille PDF de chaque journée dans un dossier « Traçabilité » de
+         votre Google Drive. À configurer une seule fois (voir « Première installation » ci-dessous).</p>
+      <div class="toolbar">
+        <div class="field" style="flex:1;min-width:260px">
+          <label for="driveUrl">Adresse du script Google (se termine par /exec)</label>
+          <input type="text" id="driveUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;padding-bottom:9px">
+          <input type="checkbox" id="driveAuto" checked> Envoi automatique chaque jour
+        </label>
+      </div>
+      <div class="recipe-actions" style="margin-top:8px">
+        <button class="small" id="btnDriveTest" type="button">Tester la connexion</button>
+        <button class="small" id="btnDriveNow" type="button">☁️ Envoyer la journée d'aujourd'hui</button>
+      </div>
+      <p class="footnote" id="driveStatus" style="margin:10px 0 0"></p>
+      <details class="more"><summary>Première installation (5 min, une seule fois)</summary>
+        <ol class="footnote" style="margin:8px 0 0;padding-left:20px;line-height:1.7">
+          <li>Sur un ordinateur, allez sur <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> et créez un <strong>Nouveau projet</strong>.</li>
+          <li>Effacez le contenu et collez le code fourni ci-dessous (bouton « Copier le code du script »).</li>
+          <li>Cliquez sur <strong>Déployer ▸ Nouveau déploiement</strong>, type <strong>Application Web</strong>, « Exécuter en tant que : moi », « Accès : tout le monde », puis <strong>Déployer</strong> et autorisez.</li>
+          <li>Copiez l'<strong>URL de l'application Web</strong> (elle se termine par <code>/exec</code>), collez-la dans le champ ci-dessus, puis touchez « Tester la connexion ».</li>
+        </ol>
+        <div class="recipe-actions" style="margin-top:10px">
+          <button class="small" id="btnDriveCode" type="button">📋 Copier le code du script</button>
+        </div>
+      </details>
     </section>
   </section>
 
@@ -1199,6 +1231,7 @@ function enregistrerProduction(){
   liensSel = {};
   renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
   toast('✅ Production enregistrée — « ' + produit.nom + ' »');
+  driveAutoJour(d);   // envoi automatique de la feuille PDF du jour sur Drive
 }
 function renderProdJour(){
   const d = jourProd(), prods = jour(d).productions;
@@ -1291,11 +1324,19 @@ function renderHisto(){
     row.innerHTML = `<div class="grow"><strong style="text-transform:capitalize">${esc(dateFr(d))}</strong>
       <div class="chips">${chips || '<span class="chip gris">vide</span>'}</div></div>`;
 
-    const bPrint = document.createElement('button'); bPrint.className = 'small'; bPrint.type = 'button';
-    bPrint.textContent = '🖨 Feuille';
-    bPrint.title = 'Imprimer / enregistrer en PDF la feuille de traçabilité';
-    bPrint.addEventListener('click', ()=>imprimerJour(d));
-    row.appendChild(bPrint);
+    const bPdf = document.createElement('button'); bPdf.className = 'small'; bPdf.type = 'button';
+    bPdf.textContent = '⬇ PDF';
+    bPdf.title = 'Télécharger la feuille de traçabilité du jour en PDF';
+    bPdf.addEventListener('click', ()=>telechargerPDF(d));
+    row.appendChild(bPdf);
+
+    if(driveCfg.url){
+      const bCloud = document.createElement('button'); bCloud.className = 'small'; bCloud.type = 'button';
+      bCloud.textContent = '☁️';
+      bCloud.title = 'Envoyer cette journée sur Google Drive';
+      bCloud.addEventListener('click', ()=>{ activerOnglet('historique'); envoyerDrivePDF(d, false); });
+      row.appendChild(bCloud);
+    }
 
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
     bDel.title = 'Supprimer cette journée'; bDel.textContent = '✕';
@@ -1309,60 +1350,246 @@ function renderHisto(){
     box.appendChild(row);
   }
 }
-async function imprimerJour(d){
+/* =====================================================================
+   FEUILLE DE TRAÇABILITÉ EN PDF (téléchargeable directement)
+   PDF construit à la main (police Helvetica standard, photos JPEG
+   intégrées) : aucune dépendance, fonctionne hors connexion.
+===================================================================== */
+/* photo réduite en JPEG RGB + dimensions, pour intégration DCTDecode */
+function jpegPourPDF(dataUrl){
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const maxw = 760, k = Math.min(1, maxw/img.width);
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.width*k));
+      cv.height = Math.max(1, Math.round(img.height*k));
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      try{
+        const b64 = cv.toDataURL('image/jpeg', .7).split(',')[1];
+        const bin = atob(b64), bytes = new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+        res({bytes, w: cv.width, h: cv.height});
+      }catch(e){ res(null); }
+    };
+    img.onerror = ()=>res(null);
+    img.src = dataUrl;
+  });
+}
+/* Unicode → WinAnsi (police PDF standard) ; caractères hors jeu remplacés */
+const WINANSI = {'œ':0x9C,'Œ':0x8C,'’':0x92,'‘':0x91,'“':0x93,'”':0x94,'–':0x96,'—':0x97,'•':0x95,'€':0x80,'…':0x85};
+function toWin(s){
+  let out = '';
+  for(const ch of String(s==null?'':s)){
+    if(ch === '→' || ch === '➔'){ out += '->'; continue; }
+    let code = WINANSI[ch] != null ? WINANSI[ch] : ch.codePointAt(0);
+    if(code > 0xFF){ out += '?'; continue; }
+    out += String.fromCharCode(code);
+  }
+  return out;
+}
+const escPDF = s => toWin(s).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)').replace(/[\r\n]/g,' ');
+
+async function pdfRecap(d){
   await chargerPhotosJour(d);
   const j = jour(d);
-  /* système de renvois : chaque marchandise du matin reçoit un numéro M1, M2…
-     repris dans les productions, et chaque marchandise liste en retour les
-     productions dans lesquelles elle est partie */
   const photoById = {}, numM = {};
   j.photos.forEach((p, i)=>{ photoById[p.id] = p; numM[p.id] = 'M' + (i+1); });
-  const usages = {};   // id de marchandise -> noms des productions qui l'utilisent
+  const usages = {};
   for(const pr of j.productions)
-    for(const i of pr.ingredients)
-      if(i.photoId && photoById[i.photoId])
-        (usages[i.photoId] = usages[i.photoId] || []).includes(pr.nom) || usages[i.photoId].push(pr.nom);
+    for(const it of pr.ingredients)
+      if(it.photoId && photoById[it.photoId])
+        (usages[it.photoId] = usages[it.photoId] || []).includes(pr.nom) || usages[it.photoId].push(pr.nom);
   const fdate = iso => iso ? new Date(iso+'T12:00:00').toLocaleDateString('fr-FR') : '—';
 
-  let html = `<h1>Feuille de traçabilité</h1>
-    <p class="sub"><span style="text-transform:capitalize">${esc(dateFr(d))}</span> — document à archiver.
-    Chaque marchandise porte un n° (M1, M2…) repris dans les productions ; photos des étiquettes en annexe.</p>`;
+  const imgs = [];
+  for(const p of j.photos){
+    if(!photoCache[p.id]) continue;
+    const im = await jpegPourPDF(photoCache[p.id]);
+    if(im){ im.p = p; im.ref = 'Im' + imgs.length; imgs.push(im); }
+  }
+
+  /* --- mise en page --- */
+  const PW = 595, PH = 842, M = 42, RIGHT = PW - M;
+  const pages = []; let ops, y;
+  const nl = ()=>{ ops = []; pages.push(ops); y = PH - M; };
+  const room = h => { if(y - h < M) nl(); };
+  const put = (x, size, bold, str)=>ops.push('BT /' + (bold?'F2':'F1') + ' ' + size + ' Tf 1 0 0 1 ' + x.toFixed(2) + ' ' + y.toFixed(2) + ' Tm (' + escPDF(str) + ') Tj ET');
+  function ligne(str, size, bold, indent, gap){
+    size = size||10; indent = indent||0; gap = gap==null?3:gap;
+    const maxw = RIGHT - M - indent, mots = String(str).split(' ');
+    let cur = '';
+    const flush = ()=>{ room(size + gap); y -= size; put(M + indent, size, bold, cur); y -= gap; cur = ''; };
+    for(const w of mots){
+      const test = cur ? cur + ' ' + w : w;
+      if(cur && test.length * size * 0.5 > maxw){ flush(); cur = w; } else cur = test;
+    }
+    if(cur) flush();
+  }
+  function titreSection(str){
+    y -= 8; room(22); y -= 13; put(M, 13, true, str);
+    y -= 6; ops.push(M + ' ' + y.toFixed(2) + ' ' + RIGHT + ' ' + y.toFixed(2) + ' 0.6 w 0.5 G ' + M + ' ' + y.toFixed(2) + ' m ' + RIGHT + ' ' + y.toFixed(2) + ' l S 0 G');
+    y -= 8;
+  }
+
+  nl();
+  y -= 24; put(M, 20, true, 'Feuille de traçabilité');
+  const dj = dateFr(d), djCap = dj.charAt(0).toUpperCase() + dj.slice(1);
+  y -= 2;
+  ligne(djCap + ' — document à archiver. Chaque marchandise porte un numéro (M1, M2…) repris dans les productions.', 9, false, 0, 4);
 
   if(j.photos.length){
-    html += `<h2>Marchandises du matin</h2>
-      <table><tr><th>N°</th><th>Marchandise</th><th>N° de lot</th><th>DLC / DDM</th><th>Utilisée dans</th></tr>` +
-      j.photos.map(p=>`<tr><td><strong>${numM[p.id]}</strong></td><td>${esc(p.nom||'(sans nom)')}</td>
-        <td>${esc(p.lot||'—')}</td><td>${fdate(p.dlc)}</td>
-        <td>${usages[p.id] ? esc(usages[p.id].join(', ')) : '<em>non utilisée ce jour</em>'}</td></tr>`).join('') +
-      `</table>`;
-  }
-
-  if(j.productions.length){
-    html += `<h2>Productions du jour</h2>`;
-    for(const pr of j.productions){
-      const conserv = pr.dlc ? ' — ' + (pr.conservation==='congel' ? 'congélateur' : 'frigo') +
-        ' · DLC ' + fdate(pr.dlc) : '';
-      html += `<h3>${esc(pr.nom)}${pr.heure ? ' — ' + esc(pr.heure) : ''}${esc(conserv)}</h3>
-        <table><tr><th>Ingrédient</th><th>Marchandise reliée</th><th>N° de lot</th><th>DLC / DDM</th></tr>` +
-        pr.ingredients.map(i=>{
-          const p = i.photoId ? photoById[i.photoId] : null;
-          return `<tr><td>${esc(i.nom)}</td>
-            <td>${p ? '<strong>' + numM[p.id] + '</strong> — ' + esc(p.nom||'(sans nom)') : '—'}</td>
-            <td>${p ? esc(p.lot||'—') : '—'}</td><td>${p ? fdate(p.dlc) : '—'}</td></tr>`;
-        }).join('') + `</table>`;
+    titreSection('Marchandises du matin');
+    for(const p of j.photos){
+      ligne(numM[p.id] + '   ' + (p.nom||'(sans nom)'), 10, true, 0, 1);
+      ligne('Lot : ' + (p.lot||'—') + '     DLC/DDM : ' + fdate(p.dlc) + '     Utilisée dans : ' +
+        (usages[p.id] ? usages[p.id].join(', ') : 'non utilisée ce jour'), 9, false, 14, 5);
     }
   }
+  if(j.productions.length){
+    titreSection('Productions du jour');
+    for(const pr of j.productions){
+      const cons = pr.dlc ? ' — ' + (pr.conservation==='congel'?'congélateur':'frigo') + ' · DLC ' + fdate(pr.dlc) : '';
+      ligne(pr.nom + (pr.heure?' — '+pr.heure:'') + cons, 11, true, 0, 2);
+      for(const it of pr.ingredients){
+        const p = it.photoId ? photoById[it.photoId] : null;
+        ligne('• ' + it.nom + '  ->  ' + (p ? numM[p.id] + ' ' + (p.nom||'') + '  (lot ' + (p.lot||'—') + ', DLC ' + fdate(p.dlc) + ')' : '—'), 9, false, 14, 2);
+      }
+      y -= 5;
+    }
+  }
+  if(imgs.length){
+    titreSection('Photos des étiquettes (M1, M2…)');
+    const col = (RIGHT - M - 16) / 2;
+    for(let i=0;i<imgs.length;i+=2){
+      const paire = [imgs[i], imgs[i+1]].filter(Boolean);
+      const hs = paire.map(im=>Math.min(col*(im.h/im.w), 240));
+      const maxH = Math.max.apply(null, hs);
+      room(maxH + 26);
+      paire.forEach((im, idx)=>{
+        const x = M + idx*(col+16), h = hs[idx];
+        ops.push('q ' + col.toFixed(2) + ' 0 0 ' + h.toFixed(2) + ' ' + x.toFixed(2) + ' ' + (y-h).toFixed(2) + ' cm /' + im.ref + ' Do Q');
+      });
+      const capY = y - maxH - 12;
+      paire.forEach((im, idx)=>{
+        const x = M + idx*(col+16);
+        ops.push('BT /F1 8 Tf 1 0 0 1 ' + x.toFixed(2) + ' ' + capY.toFixed(2) + ' Tm (' +
+          escPDF(numM[im.p.id] + ' · ' + (im.p.nom||'(sans nom)') + (im.p.lot?' — lot '+im.p.lot:'')) + ') Tj ET');
+      });
+      y -= maxH + 26;
+    }
+  }
+  y -= 22; room(30);
+  put(M, 10, false, 'Date : ...........................');
+  ops.push('BT /F1 10 Tf 1 0 0 1 ' + (M+280) + ' ' + y.toFixed(2) + ' Tm (' + escPDF('Signature : ...........................') + ') Tj ET');
 
-  const cells = j.photos.filter(p=>photoCache[p.id])
-    .map(p=>`<div class="photocell"><img src="${photoCache[p.id]}" alt=""><div><strong>${numM[p.id]} · ${esc(p.nom||'(sans nom)')}</strong>${p.lot?' — lot '+esc(p.lot):''}${p.dlc?' — DLC '+fdate(p.dlc):''}</div></div>`);
-  if(cells.length) html += `<h2>Annexe — photos des étiquettes (M1, M2…)</h2><div class="photogrid">${cells.join('')}</div>`;
+  /* --- assemblage des octets du PDF --- */
+  const enc = s => { const u = new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i] = s.charCodeAt(i)&0xff; return u; };
+  const parts = []; let len = 0; const off = {};
+  const push = u => { parts.push(u); len += u.length; };
+  const pushS = s => push(enc(s));
+  const nImg = imgs.length, P = pages.length;
+  const idImg = i => 5 + i, idContent = k => 5 + nImg + 2*k, idPage = k => 5 + nImg + 2*k + 1;
+  const maxId = 4 + nImg + 2*P;
 
-  html += `<div class="signature"><span>Date : </span><span>Signature : </span></div>`;
+  pushS('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  off[1] = len; pushS('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  const kids = []; for(let k=0;k<P;k++) kids.push(idPage(k) + ' 0 R');
+  off[2] = len; pushS('2 0 obj\n<< /Type /Pages /Count ' + P + ' /Kids [' + kids.join(' ') + '] >>\nendobj\n');
+  off[3] = len; pushS('3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n');
+  off[4] = len; pushS('4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n');
+  imgs.forEach((im, i)=>{
+    off[idImg(i)] = len;
+    pushS(idImg(i) + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + im.w + ' /Height ' + im.h +
+      ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + im.bytes.length + ' >>\nstream\n');
+    push(im.bytes); pushS('\nendstream\nendobj\n');
+  });
+  const xobj = imgs.length ? ' /XObject << ' + imgs.map((im, i)=>'/' + im.ref + ' ' + idImg(i) + ' 0 R').join(' ') + ' >>' : '';
+  const resources = '<< /Font << /F1 3 0 R /F2 4 0 R >>' + xobj + ' >>';
+  for(let k=0;k<P;k++){
+    const cb = enc(pages[k].join('\n') + '\n');
+    off[idContent(k)] = len;
+    pushS(idContent(k) + ' 0 obj\n<< /Length ' + cb.length + ' >>\nstream\n'); push(cb); pushS('\nendstream\nendobj\n');
+    off[idPage(k)] = len;
+    pushS(idPage(k) + ' 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources ' + resources + ' /Contents ' + idContent(k) + ' 0 R >>\nendobj\n');
+  }
+  const xrefStart = len;
+  let xref = 'xref\n0 ' + (maxId+1) + '\n0000000000 65535 f \n';
+  for(let id=1; id<=maxId; id++) xref += String(off[id]||0).padStart(10, '0') + ' 00000 n \n';
+  pushS(xref);
+  pushS('trailer\n<< /Size ' + (maxId+1) + ' /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF');
 
-  el('printArea').innerHTML = html;
-  try{ window.print(); }
-  catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez l\'application dans Safari ou Chrome.'); }
+  const out = new Uint8Array(len); let o = 0;
+  for(const u of parts){ out.set(u, o); o += u.length; }
+  return out;
 }
+function nomPDF(d){ return 'traçabilité-' + d + '.pdf'; }
+async function telechargerPDF(d){
+  toast('📄 Création du PDF…');
+  try{
+    const bytes = await pdfRecap(d);
+    const blob = new Blob([bytes], {type:'application/pdf'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = nomPDF(d); a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    toast('⬇ PDF téléchargé');
+    driveAutoJour(d);
+  }catch(e){ toast('⚠️ Création du PDF impossible'); }
+}
+
+/* =====================================================================
+   GOOGLE DRIVE — envoi automatique de la feuille PDF (script /exec)
+===================================================================== */
+let driveCfg = {url:'', auto:true};
+try{ driveCfg = Object.assign(driveCfg, JSON.parse(localStorage.getItem('trac_drive'))||{}); }catch(e){}
+function persistDrive(){ try{ localStorage.setItem('trac_drive', JSON.stringify(driveCfg)); }catch(e){} }
+function driveStatus(msg, err){
+  const s = el('driveStatus'); if(!s) return;
+  s.innerHTML = err ? '<strong style="color:var(--bad)">✗ ' + esc(msg) + '</strong>' : '✓ ' + esc(msg);
+}
+function base64Octets(bytes){
+  let s = ''; const CH = 0x8000;
+  for(let i=0;i<bytes.length;i+=CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i+CH));
+  return btoa(s);
+}
+async function envoyerDrivePDF(d, silencieux){
+  if(!driveCfg.url || !driveCfg.url.includes('script.google')){
+    if(!silencieux) driveStatus('Adresse du script Google non configurée (voir « Première installation »).', true);
+    return false;
+  }
+  if(!silencieux) driveStatus('Envoi en cours…');
+  try{
+    const bytes = await pdfRecap(d);
+    const r = await fetch(driveCfg.url, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({app:'tracabilite', nom: nomPDF(d), type:'application/pdf', encodage:'base64', contenu: base64Octets(bytes)})
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    driveStatus(nomPDF(d) + ' envoyé sur votre Drive (dossier « Traçabilité ») à ' + new Date().toLocaleTimeString('fr-FR') + '.');
+    return true;
+  }catch(e){
+    driveStatus('Envoi impossible : vérifiez l\'adresse du script et votre connexion internet.', true);
+    return false;
+  }
+}
+function driveAutoJour(d){ if(driveCfg.auto && driveCfg.url) envoyerDrivePDF(d, true); }
+
+/* code du script Google Apps Script à coller (décode le base64 en PDF) */
+const CODE_APPS_SCRIPT =
+`function doPost(e) {
+  var d = JSON.parse(e.postData.contents);
+  var dossiers = DriveApp.getFoldersByName('Traçabilité');
+  var dossier = dossiers.hasNext() ? dossiers.next() : DriveApp.createFolder('Traçabilité');
+  var octets = Utilities.base64Decode(d.contenu);
+  var blob = Utilities.newBlob(octets, d.type || 'application/pdf', d.nom);
+  // remplace le fichier du même nom s'il existe déjà (une version par jour)
+  var existants = dossier.getFilesByName(d.nom);
+  while (existants.hasNext()) existants.next().setTrashed(true);
+  dossier.createFile(blob);
+  return ContentService.createTextOutput('OK');
+}`;
 
 /* =====================================================================
    SAUVEGARDE / RESTAURATION (fichier JSON, photos comprises)
@@ -1506,6 +1733,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     const f = e.target.files && e.target.files[0];
     if(f) importer(f);
     e.target.value = '';
+  });
+
+  /* Google Drive */
+  el('driveUrl').value = driveCfg.url || '';
+  el('driveAuto').checked = driveCfg.auto !== false;
+  el('driveUrl').addEventListener('input', ()=>{ driveCfg.url = el('driveUrl').value.trim(); persistDrive(); renderHisto(); });
+  el('driveAuto').addEventListener('change', ()=>{ driveCfg.auto = el('driveAuto').checked; persistDrive(); });
+  el('btnDriveTest').addEventListener('click', ()=>envoyerDrivePDF(aujourdhui(), false));
+  el('btnDriveNow').addEventListener('click', ()=>envoyerDrivePDF(aujourdhui(), false));
+  el('btnDriveCode').addEventListener('click', async ()=>{
+    try{ await navigator.clipboard.writeText(CODE_APPS_SCRIPT); toast('📋 Code copié — collez-le dans script.google.com'); }
+    catch(e){ prompt('Copiez ce code dans votre projet script.google.com :', CODE_APPS_SCRIPT); }
   });
 
   /* visionneuse */

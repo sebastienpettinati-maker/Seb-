@@ -13,7 +13,7 @@
      - Compter le stock du soir
      - Gérer librement les articles (ajouter / modifier / supprimer)
      - Calculer automatiquement la production du lendemain
-     - Exporter en PDF, envoyer sur Google Drive, sauvegarder
+     - Exporter en PDF et l'envoyer par mail, sauvegarder
      Les données sont conservées dans le navigateur (localStorage).
      ============================================================ */
   :root{
@@ -349,14 +349,15 @@ const PALETTE = ["#8FAE83","#CB8A45","#6E9CB3","#C1725D","#5FADA6","#A18FC4",
 /* ============================================================
    2) PERSISTANCE (localStorage)
    ============================================================ */
-const K_CATALOG = "lps-catalogue";
-const K_COUNTS  = "lps-comptages";
-const K_DRIVE   = "lps-drive";
-const K_SAVED   = "lps-derniere-sauvegarde";
+const K_CATALOG  = "lps-catalogue";
+const K_COUNTS   = "lps-comptages";
+const K_SETTINGS = "lps-reglages";
+const K_SAVED    = "lps-derniere-sauvegarde";
 
-let CATALOG = { cats: [], products: [] };
-let COUNTS  = {};                 // { "AAAA-MM-JJ": { idProduit: qté } }
-let DRIVE   = { url: "", auto: true };
+const MAIL_DEFAUT = "lapausesucree.contact@gmail.com";
+let CATALOG  = { cats: [], products: [] };
+let COUNTS   = {};                 // { "AAAA-MM-JJ": { idProduit: qté } }
+let SETTINGS = { mailTo: MAIL_DEFAUT };
 
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 
@@ -370,7 +371,8 @@ function loadAll(){
   if(!CATALOG.products) CATALOG.products = [];
 
   try{ COUNTS = JSON.parse(localStorage.getItem(K_COUNTS)) || {}; }catch(e){ COUNTS = {}; }
-  try{ DRIVE = Object.assign(DRIVE, JSON.parse(localStorage.getItem(K_DRIVE)) || {}); }catch(e){}
+  try{ SETTINGS = Object.assign(SETTINGS, JSON.parse(localStorage.getItem(K_SETTINGS)) || {}); }catch(e){}
+  if(!SETTINGS.mailTo) SETTINGS.mailTo = MAIL_DEFAUT;
 }
 function saveCatalog(){ try{ localStorage.setItem(K_CATALOG, JSON.stringify(CATALOG)); }catch(e){} }
 function saveCounts(silencieux){
@@ -381,7 +383,7 @@ function saveCounts(silencieux){
     if(!silencieux) showToast("Stock enregistré");
   }catch(e){}
 }
-function saveDrive(){ try{ localStorage.setItem(K_DRIVE, JSON.stringify(DRIVE)); }catch(e){} }
+function saveSettings(){ try{ localStorage.setItem(K_SETTINGS, JSON.stringify(SETTINGS)); }catch(e){} }
 
 /* comptages du jour */
 function todayCounts(){
@@ -602,15 +604,15 @@ function renderProduction(){
 
   html += `<div class="btn-row">
       <button class="btn btn-ghost" id="pCopy">📋 Copier</button>
-      <button class="btn btn-ghost" id="pPdf">📄 PDF</button>
-      <button class="btn btn-primary" id="pDrive">☁️ Envoyer</button>
+      <button class="btn btn-ghost" id="pPdf">📄 Créer le PDF</button>
+      <button class="btn btn-primary" id="pMail">📧 Envoyer par mail</button>
     </div>
     <div class="status" id="prodStatus"></div>`;
   app.innerHTML = html;
 
   document.getElementById("pCopy").addEventListener("click", copierProduction);
   document.getElementById("pPdf").addEventListener("click", () => telechargerPDF());
-  document.getElementById("pDrive").addEventListener("click", () => envoyerDrive(false));
+  document.getElementById("pMail").addEventListener("click", envoyerMail);
 }
 
 function texteProduction(){
@@ -781,39 +783,15 @@ function deleteCat(id){
 }
 
 /* ============================================================
-   8) ONGLET RÉGLAGES (Drive, sauvegarde, réinitialisation)
+   8) ONGLET RÉGLAGES (adresse mail, sauvegarde, réinitialisation)
    ============================================================ */
 function renderReglages(){
-  const url = DRIVE.url || "";
-  const etat = !url
-    ? `<div class="status">📴 Envoi Drive non configuré — le PDF reste sur l'appareil (ou via « Copier »).</div>`
-    : `<div class="status ok">✅ Envoi Drive configuré.</div>`;
   app.innerHTML = `
     <div class="card">
-      <h3>☁️ Enregistrer sur Google Drive</h3>
-      <p class="hint">Chaque feuille de production peut être envoyée automatiquement dans un dossier « Stock — La Pause Sucrée » de votre Drive, en PDF.</p>
-      ${etat}
-      <label class="lbl">Adresse du script Google (se termine par /exec)</label>
-      <input class="fld" id="r-url" value="${attr(url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <label class="chk"><input type="checkbox" id="r-auto" ${DRIVE.auto !== false ? "checked" : ""}> Envoyer automatiquement à chaque export PDF</label>
-      <div class="btn-row">
-        <button class="btn btn-ghost" id="r-test">🔌 Tester</button>
-        <button class="btn btn-primary" id="r-send">☁️ Envoyer maintenant</button>
-      </div>
-      <div class="status" id="r-status"></div>
-    </div>
-
-    <div class="card">
-      <h3>🛠 Mise en place du Drive (une seule fois)</h3>
-      <div class="guide">
-        <div class="st"><div>Sur un ordinateur, ouvrez <code>script.google.com</code> et créez un <b>Nouveau projet</b>.</div></div>
-        <div class="st"><div>Effacez le contenu proposé et collez le script ci-dessous.</div></div>
-        <div class="st"><div><b>Déployer ▸ Nouveau déploiement</b>, type <b>Application Web</b>.</div></div>
-        <div class="st"><div>Réglez <b>Exécuter en tant que : Moi</b> et <b>Qui a accès : Tout le monde</b>, puis autorisez.</div></div>
-        <div class="st"><div>Copiez l'<b>URL de l'application Web</b> (finit par <code>/exec</code>) et collez-la ci-dessus.</div></div>
-      </div>
-      <button class="btn btn-ghost btn-block" id="r-copycode" style="margin-top:10px">📋 Copier le script</button>
-      <div class="codeblock" id="r-code"></div>
+      <h3>📧 Envoi par mail</h3>
+      <p class="hint">Le bouton « Envoyer par mail » de l'onglet « À produire » ouvre votre application mail, déjà adressée à cette adresse, avec la liste de production prête à envoyer.</p>
+      <label class="lbl">Adresse de destination</label>
+      <input class="fld" id="r-mail" type="email" value="${attr(SETTINGS.mailTo || MAIL_DEFAUT)}" placeholder="${MAIL_DEFAUT}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="email">
     </div>
 
     <div class="card">
@@ -832,17 +810,8 @@ function renderReglages(){
       <button class="btn btn-danger btn-block" id="r-resetcat">Réinitialiser les articles par défaut</button>
     </div>`;
 
-  document.getElementById("r-code").textContent = CODE_APPS_SCRIPT;
-  const url_ = document.getElementById("r-url");
-  url_.addEventListener("input", () => { DRIVE.url = url_.value.trim(); saveDrive(); });
-  document.getElementById("r-auto").addEventListener("change", (e) => { DRIVE.auto = e.target.checked; saveDrive(); });
-  document.getElementById("r-test").addEventListener("click", testerDrive);
-  document.getElementById("r-send").addEventListener("click", () => envoyerDrive(false, "r-status"));
-  document.getElementById("r-copycode").addEventListener("click", () => {
-    navigator.clipboard.writeText(CODE_APPS_SCRIPT)
-      .then(() => showToast("Script copié"))
-      .catch(() => showToast("Copie impossible — sélectionnez le texte"));
-  });
+  const mail_ = document.getElementById("r-mail");
+  mail_.addEventListener("input", () => { SETTINGS.mailTo = mail_.value.trim(); saveSettings(); });
   document.getElementById("r-export").addEventListener("click", exporterSauvegarde);
   document.getElementById("r-import").addEventListener("click", () => document.getElementById("r-file").click());
   document.getElementById("r-file").addEventListener("change", (e) => { if(e.target.files[0]) importerSauvegarde(e.target.files[0]); });
@@ -860,7 +829,7 @@ function statusMsg(id, msg, err){
 
 /* ---- sauvegarde / restauration JSON ---- */
 function exporterSauvegarde(){
-  const data = { app: "lps-stock", version: 1, catalog: CATALOG, counts: COUNTS, drive: DRIVE };
+  const data = { app: "lps-stock", version: 1, catalog: CATALOG, counts: COUNTS, settings: SETTINGS };
   const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -876,7 +845,7 @@ async function importerSauvegarde(file){
     if(!confirm("Restaurer cette sauvegarde ? Les données actuelles seront remplacées.")) return;
     if(data.catalog){ CATALOG = data.catalog; saveCatalog(); }
     if(data.counts){ COUNTS = data.counts; saveCounts(true); }
-    if(data.drive){ DRIVE = Object.assign(DRIVE, data.drive); saveDrive(); }
+    if(data.settings){ SETTINGS = Object.assign(SETTINGS, data.settings); saveSettings(); }
     render(); showToast("Données restaurées");
   }catch(e){ alert("Fichier illisible : choisissez une sauvegarde créée par cette application (.json)."); }
 }
@@ -997,78 +966,23 @@ async function telechargerPDF(){
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     showToast("PDF téléchargé");
   }
-  if(DRIVE.auto && DRIVE.url) envoyerDrive(true);
 }
 
 /* ============================================================
-   10) ENVOI GOOGLE DRIVE (script /exec)
+   10) ENVOI PAR MAIL
+   Ouvre l'application mail du téléphone, déjà adressée, avec la
+   liste de production dans le corps du message — prête à envoyer.
    ============================================================ */
-function base64Octets(bytes){
-  let s = ""; const CH = 0x8000;
-  for(let i=0;i<bytes.length;i+=CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i+CH));
-  return btoa(s);
+function envoyerMail(){
+  const to = (SETTINGS.mailTo || MAIL_DEFAUT).trim();
+  const sujet = "Production à préparer — " + fmtDate(demain());
+  const corps = texteProduction();
+  const url = "mailto:" + encodeURIComponent(to)
+    + "?subject=" + encodeURIComponent(sujet)
+    + "&body=" + encodeURIComponent(corps);
+  window.location.href = url;
+  statusMsg("prodStatus", "✉️ Mail préparé pour " + to + " — vérifiez puis envoyez depuis votre messagerie.");
 }
-async function envoyerDrive(silencieux, statusId){
-  statusId = statusId || "prodStatus";
-  if(!DRIVE.url || !DRIVE.url.includes("script.google")){
-    if(!silencieux) statusMsg(statusId, "✗ Adresse du script Google non configurée (onglet Réglages).", true);
-    return false;
-  }
-  if(!silencieux) statusMsg(statusId, "Envoi en cours…");
-  let corps;
-  try{
-    const bytes = pdfProduction();
-    corps = JSON.stringify({ app:"stock", nom: nomPDF(), type:"application/pdf", encodage:"base64", contenu: base64Octets(bytes) });
-  }catch(e){ if(!silencieux) statusMsg(statusId, "✗ Création du PDF impossible.", true); return false; }
-  const heure = () => new Date().toLocaleTimeString("fr-FR");
-  const pageGoogle = t => /<html|accounts\.google|Sign ?in|Se connecter|autorisation requise|Moved Temporarily|Temporary Redirect/i.test(t);
-  try{
-    const r = await fetch(DRIVE.url, { method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: corps });
-    const rep = await r.text().catch(() => "");
-    if(r.ok && !pageGoogle(rep)){ if(!silencieux) statusMsg(statusId, "✓ " + nomPDF() + " envoyé sur Drive à " + heure() + "."); showToast("Envoyé sur Drive"); return true; }
-    if(pageGoogle(rep) || r.status === 401 || r.status === 403){
-      if(!silencieux) statusMsg(statusId, "✗ Le script renvoie une page de connexion : réglez « Qui a accès » sur « Tout le monde » puis redéployez.", true);
-      return false;
-    }
-    throw new Error("HTTP " + r.status);
-  }catch(e){
-    try{
-      await fetch(DRIVE.url, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: corps });
-      if(!silencieux) statusMsg(statusId, "✓ Envoyé à " + heure() + " (confirmation non lisible). Vérifiez le dossier Drive.");
-      showToast("Envoyé sur Drive"); return true;
-    }catch(e2){
-      if(!silencieux) statusMsg(statusId, "✗ Envoi impossible : vérifiez la connexion et l'adresse du script (/exec).", true);
-      return false;
-    }
-  }
-}
-async function testerDrive(){
-  if(!DRIVE.url){ statusMsg("r-status", "✗ Collez d'abord l'URL du script.", true); return; }
-  statusMsg("r-status", "Test en cours…");
-  try{
-    const r = await fetch(DRIVE.url, { method:"GET" });
-    const t = await r.text();
-    if(/<html|accounts\.google|Se connecter/i.test(t)) statusMsg("r-status", "✗ Page de connexion Google : réglez l'accès sur « Tout le monde ».", true);
-    else statusMsg("r-status", "✓ Connexion réussie.");
-  }catch(e){ statusMsg("r-status", "✗ Échec — vérifiez l'URL et le déploiement.", true); }
-}
-
-const CODE_APPS_SCRIPT =
-`function doGet(e) {
-  return ContentService.createTextOutput('OK');
-}
-function doPost(e) {
-  var d = JSON.parse(e.postData.contents);
-  var dossiers = DriveApp.getFoldersByName('Stock - La Pause Sucrée');
-  var dossier = dossiers.hasNext() ? dossiers.next() : DriveApp.createFolder('Stock - La Pause Sucrée');
-  var octets = Utilities.base64Decode(d.contenu);
-  var blob = Utilities.newBlob(octets, d.type || 'application/pdf', d.nom);
-  // remplace le fichier du même nom (une version par jour)
-  var existants = dossier.getFilesByName(d.nom);
-  while (existants.hasNext()) existants.next().setTrashed(true);
-  dossier.createFile(blob);
-  return ContentService.createTextOutput('OK');
-}`;
 
 /* ============================================================
    11) DÉMARRAGE + service worker (hors-ligne / installation)

@@ -953,19 +953,38 @@ function nomPDF(){ return "production-" + demain().toISOString().slice(0,10) + "
 async function telechargerPDF(){
   showToast("Création du PDF…");
   let bytes;
-  try{ bytes = pdfProduction(); }catch(e){ showToast("PDF impossible"); return; }
-  const fichier = new File([bytes], nomPDF(), { type: "application/pdf" });
-  // Partage natif du téléphone (permet « Enregistrer dans Drive », Mail, etc.)
+  try{ bytes = pdfProduction(); }catch(e){ statusMsg("prodStatus", "✗ Création du PDF impossible.", true); return; }
+  const nom = nomPDF();
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const fichier = new File([bytes], nom, { type: "application/pdf" });
+
+  // 1) Téléphone : partage natif (Mail, WhatsApp, Fichiers…) avec le PDF joint.
   if(navigator.canShare && navigator.canShare({ files: [fichier] })){
-    try{ await navigator.share({ files: [fichier], title: nomPDF(), text: "Production — " + fmtDate(demain()) }); }
-    catch(e){ /* annulé */ }
-  }else{
-    const blob = new Blob([bytes], { type: "application/pdf" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = nomPDF(); a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    showToast("PDF téléchargé");
+    try{
+      await navigator.share({ files: [fichier], title: nom, text: "Production — " + fmtDate(demain()) });
+      statusMsg("prodStatus", "✓ PDF prêt à partager.");
+      return;
+    }catch(e){ if(e && e.name === "AbortError") return; /* sinon on tente le repli */ }
   }
+
+  // 2) Ordinateur / repli : téléchargement + ouverture dans un nouvel onglet,
+  //    et un lien de secours visible si le navigateur bloque l'un ou l'autre.
+  const urlB = URL.createObjectURL(blob);
+  try{
+    const a = document.createElement("a");
+    a.href = urlB; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){}
+  const w = window.open(urlB, "_blank");
+  const s = document.getElementById("prodStatus");
+  if(s){
+    s.className = "status ok";
+    s.textContent = w ? "📄 PDF ouvert dans un nouvel onglet (et téléchargé). " : "📄 PDF généré. S'il ne s'ouvre pas, touchez : ";
+    const link = document.createElement("a");
+    link.href = urlB; link.target = "_blank"; link.download = nom;
+    link.textContent = "ouvrir le PDF"; link.style.color = "var(--accent)"; link.style.fontWeight = "700";
+    s.appendChild(link);
+  }
+  setTimeout(() => URL.revokeObjectURL(urlB), 60000);
 }
 
 /* ============================================================
@@ -980,8 +999,18 @@ function envoyerMail(){
   const url = "mailto:" + encodeURIComponent(to)
     + "?subject=" + encodeURIComponent(sujet)
     + "&body=" + encodeURIComponent(corps);
-  window.location.href = url;
-  statusMsg("prodStatus", "✉️ Mail préparé pour " + to + " — vérifiez puis envoyez depuis votre messagerie.");
+  // Un vrai clic sur un lien est plus fiable que window.location pour ouvrir la messagerie.
+  const a = document.createElement("a");
+  a.href = url; document.body.appendChild(a); a.click(); a.remove();
+  const s = document.getElementById("prodStatus");
+  if(s){
+    s.className = "status ok";
+    s.textContent = "✉️ Ouverture de votre messagerie, adressée à " + to + ". Si rien ne s'ouvre, touchez : ";
+    const link = document.createElement("a");
+    link.href = url; link.textContent = "écrire le mail";
+    link.style.color = "var(--accent)"; link.style.fontWeight = "700";
+    s.appendChild(link);
+  }
 }
 
 /* ============================================================

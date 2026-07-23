@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1E1B18">
+<link rel="manifest" href="stock.webmanifest">
+<title>Stock &amp; Production — La Pause Sucrée</title>
+<style>
+  /* ============================================================
+     LA PAUSE SUCRÉE — Stock & Production
+     Application autonome (un seul fichier, fonctionne hors-ligne).
+     - Compter le stock du soir
+     - Gérer librement les articles (ajouter / modifier / supprimer)
+     - Calculer automatiquement la production du lendemain
+     - Exporter en PDF et l'envoyer par mail, sauvegarder
+     Les données sont conservées dans le navigateur (localStorage).
+     ============================================================ */
+  :root{
+    --bg: #1E1B18;
+    --bg-dust: radial-gradient(ellipse at 15% -10%, rgba(245,239,230,0.06), transparent 45%),
+               radial-gradient(ellipse at 85% 0%, rgba(245,239,230,0.05), transparent 40%);
+    --surface: #27221E;
+    --surface-2: #322C27;
+    --surface-input: #3A332C;
+    --line: #423B33;
+    --text: #F5EFE6;
+    --text-dim: #B7A996;
+    --text-faint: #8A7D6C;
+    --accent: #D9A455;
+    --accent-ink: #2A2016;
+    --ok: #7C9473;
+    --warn: #D9764A;
+    --danger: #D9764A;
+    font-size: 16px;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{
+    margin:0; padding:0;
+    background: var(--bg-dust), var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  .display{ font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif; }
+  button{ font-family: inherit; }
+
+  header{
+    position: sticky; top: 0; z-index: 20;
+    background: linear-gradient(180deg, var(--bg) 78%, rgba(30,27,24,0));
+    padding: calc(14px + env(safe-area-inset-top)) 16px 8px;
+  }
+  header h1{ margin: 0; font-size: 1.45rem; font-weight: 600; letter-spacing: 0.2px; }
+  header h1 .accent{ color: var(--accent); }
+  header .sub{
+    margin-top: 2px; font-size: 0.8rem; color: var(--text-dim);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  }
+  header .sub span.saved-ok{ color: var(--ok); }
+
+  .tabs{
+    display: flex; gap: 6px; padding: 8px 12px 2px;
+    max-width: 640px; margin: 0 auto; overflow-x: auto; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab{
+    flex: 1 0 auto; white-space: nowrap;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--text-dim); border-radius: 12px;
+    padding: 9px 14px; font-size: 0.86rem; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab.active{ background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  .search-wrap{ padding: 8px 16px 4px; max-width: 640px; margin: 0 auto; }
+  .search-wrap input{
+    width: 100%; padding: 11px 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--text); font-size: 1rem;
+  }
+  .search-wrap input::placeholder{ color: var(--text-faint); }
+  .search-wrap input:focus{ outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  main{ padding: 6px 12px 150px; max-width: 640px; margin: 0 auto; }
+
+  .cat{
+    margin-top: 14px; border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--line); background: var(--surface);
+  }
+  .cat-head{
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; cursor: pointer; user-select: none; background: var(--surface-2);
+  }
+  .cat-dot{ width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .cat-head .name{ font-weight: 600; flex: 1; font-size: 0.98rem; }
+  .cat-head .count{ font-size: 0.78rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .cat-head .chevron{ color: var(--text-faint); transition: transform .18s ease; font-size: 0.8rem; }
+  .cat.collapsed .chevron{ transform: rotate(-90deg); }
+  .cat.collapsed .rows{ display: none; }
+
+  .row{ display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); }
+  .row .info{ flex: 1; min-width: 0; }
+  .row .pname{ font-size: 0.94rem; line-height: 1.25; }
+  .row .ptarget{ font-size: 0.74rem; color: var(--text-faint); margin-top: 1px; }
+  .badge{
+    font-size: 0.7rem; padding: 2px 7px; border-radius: 999px; margin-left: 6px;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .badge.need{ background: rgba(217,118,74,0.18); color: var(--warn); }
+  .badge.ok{ background: rgba(124,148,115,0.18); color: var(--ok); }
+
+  .stepper{
+    display: flex; align-items: center; background: var(--surface-input);
+    border-radius: 12px; border: 1px solid var(--line); flex: none;
+  }
+  .stepper button{
+    width: 38px; height: 38px; border: none; background: transparent; color: var(--text);
+    font-size: 1.15rem; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .stepper button:active{ background: rgba(255,255,255,0.06); }
+  .stepper input{
+    width: 42px; border: none; background: transparent; color: var(--text);
+    text-align: center; font-size: 1rem; font-variant-numeric: tabular-nums; padding: 0;
+  }
+  .stepper input:focus{ outline: none; }
+
+  .empty-msg{ padding: 22px 14px; color: var(--text-faint); font-size: 0.9rem; text-align: center; }
+
+  /* ---- boutons génériques ---- */
+  .btn{ border: none; border-radius: 12px; padding: 11px 15px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+  .btn-primary{ background: var(--accent); color: var(--accent-ink); }
+  .btn-ghost{ background: transparent; color: var(--text-dim); border: 1px solid var(--line); }
+  .btn-danger{ background: rgba(217,118,74,0.16); color: var(--danger); border: 1px solid rgba(217,118,74,0.4); }
+  .btn-block{ width: 100%; }
+  .btn-row{ display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .btn-row .btn{ flex: 1; }
+
+  /* ---- gestion des articles ---- */
+  .art-row{ display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-top: 1px solid var(--line); }
+  .art-row .info{ flex: 1; min-width: 0; }
+  .art-row .pname{ font-size: 0.92rem; }
+  .art-row .ptarget{ font-size: 0.72rem; color: var(--text-faint); margin-top: 1px; }
+  .icon-btn{
+    width: 34px; height: 34px; border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--text-dim); border-radius: 10px; font-size: 0.9rem; cursor: pointer; flex: none;
+  }
+  .cat-tools{ display: flex; align-items: center; gap: 8px; padding-right: 4px; }
+  .add-bar{ margin-top: 16px; display: flex; gap: 10px; }
+
+  /* ---- production ---- */
+  .prod-cat{ margin-top: 14px; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--surface); }
+  .prod-cat h3{
+    margin: 0; padding: 11px 14px; font-size: 0.9rem; font-weight: 600;
+    background: var(--surface-2); display: flex; align-items: center; gap: 9px;
+  }
+  .prod-line{ display: flex; align-items: baseline; gap: 8px; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 0.9rem; }
+  .prod-line .pn{ flex: 1; min-width: 0; }
+  .prod-line .meta{ font-size: 0.72rem; color: var(--text-faint); }
+  .prod-line .qty{ font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .prod-none{ padding: 26px 16px; text-align: center; color: var(--ok); font-size: 0.92rem; }
+  .prod-total{
+    margin-top: 16px; padding: 14px 16px; border-radius: 16px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between; font-size: 0.95rem;
+  }
+  .prod-total b{ font-size: 1.4rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+  /* ---- réglages ---- */
+  .card{ margin-top: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); padding: 14px; }
+  .card h3{ margin: 0 0 4px; font-size: 0.98rem; font-weight: 600; }
+  .card p.hint{ margin: 0 0 10px; font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
+  label.lbl{ display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-dim); margin: 12px 0 5px; }
+  label.lbl:first-child{ margin-top: 0; }
+  input.fld, select.fld, textarea.fld{
+    width: 100%; border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px;
+    font-size: 1rem; font-family: inherit; background: var(--surface-input); color: var(--text);
+  }
+  textarea.fld{ resize: vertical; min-height: 52px; }
+  input.fld:focus, select.fld:focus, textarea.fld:focus{ outline: 2px solid var(--accent); outline-offset: 1px; }
+  .chk{ display: flex; align-items: center; gap: 9px; font-size: 0.9rem; margin-top: 12px; color: var(--text); }
+  .chk input{ width: 20px; height: 20px; accent-color: var(--accent); }
+  .status{ margin-top: 10px; font-size: 0.82rem; line-height: 1.4; min-height: 1.2em; }
+  .status.err{ color: var(--warn); }
+  .status.ok{ color: var(--ok); }
+  .codeblock{
+    background: #17140F; color: #D9CBB4; border-radius: 12px; padding: 12px; margin-top: 10px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.68rem; white-space: pre;
+    overflow-x: auto; max-height: 220px; overflow-y: auto;
+  }
+  .guide{ counter-reset: step; font-size: 0.84rem; margin-top: 4px; }
+  .guide .st{ display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .guide .st:first-child{ border-top: none; }
+  .guide .st::before{
+    counter-increment: step; content: counter(step);
+    width: 22px; height: 22px; flex: none; border-radius: 50%; background: var(--surface-input);
+    color: var(--accent); font-weight: 700; font-size: 0.75rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .guide code{ background: var(--surface-input); border-radius: 6px; padding: 1px 5px; font-size: 0.76rem; }
+
+  /* ---- footer récap (onglet Stock) ---- */
+  footer{
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    background: linear-gradient(0deg, var(--bg) 80%, rgba(30,27,24,0));
+    padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  }
+  .summary{
+    max-width: 640px; margin: 0 auto; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .summary .stat{ text-align: center; flex: 1; }
+  .summary .stat b{ display: block; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+  .summary .stat span{ font-size: 0.66rem; color: var(--text-dim); }
+  .summary .stat.warn b{ color: var(--warn); }
+  .summary .actions{ display: flex; gap: 8px; }
+
+  /* ---- modal ---- */
+  .modal-back{
+    position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.55);
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  .modal-back.show{ display: flex; }
+  .modal{
+    width: 100%; max-width: 480px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 20px 20px 0 0;
+    padding: 16px 16px calc(18px + env(safe-area-inset-bottom));
+    max-height: 88vh; overflow-y: auto;
+  }
+  @media (min-width: 520px){ .modal-back{ align-items: center; } .modal{ border-radius: 20px; } }
+  .modal h2{ margin: 2px 0 10px; font-size: 1.1rem; }
+  .palette{ display: flex; flex-wrap: wrap; gap: 9px; margin-top: 6px; }
+  .swatch{ width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .swatch.sel{ border-color: var(--text); box-shadow: 0 0 0 2px var(--bg); }
+
+  .toast{
+    position: fixed; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom));
+    transform: translateX(-50%) translateY(8px);
+    background: var(--ok); color: #1B2419; padding: 9px 18px; border-radius: 999px;
+    font-size: 0.84rem; font-weight: 600; opacity: 0; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease; z-index: 60; max-width: 90vw; text-align: center;
+  }
+  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (min-width: 480px){ :root{ font-size: 17px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 class="display">La Pause <span class="accent">Sucrée</span></h1>
+  <div class="sub">
+    <span id="dateLabel">—</span>
+    <span id="savedLabel">non enregistré</span>
+  </div>
+</header>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-tab="stock">📋 Stock</div>
+  <div class="tab" data-tab="prod">🥐 À produire</div>
+  <div class="tab" data-tab="articles">🧾 Articles</div>
+  <div class="tab" data-tab="reglages">⚙️ Réglages</div>
+</div>
+
+<div class="search-wrap" id="searchWrap">
+  <input id="search" type="text" placeholder="Rechercher un produit…" autocomplete="off">
+</div>
+
+<main id="app"></main>
+
+<div class="toast" id="toast">Stock enregistré</div>
+
+<footer id="footer">
+  <div class="summary">
+    <div class="stat">
+      <b id="sumCount">0</b>
+      <span>produits comptés</span>
+    </div>
+    <div class="stat warn">
+      <b id="sumProduire">0</b>
+      <span>pièces à produire</span>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" id="btnReset">Effacer</button>
+      <button class="btn btn-primary" id="btnGoProd">Production ›</button>
+    </div>
+  </div>
+</footer>
+
+<!-- Modal d'édition d'article / catégorie -->
+<div class="modal-back" id="modalBack">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+/* ============================================================
+   1) DONNÉES PAR DÉFAUT (au tout premier lancement)
+   Ensuite, tout se modifie depuis l'onglet « Articles ».
+   ============================================================ */
+const CATS_DEFAUT = [
+  { id: "gateau", label: "Gâteau",        color: "#8FAE83" },
+  { id: "cookie", label: "Cookie",        color: "#CB8A45" },
+  { id: "gouter", label: "Autres goûters", color: "#6E9CB3" },
+  { id: "buns",   label: "Buns pomme",    color: "#C1725D" },
+  { id: "glace",  label: "Glacerie",      color: "#5FADA6" },
+  { id: "vienno", label: "Viennoiserie",  color: "#A18FC4" },
+];
+const PRODUITS_DEFAUT = [
+  { id:"cacahuetes",       name:"Cacahuètes",                        cat:"gateau", mini:5,  maxi:10 },
+  { id:"flan",             name:"Flan",                              cat:"gateau", mini:5,  maxi:10 },
+  { id:"flan_framboise",   name:"Flan framboise",                    cat:"gateau", mini:5,  maxi:10 },
+  { id:"fruits_rouges",    name:"Fruits rouges",                     cat:"gateau", mini:5,  maxi:10 },
+  { id:"pistache",         name:"Pistache",                          cat:"gateau", mini:5,  maxi:10 },
+  { id:"royal",            name:"Royal",                             cat:"gateau", mini:5,  maxi:10 },
+  { id:"tarte_citron",     name:"Tarte citron",                      cat:"gateau", mini:5,  maxi:10 },
+  { id:"finger_cookie",    name:"Finger Cookie",                     cat:"cookie", mini:10, maxi:20 },
+  { id:"finger_cacahuete", name:"Finger Cookie Beurre de Cacahuète", cat:"cookie", mini:10, maxi:20 },
+  { id:"finger_caramel",   name:"Finger Cookie Caramel",             cat:"cookie", mini:10, maxi:20 },
+  { id:"finger_nutella",   name:"Finger Cookie Nutella",             cat:"cookie", mini:10, maxi:20 },
+  { id:"finger_praline",   name:"Finger Cookie Praline",             cat:"cookie", mini:10, maxi:20 },
+  { id:"finger_oreo",      name:"Finger Oreo",                       cat:"cookie", mini:10, maxi:20 },
+  { id:"finger_speculoos", name:"Finger Speculoos",                  cat:"cookie", mini:10, maxi:20 },
+  { id:"finger_pistache",  name:"Finger Pistache",                   cat:"cookie", mini:10, maxi:20 },
+  { id:"finger_bueno",     name:"Finger Bueno",                      cat:"cookie", mini:10, maxi:20 },
+  { id:"crinkel",          name:"Crinkel du jour",                   cat:"cookie", mini:10, maxi:20 },
+  { id:"brookie",          name:"Brookie",                           cat:"cookie", mini:10, maxi:20 },
+  { id:"brownie",          name:"Brownie du moment",                 cat:"gouter", mini:6,  maxi:12 },
+  { id:"mini_cake",        name:"Mini cake indiv",                   cat:"gouter", mini:6,  maxi:12 },
+  { id:"moelleux_fr",      name:"Moelleux fruits rouges",            cat:"gouter", mini:6,  maxi:12 },
+  { id:"moelleux_marron",  name:"Moelleux marron",                   cat:"gouter", mini:6,  maxi:12 },
+  { id:"pain_brioche",     name:"Pain brioche cheesecake pomme",     cat:"buns",   mini:4,  maxi:8  },
+  { id:"glace_chocolat",   name:"Glace chocolat",                    cat:"glace",  mini:3,  maxi:6  },
+  { id:"glace_pistache",   name:"Glace pistache",                    cat:"glace",  mini:3,  maxi:6  },
+  { id:"glace_vanille",    name:"Glace vanille",                     cat:"glace",  mini:3,  maxi:6  },
+  { id:"sorbet_coco",      name:"Sorbet coco",                       cat:"glace",  mini:3,  maxi:6  },
+  { id:"sorbet_passion",   name:"Sorbet passion",                    cat:"glace",  mini:3,  maxi:6  },
+  { id:"brioche_sucre",    name:"Brioche au sucre",                  cat:"vienno", mini:6,  maxi:12 },
+  { id:"brioche_oranger",  name:"Brioche fleur d'oranger",           cat:"vienno", mini:6,  maxi:12 },
+  { id:"croissant_fr",     name:"Croissant fruits rouges",           cat:"vienno", mini:5,  maxi:9  },
+  { id:"croissant_pistache", name:"Croissant pistache",              cat:"vienno", mini:5,  maxi:9  },
+  { id:"feuillete_pomme",  name:"Feuilleté pomme",                   cat:"vienno", mini:9,  maxi:18 },
+  { id:"pain_suisse",      name:"Pain suisse",                       cat:"vienno", mini:9,  maxi:18 },
+  { id:"vienno_jour",      name:"Viennoiserie du jour",              cat:"vienno", mini:12, maxi:24 },
+];
+
+const PALETTE = ["#8FAE83","#CB8A45","#6E9CB3","#C1725D","#5FADA6","#A18FC4",
+                 "#D9A455","#7C9473","#D9764A","#C4708F","#8F9EC4","#B0A06B"];
+
+/* ============================================================
+   2) PERSISTANCE (localStorage)
+   ============================================================ */
+const K_CATALOG  = "lps-catalogue";
+const K_COUNTS   = "lps-comptages";
+const K_SETTINGS = "lps-reglages";
+const K_SAVED    = "lps-derniere-sauvegarde";
+
+const MAIL_DEFAUT = "lapausesucree.contact@gmail.com";
+let CATALOG  = { cats: [], products: [] };
+let COUNTS   = {};                 // { "AAAA-MM-JJ": { idProduit: qté } }
+let SETTINGS = { mailTo: MAIL_DEFAUT };
+
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+function loadAll(){
+  try{
+    const rawCat = localStorage.getItem(K_CATALOG);
+    if(rawCat){ CATALOG = JSON.parse(rawCat); }
+    else{ CATALOG = { cats: JSON.parse(JSON.stringify(CATS_DEFAUT)), products: JSON.parse(JSON.stringify(PRODUITS_DEFAUT)) }; saveCatalog(); }
+  }catch(e){ CATALOG = { cats: JSON.parse(JSON.stringify(CATS_DEFAUT)), products: JSON.parse(JSON.stringify(PRODUITS_DEFAUT)) }; }
+  if(!CATALOG.cats) CATALOG.cats = [];
+  if(!CATALOG.products) CATALOG.products = [];
+
+  try{ COUNTS = JSON.parse(localStorage.getItem(K_COUNTS)) || {}; }catch(e){ COUNTS = {}; }
+  try{ SETTINGS = Object.assign(SETTINGS, JSON.parse(localStorage.getItem(K_SETTINGS)) || {}); }catch(e){}
+  if(!SETTINGS.mailTo) SETTINGS.mailTo = MAIL_DEFAUT;
+}
+function saveCatalog(){ try{ localStorage.setItem(K_CATALOG, JSON.stringify(CATALOG)); }catch(e){} }
+function saveCounts(silencieux){
+  try{
+    localStorage.setItem(K_COUNTS, JSON.stringify(COUNTS));
+    localStorage.setItem(K_SAVED, new Date().toISOString());
+    updateSavedLabel();
+    if(!silencieux) showToast("Stock enregistré");
+  }catch(e){}
+}
+function saveSettings(){ try{ localStorage.setItem(K_SETTINGS, JSON.stringify(SETTINGS)); }catch(e){} }
+
+/* comptages du jour */
+function todayCounts(){
+  const k = todayISO();
+  if(!COUNTS[k]) COUNTS[k] = {};
+  return COUNTS[k];
+}
+function qtyOf(id){ return todayCounts()[id] || 0; }
+function setQty(id, v){
+  v = Math.max(0, parseInt(v || 0, 10) || 0);
+  todayCounts()[id] = v;
+  return v;
+}
+
+/* ============================================================
+   3) OUTILS
+   ============================================================ */
+const app = document.getElementById("app");
+const dateLabel = document.getElementById("dateLabel");
+const savedLabel = document.getElementById("savedLabel");
+const searchInput = document.getElementById("search");
+const searchWrap = document.getElementById("searchWrap");
+const footer = document.getElementById("footer");
+let currentTab = "stock";
+let collapsedCats = {};
+
+const JOURS = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+const MOIS  = ["jan.","fév.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
+function fmtDate(d){ d = d || new Date(); return JOURS[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()]; }
+function demain(){ const d = new Date(); d.setDate(d.getDate()+1); return d; }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function attr(s){ return esc(s).replace(/"/g,"&quot;"); }
+function catById(id){ return CATALOG.cats.find(c => c.id === id); }
+function productsOfCat(id){ return CATALOG.products.filter(p => p.cat === id); }
+function needOf(p){ return Math.max((p.maxi||0) - qtyOf(p.id), 0); }
+function uid(prefix){ return (prefix||"x") + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
+
+function updateSavedLabel(){
+  const iso = localStorage.getItem(K_SAVED);
+  if(!iso){ savedLabel.textContent = "non enregistré"; savedLabel.className = ""; return; }
+  const t = new Date(iso);
+  savedLabel.textContent = "enregistré à " + String(t.getHours()).padStart(2,"0") + ":" + String(t.getMinutes()).padStart(2,"0");
+  savedLabel.className = "saved-ok";
+}
+
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  if(msg) t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1500);
+}
+
+/* ============================================================
+   4) NAVIGATION PAR ONGLETS
+   ============================================================ */
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const t = e.target.closest(".tab");
+  if(!t) return;
+  goTab(t.dataset.tab);
+});
+function goTab(tab){
+  currentTab = tab;
+  document.querySelectorAll(".tab").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+  searchWrap.style.display = (tab === "stock") ? "" : "none";
+  footer.style.display = (tab === "stock") ? "" : "none";
+  render();
+}
+function render(){
+  if(currentTab === "stock") renderStock(searchInput.value);
+  else if(currentTab === "prod") renderProduction();
+  else if(currentTab === "articles") renderArticles();
+  else if(currentTab === "reglages") renderReglages();
+  window.scrollTo(0,0);
+}
+
+/* ============================================================
+   5) ONGLET STOCK (comptage)
+   ============================================================ */
+searchInput.addEventListener("input", () => renderStock(searchInput.value));
+
+function renderStock(filter){
+  filter = (filter || "").trim().toLowerCase();
+  app.innerHTML = "";
+
+  CATALOG.cats.forEach(cat => {
+    const items = productsOfCat(cat.id).filter(p => !filter || p.name.toLowerCase().includes(filter));
+    if(items.length === 0) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "cat" + (collapsedCats[cat.id] ? " collapsed" : "");
+    const countDone = items.filter(p => qtyOf(p.id) >= p.maxi).length;
+    wrap.innerHTML = `
+      <div class="cat-head" data-cat="${cat.id}">
+        <div class="cat-dot" style="background:${cat.color}"></div>
+        <div class="name">${esc(cat.label)}</div>
+        <div class="count">${countDone}/${items.length} au max</div>
+        <div class="chevron">▾</div>
+      </div>
+      <div class="rows"></div>`;
+    const rowsWrap = wrap.querySelector(".rows");
+
+    items.forEach(p => {
+      const qty = qtyOf(p.id);
+      const need = needOf(p);
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `
+        <div class="info">
+          <div class="pname">${esc(p.name)}</div>
+          <div class="ptarget">cible ${p.mini}–${p.maxi}
+            <span class="badge ${need > 0 ? "need" : "ok"}">${need > 0 ? "+" + need + " à produire" : "objectif atteint"}</span>
+          </div>
+        </div>
+        <div class="stepper">
+          <button type="button" data-act="minus" aria-label="Diminuer">−</button>
+          <input type="number" inputmode="numeric" min="0" value="${qty}" aria-label="Stock ${attr(p.name)}">
+          <button type="button" data-act="plus" aria-label="Augmenter">+</button>
+        </div>`;
+      const input = row.querySelector("input");
+      function apply(v){
+        v = setQty(p.id, v);
+        input.value = v;
+        const badge = row.querySelector(".badge");
+        const need2 = needOf(p);
+        badge.textContent = need2 > 0 ? ("+" + need2 + " à produire") : "objectif atteint";
+        badge.className = "badge " + (need2 > 0 ? "need" : "ok");
+        saveCounts(true);
+        updateSummary();
+        renderCatCount(cat.id);
+      }
+      row.querySelector('[data-act="minus"]').addEventListener("click", () => apply(qtyOf(p.id) - 1));
+      row.querySelector('[data-act="plus"]').addEventListener("click", () => apply(qtyOf(p.id) + 1));
+      input.addEventListener("change", () => apply(input.value));
+      input.addEventListener("focus", () => input.select());
+      rowsWrap.appendChild(row);
+    });
+
+    wrap.querySelector(".cat-head").addEventListener("click", () => {
+      collapsedCats[cat.id] = !collapsedCats[cat.id];
+      wrap.classList.toggle("collapsed");
+    });
+    app.appendChild(wrap);
+  });
+
+  if(app.children.length === 0){
+    app.innerHTML = '<div class="empty-msg">Aucun produit ne correspond à la recherche.</div>';
+  }
+  updateSummary();
+}
+function renderCatCount(catId){
+  const items = productsOfCat(catId);
+  const done = items.filter(p => qtyOf(p.id) >= p.maxi).length;
+  const el = document.querySelector(`.cat-head[data-cat="${catId}"] .count`);
+  if(el) el.textContent = done + "/" + items.length + " au max";
+}
+function updateSummary(){
+  const counted = CATALOG.products.filter(p => qtyOf(p.id) > 0).length;
+  const total = CATALOG.products.reduce((s,p) => s + needOf(p), 0);
+  document.getElementById("sumCount").textContent = counted;
+  document.getElementById("sumProduire").textContent = total;
+}
+
+document.getElementById("btnReset").addEventListener("click", () => {
+  if(confirm("Effacer toutes les quantités saisies aujourd'hui ?")){
+    COUNTS[todayISO()] = {};
+    saveCounts();
+    renderStock(searchInput.value);
+  }
+});
+document.getElementById("btnGoProd").addEventListener("click", () => goTab("prod"));
+
+/* ============================================================
+   6) ONGLET « À PRODUIRE » (calcul automatique du lendemain)
+   Pour chaque produit : à produire = cible maxi − stock du soir.
+   ============================================================ */
+function productionData(){
+  const sections = [];
+  let total = 0;
+  CATALOG.cats.forEach(cat => {
+    const items = productsOfCat(cat.id)
+      .map(p => ({ name: p.name, stock: qtyOf(p.id), maxi: p.maxi, mini: p.mini, need: needOf(p) }))
+      .filter(it => it.need > 0);
+    if(items.length === 0) return;
+    const sous = items.reduce((s,it) => s + it.need, 0);
+    total += sous;
+    sections.push({ label: cat.label, color: cat.color, items, sous });
+  });
+  return { sections, total };
+}
+
+function renderProduction(){
+  const { sections, total } = productionData();
+  const dLabel = fmtDate(demain());
+  let html = `<div class="empty-msg" style="padding:12px 4px 0;color:var(--text-dim)">
+      Production à préparer pour <b style="color:var(--text)">${dLabel}</b>,
+      calculée d'après le stock compté ce soir (on remonte chaque produit à sa cible maxi).
+    </div>`;
+
+  if(sections.length === 0){
+    html += `<div class="prod-none">✓ Rien à produire : tous les produits sont à leur cible.</div>`;
+  }else{
+    sections.forEach(s => {
+      html += `<div class="prod-cat">
+        <h3><span class="cat-dot" style="background:${s.color}"></span>${esc(s.label)}
+          <span style="margin-left:auto;font-weight:600;color:var(--text-dim);font-size:0.78rem">${s.sous} pcs</span></h3>`;
+      s.items.forEach(it => {
+        html += `<div class="prod-line">
+          <span class="pn">${esc(it.name)}<div class="meta">stock ${it.stock} · cible ${it.mini}–${it.maxi}</div></span>
+          <span class="qty">+${it.need}</span>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    html += `<div class="prod-total"><span>Total à produire</span><b>${total}</b></div>`;
+  }
+
+  html += `<div class="btn-row">
+      <button class="btn btn-ghost" id="pCopy">📋 Copier</button>
+      <button class="btn btn-ghost" id="pPdf">📄 Créer le PDF</button>
+      <button class="btn btn-primary" id="pMail">📧 Envoyer par mail</button>
+    </div>
+    <div class="status" id="prodStatus"></div>`;
+  app.innerHTML = html;
+
+  document.getElementById("pCopy").addEventListener("click", copierProduction);
+  document.getElementById("pPdf").addEventListener("click", () => telechargerPDF());
+  document.getElementById("pMail").addEventListener("click", envoyerMail);
+}
+
+function texteProduction(){
+  const { sections, total } = productionData();
+  const lines = ["Production à préparer — " + fmtDate(demain()), ""];
+  if(sections.length === 0){ lines.push("Rien à produire : tout est à la cible."); return lines.join("\n"); }
+  sections.forEach(s => {
+    lines.push(s.label.toUpperCase());
+    s.items.forEach(it => lines.push("- " + it.name + " : " + it.need));
+    lines.push("");
+  });
+  lines.push("TOTAL : " + total + " pièces");
+  return lines.join("\n");
+}
+function copierProduction(){
+  const text = texteProduction();
+  const done = () => showToast("Récap copié");
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+  }else fallback();
+  function fallback(){
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try{ document.execCommand("copy"); }catch(e){}
+    document.body.removeChild(ta); done();
+  }
+}
+
+/* ============================================================
+   7) ONGLET ARTICLES (ajouter / modifier / supprimer)
+   ============================================================ */
+function renderArticles(){
+  let html = `<div class="empty-msg" style="padding:12px 4px 2px;color:var(--text-dim)">
+      Ajoutez, modifiez ou supprimez vos produits et catégories. Les cibles
+      <b style="color:var(--text)">mini / maxi</b> servent au calcul de la production.
+    </div>`;
+
+  CATALOG.cats.forEach(cat => {
+    const items = productsOfCat(cat.id);
+    html += `<div class="cat">
+      <div class="cat-head" style="cursor:default">
+        <div class="cat-dot" style="background:${cat.color}"></div>
+        <div class="name">${esc(cat.label)}</div>
+        <div class="cat-tools">
+          <button class="icon-btn" data-editcat="${cat.id}" title="Modifier la catégorie">✏️</button>
+          <button class="icon-btn" data-delcat="${cat.id}" title="Supprimer la catégorie">🗑</button>
+        </div>
+      </div>
+      <div class="rows">`;
+    if(items.length === 0){
+      html += `<div class="empty-msg" style="padding:12px">Aucun article dans cette catégorie.</div>`;
+    }else{
+      items.forEach(p => {
+        html += `<div class="art-row">
+          <div class="info">
+            <div class="pname">${esc(p.name)}</div>
+            <div class="ptarget">cible ${p.mini}–${p.maxi}</div>
+          </div>
+          <button class="icon-btn" data-editprod="${p.id}" title="Modifier">✏️</button>
+          <button class="icon-btn" data-delprod="${p.id}" title="Supprimer">🗑</button>
+        </div>`;
+      });
+    }
+    html += `<div class="art-row"><button class="btn btn-ghost btn-block" data-addprod="${cat.id}">＋ Ajouter un article</button></div>`;
+    html += `</div></div>`;
+  });
+
+  html += `<div class="add-bar"><button class="btn btn-primary btn-block" id="addCat">＋ Nouvelle catégorie</button></div>`;
+  app.innerHTML = html;
+
+  app.querySelectorAll("[data-addprod]").forEach(b => b.addEventListener("click", () => editProduct(null, b.dataset.addprod)));
+  app.querySelectorAll("[data-editprod]").forEach(b => b.addEventListener("click", () => editProduct(b.dataset.editprod)));
+  app.querySelectorAll("[data-delprod]").forEach(b => b.addEventListener("click", () => deleteProduct(b.dataset.delprod)));
+  app.querySelectorAll("[data-editcat]").forEach(b => b.addEventListener("click", () => editCat(b.dataset.editcat)));
+  app.querySelectorAll("[data-delcat]").forEach(b => b.addEventListener("click", () => deleteCat(b.dataset.delcat)));
+  document.getElementById("addCat").addEventListener("click", () => editCat(null));
+}
+
+/* ---- modal ---- */
+const modalBack = document.getElementById("modalBack");
+const modal = document.getElementById("modal");
+function openModal(html){ modal.innerHTML = html; modalBack.classList.add("show"); }
+function closeModal(){ modalBack.classList.remove("show"); modal.innerHTML = ""; }
+modalBack.addEventListener("click", (e) => { if(e.target === modalBack) closeModal(); });
+
+function editProduct(id, catForNew){
+  const p = id ? CATALOG.products.find(x => x.id === id) : null;
+  const cats = CATALOG.cats.map(c => `<option value="${c.id}" ${((p && p.cat === c.id) || (!p && catForNew === c.id)) ? "selected" : ""}>${esc(c.label)}</option>`).join("");
+  openModal(`
+    <h2>${p ? "Modifier l'article" : "Nouvel article"}</h2>
+    <label class="lbl">Nom du produit</label>
+    <input class="fld" id="m-name" value="${p ? attr(p.name) : ""}" placeholder="Ex. Tarte citron" autocomplete="off">
+    <label class="lbl">Catégorie</label>
+    <select class="fld" id="m-cat">${cats}</select>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1"><label class="lbl">Cible mini</label>
+        <input class="fld" id="m-mini" type="number" inputmode="numeric" min="0" value="${p ? p.mini : 5}"></div>
+      <div style="flex:1"><label class="lbl">Cible maxi</label>
+        <input class="fld" id="m-maxi" type="number" inputmode="numeric" min="0" value="${p ? p.maxi : 10}"></div>
+    </div>
+    <p class="hint" style="margin-top:8px">La <b>cible maxi</b> est la quantité à avoir en rayon. La production du lendemain remonte chaque produit jusqu'à cette valeur.</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" id="m-save">Enregistrer</button>
+    </div>`);
+  document.getElementById("m-save").addEventListener("click", () => {
+    const name = document.getElementById("m-name").value.trim();
+    if(!name){ document.getElementById("m-name").focus(); return; }
+    let mini = Math.max(0, parseInt(document.getElementById("m-mini").value,10) || 0);
+    let maxi = Math.max(0, parseInt(document.getElementById("m-maxi").value,10) || 0);
+    if(maxi < mini) maxi = mini;
+    const cat = document.getElementById("m-cat").value;
+    if(p){ p.name = name; p.cat = cat; p.mini = mini; p.maxi = maxi; }
+    else CATALOG.products.push({ id: uid("p"), name, cat, mini, maxi });
+    saveCatalog(); closeModal(); render();
+    showToast(p ? "Article modifié" : "Article ajouté");
+  });
+  setTimeout(() => document.getElementById("m-name").focus(), 60);
+}
+function deleteProduct(id){
+  const p = CATALOG.products.find(x => x.id === id);
+  if(!p) return;
+  if(!confirm("Supprimer « " + p.name + " » ?")) return;
+  CATALOG.products = CATALOG.products.filter(x => x.id !== id);
+  saveCatalog(); render(); showToast("Article supprimé");
+}
+function editCat(id){
+  const c = id ? catById(id) : null;
+  const cur = c ? c.color : PALETTE[CATALOG.cats.length % PALETTE.length];
+  const swatches = PALETTE.map(col => `<div class="swatch ${col === cur ? "sel" : ""}" data-col="${col}" style="background:${col}"></div>`).join("");
+  openModal(`
+    <h2>${c ? "Modifier la catégorie" : "Nouvelle catégorie"}</h2>
+    <label class="lbl">Nom</label>
+    <input class="fld" id="c-name" value="${c ? attr(c.label) : ""}" placeholder="Ex. Chocolats" autocomplete="off">
+    <label class="lbl">Couleur</label>
+    <div class="palette" id="c-pal">${swatches}</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" id="c-save">Enregistrer</button>
+    </div>`);
+  let chosen = cur;
+  document.getElementById("c-pal").addEventListener("click", (e) => {
+    const s = e.target.closest(".swatch"); if(!s) return;
+    chosen = s.dataset.col;
+    document.querySelectorAll("#c-pal .swatch").forEach(x => x.classList.toggle("sel", x === s));
+  });
+  document.getElementById("c-save").addEventListener("click", () => {
+    const name = document.getElementById("c-name").value.trim();
+    if(!name){ document.getElementById("c-name").focus(); return; }
+    if(c){ c.label = name; c.color = chosen; }
+    else CATALOG.cats.push({ id: uid("c"), label: name, color: chosen });
+    saveCatalog(); closeModal(); render();
+    showToast(c ? "Catégorie modifiée" : "Catégorie ajoutée");
+  });
+  setTimeout(() => document.getElementById("c-name").focus(), 60);
+}
+function deleteCat(id){
+  const c = catById(id); if(!c) return;
+  const n = productsOfCat(id).length;
+  const msg = n > 0
+    ? "Supprimer la catégorie « " + c.label + " » et ses " + n + " article(s) ?"
+    : "Supprimer la catégorie « " + c.label + " » ?";
+  if(!confirm(msg)) return;
+  CATALOG.products = CATALOG.products.filter(p => p.cat !== id);
+  CATALOG.cats = CATALOG.cats.filter(x => x.id !== id);
+  saveCatalog(); render(); showToast("Catégorie supprimée");
+}
+
+/* ============================================================
+   8) ONGLET RÉGLAGES (adresse mail, sauvegarde, réinitialisation)
+   ============================================================ */
+function renderReglages(){
+  app.innerHTML = `
+    <div class="card">
+      <h3>📧 Envoi par mail</h3>
+      <p class="hint">Le bouton « Envoyer par mail » de l'onglet « À produire » ouvre votre application mail, déjà adressée à cette adresse, avec la liste de production prête à envoyer.</p>
+      <label class="lbl">Adresse de destination</label>
+      <input class="fld" id="r-mail" type="email" value="${attr(SETTINGS.mailTo || MAIL_DEFAUT)}" placeholder="${MAIL_DEFAUT}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="email">
+    </div>
+
+    <div class="card">
+      <h3>💾 Sauvegarde de l'appli</h3>
+      <p class="hint">Exportez un fichier de sauvegarde (articles + comptages) pour le garder ou le transférer sur un autre téléphone.</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="r-export">⬇️ Exporter</button>
+        <button class="btn btn-ghost" id="r-import">⬆️ Restaurer</button>
+      </div>
+      <input type="file" id="r-file" accept="application/json,.json" style="display:none">
+    </div>
+
+    <div class="card">
+      <h3>♻️ Réinitialiser</h3>
+      <p class="hint">Restaure la liste d'articles d'origine. Les comptages du jour sont conservés.</p>
+      <button class="btn btn-danger btn-block" id="r-resetcat">Réinitialiser les articles par défaut</button>
+    </div>`;
+
+  const mail_ = document.getElementById("r-mail");
+  mail_.addEventListener("input", () => { SETTINGS.mailTo = mail_.value.trim(); saveSettings(); });
+  document.getElementById("r-export").addEventListener("click", exporterSauvegarde);
+  document.getElementById("r-import").addEventListener("click", () => document.getElementById("r-file").click());
+  document.getElementById("r-file").addEventListener("change", (e) => { if(e.target.files[0]) importerSauvegarde(e.target.files[0]); });
+  document.getElementById("r-resetcat").addEventListener("click", () => {
+    if(!confirm("Réinitialiser la liste d'articles par défaut ? Vos ajouts personnalisés seront perdus.")) return;
+    CATALOG = { cats: JSON.parse(JSON.stringify(CATS_DEFAUT)), products: JSON.parse(JSON.stringify(PRODUITS_DEFAUT)) };
+    saveCatalog(); render(); showToast("Articles réinitialisés");
+  });
+}
+
+function statusMsg(id, msg, err){
+  const s = document.getElementById(id); if(!s) return;
+  s.textContent = msg; s.className = "status " + (err ? "err" : "ok");
+}
+
+/* ---- sauvegarde / restauration JSON ---- */
+function exporterSauvegarde(){
+  const data = { app: "lps-stock", version: 1, catalog: CATALOG, counts: COUNTS, settings: SETTINGS };
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "sauvegarde-stock-" + todayISO() + ".json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  showToast("Sauvegarde téléchargée");
+}
+async function importerSauvegarde(file){
+  try{
+    const data = JSON.parse(await file.text());
+    if(data.app !== "lps-stock") throw new Error("mauvais fichier");
+    if(!confirm("Restaurer cette sauvegarde ? Les données actuelles seront remplacées.")) return;
+    if(data.catalog){ CATALOG = data.catalog; saveCatalog(); }
+    if(data.counts){ COUNTS = data.counts; saveCounts(true); }
+    if(data.settings){ SETTINGS = Object.assign(SETTINGS, data.settings); saveSettings(); }
+    render(); showToast("Données restaurées");
+  }catch(e){ alert("Fichier illisible : choisissez une sauvegarde créée par cette application (.json)."); }
+}
+
+/* ============================================================
+   9) GÉNÉRATION PDF (sans dépendance externe)
+   Feuille de production A4, texte encodé en WinAnsi.
+   ============================================================ */
+const WINANSI = {'œ':0x9C,'Œ':0x8C,'’':0x92,'‘':0x91,'“':0x93,'”':0x94,'–':0x96,'—':0x97,'•':0x95,'€':0x80,'…':0x85};
+function toWin(s){
+  let out = "";
+  for(const ch of String(s==null?"":s)){
+    let code = WINANSI[ch] != null ? WINANSI[ch] : ch.codePointAt(0);
+    if(code > 0xFF){ out += "?"; continue; }
+    out += String.fromCharCode(code);
+  }
+  return out;
+}
+const escPDF = s => toWin(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)").replace(/[\r\n]/g," ");
+
+function pdfProduction(){
+  const { sections, total } = productionData();
+  const PW = 595, PH = 842, M = 42, RIGHT = PW - M;
+  const cxStock = 330, cxCible = 400, cxProd = 480;   // colonnes
+  const pages = []; let ops, y;
+  const nl = () => { ops = []; pages.push(ops); y = PH - M; };
+  const room = h => { if(y - h < M) nl(); };
+  const put = (x, size, bold, str) => ops.push("BT /" + (bold?"F2":"F1") + " " + size + " Tf 1 0 0 1 " + x.toFixed(2) + " " + y.toFixed(2) + " Tm (" + escPDF(str) + ") Tj ET");
+  const rule = () => ops.push("0.6 w 0.75 0.70 0.62 RG " + M + " " + y.toFixed(2) + " m " + RIGHT + " " + y.toFixed(2) + " l S 0 G");
+
+  nl();
+  y -= 24; put(M, 20, true, "La Pause Sucrée — Production");
+  const dl = fmtDate(demain()); y -= 16;
+  put(M, 11, false, "À préparer pour " + dl.charAt(0).toUpperCase() + dl.slice(1));
+  y -= 6; put(RIGHT - 150, 9, false, "Stock compté le " + fmtDate());
+  y -= 12; rule(); y -= 6;
+
+  function entete(){
+    room(20); y -= 12;
+    put(M, 9, true, "PRODUIT");
+    put(cxStock, 9, true, "STOCK");
+    put(cxCible, 9, true, "CIBLE");
+    put(cxProd, 9, true, "À PROD.");
+    y -= 4; rule(); y -= 4;
+  }
+
+  if(sections.length === 0){
+    y -= 24; put(M, 12, false, "Rien à produire : tous les produits sont à leur cible.");
+  }else{
+    sections.forEach(s => {
+      room(40); y -= 16;
+      put(M, 13, true, s.label + "  (" + s.sous + " pcs)");
+      y -= 6; entete();
+      s.items.forEach(it => {
+        room(16); y -= 13;
+        let nom = it.name; if(nom.length > 46) nom = nom.slice(0,45) + "…";
+        put(M, 10, false, nom);
+        put(cxStock, 10, false, String(it.stock));
+        put(cxCible, 10, false, it.mini + "–" + it.maxi);
+        put(cxProd, 11, true, "+" + it.need);
+        y -= 4;
+      });
+      y -= 4;
+    });
+    room(40); y -= 16; rule(); y -= 16;
+    put(M, 14, true, "TOTAL À PRODUIRE");
+    put(cxProd, 14, true, String(total));
+  }
+
+  /* --- assemblage des octets --- */
+  const enc = s => { const u = new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i] = s.charCodeAt(i)&0xff; return u; };
+  const parts = []; let len = 0; const off = {};
+  const push = u => { parts.push(u); len += u.length; };
+  const pushS = s => push(enc(s));
+  const P = pages.length;
+  const idContent = k => 5 + 2*k, idPage = k => 5 + 2*k + 1;
+  const maxId = 4 + 2*P;
+
+  pushS("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  off[1] = len; pushS("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+  const kids = []; for(let k=0;k<P;k++) kids.push(idPage(k) + " 0 R");
+  off[2] = len; pushS("2 0 obj\n<< /Type /Pages /Count " + P + " /Kids [" + kids.join(" ") + "] >>\nendobj\n");
+  off[3] = len; pushS("3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n");
+  off[4] = len; pushS("4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n");
+  const resources = "<< /Font << /F1 3 0 R /F2 4 0 R >> >>";
+  for(let k=0;k<P;k++){
+    const cb = enc(pages[k].join("\n") + "\n");
+    off[idContent(k)] = len;
+    pushS(idContent(k) + " 0 obj\n<< /Length " + cb.length + " >>\nstream\n"); push(cb); pushS("\nendstream\nendobj\n");
+    off[idPage(k)] = len;
+    pushS(idPage(k) + " 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] /Resources " + resources + " /Contents " + idContent(k) + " 0 R >>\nendobj\n");
+  }
+  const xrefStart = len;
+  let xref = "xref\n0 " + (maxId+1) + "\n0000000000 65535 f \n";
+  for(let id=1; id<=maxId; id++) xref += String(off[id]||0).padStart(10,"0") + " 00000 n \n";
+  pushS(xref);
+  pushS("trailer\n<< /Size " + (maxId+1) + " /Root 1 0 R >>\nstartxref\n" + xrefStart + "\n%%EOF");
+
+  const out = new Uint8Array(len); let o = 0;
+  for(const u of parts){ out.set(u, o); o += u.length; }
+  return out;
+}
+function nomPDF(){ return "production-" + demain().toISOString().slice(0,10) + ".pdf"; }
+
+async function telechargerPDF(){
+  showToast("Création du PDF…");
+  let bytes;
+  try{ bytes = pdfProduction(); }catch(e){ statusMsg("prodStatus", "✗ Création du PDF impossible.", true); return; }
+  const nom = nomPDF();
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const fichier = new File([bytes], nom, { type: "application/pdf" });
+
+  // 1) Téléphone : partage natif (Mail, WhatsApp, Fichiers…) avec le PDF joint.
+  if(navigator.canShare && navigator.canShare({ files: [fichier] })){
+    try{
+      await navigator.share({ files: [fichier], title: nom, text: "Production — " + fmtDate(demain()) });
+      statusMsg("prodStatus", "✓ PDF prêt à partager.");
+      return;
+    }catch(e){ if(e && e.name === "AbortError") return; /* sinon on tente le repli */ }
+  }
+
+  // 2) Ordinateur / repli : téléchargement + ouverture dans un nouvel onglet,
+  //    et un lien de secours visible si le navigateur bloque l'un ou l'autre.
+  const urlB = URL.createObjectURL(blob);
+  try{
+    const a = document.createElement("a");
+    a.href = urlB; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){}
+  const w = window.open(urlB, "_blank");
+  const s = document.getElementById("prodStatus");
+  if(s){
+    s.className = "status ok";
+    s.textContent = w ? "📄 PDF ouvert dans un nouvel onglet (et téléchargé). " : "📄 PDF généré. S'il ne s'ouvre pas, touchez : ";
+    const link = document.createElement("a");
+    link.href = urlB; link.target = "_blank"; link.download = nom;
+    link.textContent = "ouvrir le PDF"; link.style.color = "var(--accent)"; link.style.fontWeight = "700";
+    s.appendChild(link);
+  }
+  setTimeout(() => URL.revokeObjectURL(urlB), 60000);
+}
+
+/* ============================================================
+   10) ENVOI PAR MAIL
+   Ouvre l'application mail du téléphone, déjà adressée, avec la
+   liste de production dans le corps du message — prête à envoyer.
+   ============================================================ */
+function envoyerMail(){
+  const to = (SETTINGS.mailTo || MAIL_DEFAUT).trim();
+  const sujet = "Production à préparer — " + fmtDate(demain());
+  const corps = texteProduction();
+  const url = "mailto:" + encodeURIComponent(to)
+    + "?subject=" + encodeURIComponent(sujet)
+    + "&body=" + encodeURIComponent(corps);
+  // Un vrai clic sur un lien est plus fiable que window.location pour ouvrir la messagerie.
+  const a = document.createElement("a");
+  a.href = url; document.body.appendChild(a); a.click(); a.remove();
+  const s = document.getElementById("prodStatus");
+  if(s){
+    s.className = "status ok";
+    s.textContent = "✉️ Ouverture de votre messagerie, adressée à " + to + ". Si rien ne s'ouvre, touchez : ";
+    const link = document.createElement("a");
+    link.href = url; link.textContent = "écrire le mail";
+    link.style.color = "var(--accent)"; link.style.fontWeight = "700";
+    s.appendChild(link);
+  }
+}
+
+/* ============================================================
+   11) DÉMARRAGE + service worker (hors-ligne / installation)
+   ============================================================ */
+dateLabel.textContent = "Stock du " + fmtDate();
+loadAll();
+updateSavedLabel();
+render();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("stock-sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>

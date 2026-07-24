@@ -208,7 +208,8 @@
   <nav class="tabs">
     <button class="tab" data-tab="matin" type="button"><span class="ico">📷</span><span class="lbl">Matin</span></button>
     <button class="tab" data-tab="production" type="button"><span class="ico">🍳</span><span class="lbl">Production</span></button>
-    <button class="tab" data-tab="produits" type="button"><span class="ico">📁</span><span class="lbl">Mes produits</span></button>
+    <button class="tab" data-tab="entremets" type="button"><span class="ico">🎂</span><span class="lbl">Entremets</span></button>
+    <button class="tab" data-tab="produits" type="button"><span class="ico">📁</span><span class="lbl">Produits</span></button>
     <button class="tab" data-tab="historique" type="button"><span class="ico">📅</span><span class="lbl">Historique</span></button>
   </nav>
 </header>
@@ -324,6 +325,59 @@
     <section class="card" id="prodJourCard" hidden>
       <h2>🧾 Déjà enregistré ce jour-là</h2>
       <div id="prodJourList"></div>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet ENTREMETS ==================== -->
+  <section class="panel" data-panel="entremets">
+    <section class="card">
+      <h2>🎂 Fabrication d'entremets</h2>
+      <p class="hint">Assemblez un entremets à partir des produits que vous avez fabriqués ces 5 derniers jours
+         (biscuit, mousse, crémeux, glaçage…). Chaque composant garde sa traçabilité — date de fabrication, DLC
+         et, en remontant, ses propres marchandises.</p>
+      <div class="toolbar">
+        <div class="field"><label for="jourEntremets">Journée</label><input type="date" id="jourEntremets"></div>
+        <div class="field" style="flex:1;min-width:220px">
+          <label for="nomEntremets">Nom de l'entremets</label>
+          <input type="text" id="nomEntremets" list="dlEntremets" placeholder="ex. Fraisier, Royal chocolat…" autocomplete="off">
+          <datalist id="dlEntremets"></datalist>
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label for="selComposant">Ajouter un composant — produits fabriqués les 5 derniers jours</label>
+        <select id="selComposant"><option value="">— choisir un produit fabriqué —</option></select>
+      </div>
+      <div id="composantsList" style="margin-top:8px"></div>
+      <p class="footnote" id="composantsVide" style="margin:0">Aucun composant ajouté. Choisissez dans la liste ci-dessus
+         (les produits des 5 derniers jours y apparaissent).</p>
+
+      <div class="toolbar" style="margin-top:16px">
+        <div class="field">
+          <label for="selConservE">Conservation</label>
+          <select id="selConservE">
+            <option value="frigo">❄️ Frigo — J + 3 jours</option>
+            <option value="congel">🧊 Congélateur</option>
+          </select>
+        </div>
+        <div class="field" id="fieldCongelE" hidden>
+          <label for="selCongelMoisE">Durée au congélateur</label>
+          <select id="selCongelMoisE">
+            <option value="1">1 mois</option>
+            <option value="2">2 mois</option>
+            <option value="3" selected>3 mois</option>
+            <option value="6">6 mois</option>
+          </select>
+        </div>
+      </div>
+      <p class="footnote" id="dlcInfoE" style="margin:8px 0 0;font-weight:700"></p>
+      <div class="recipe-actions">
+        <button class="primary" id="btnEnregistrerEntremets" type="button">✅ Enregistrer l'entremets</button>
+      </div>
+    </section>
+
+    <section class="card" id="entremetsJourCard" hidden>
+      <h2>🧾 Entremets montés ce jour-là</h2>
+      <div id="entremetsJourList"></div>
     </section>
   </section>
 
@@ -1244,6 +1298,7 @@ function renderProdJour(){
   box.innerHTML = '';
   const photos = jour(d).photos;
   for(const pr of prods){
+    if(pr.composants) continue;   // les entremets ont leur propre onglet
     const lies = pr.ingredients.filter(i=>i.photoId && photos.some(p=>p.id===i.photoId)).length;
     const row = document.createElement('div'); row.className = 'itemrow';
     const conserv = pr.dlc ? ' — ' + (pr.conservation==='congel' ? '🧊 congél.' : '❄️ frigo') +
@@ -1256,6 +1311,124 @@ function renderProdJour(){
       if(!confirm('Supprimer la production « ' + pr.nom + ' » de cette journée ?')) return;
       const j = jour(d); j.productions = j.productions.filter(x=>x.id!==pr.id);
       save(); renderProdJour(); renderHisto();
+    });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+}
+
+/* =====================================================================
+   ONGLET 🎂 ENTREMETS — montage à partir des produits des 5 derniers jours
+===================================================================== */
+let entremetsLib = [];
+try{ entremetsLib = JSON.parse(localStorage.getItem('trac_entremets')) || []; }catch(e){}
+function saveEntremetsLib(){ try{ localStorage.setItem('trac_entremets', JSON.stringify(entremetsLib)); }catch(e){} }
+let composantsSel = [];   // composants choisis : [{prodId, date, nom, dlc, conservation, heure}]
+
+function jourEntremets(){ return el('jourEntremets').value || aujourdhui(); }
+function dateCourt(iso){ try{ return new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); }catch(e){ return iso; } }
+function ilya(nJours){
+  const dt = new Date(aujourdhui()+'T12:00:00'); dt.setDate(dt.getDate()-nJours);
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+}
+/* productions (hors entremets) fabriquées ces 5 derniers jours, plus récentes d'abord */
+function productionsRecentes(){
+  const min = ilya(4), out = [];   // aujourd'hui + 4 jours en arrière = 5 jours
+  for(const date of Object.keys(journal)){
+    if(date < min) continue;
+    for(const pr of journal[date].productions){
+      if(pr.composants) continue;
+      out.push({prodId: pr.id, date, nom: pr.nom, dlc: pr.dlc, conservation: pr.conservation, heure: pr.heure||''});
+    }
+  }
+  return out.sort((a,b)=>(b.date+b.heure).localeCompare(a.date+a.heure));
+}
+function renderSelComposant(){
+  const recents = productionsRecentes();
+  el('selComposant').innerHTML = '<option value="">— choisir un produit fabriqué —</option>' +
+    recents.map(r=>`<option value="${esc(r.prodId)}">${esc(r.nom)} — ${dateCourt(r.date)}${r.dlc?' · DLC '+dateCourt(r.dlc):''}</option>`).join('');
+}
+function renderDlEntremets(){
+  const tri = [...entremetsLib].sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+  el('dlEntremets').innerHTML = tri.map(e=>`<option value="${esc(e.nom)}">`).join('');
+}
+function renderComposants(){
+  const box = el('composantsList'); box.innerHTML = '';
+  el('composantsVide').hidden = composantsSel.length > 0;
+  for(const c of composantsSel){
+    const row = document.createElement('div'); row.className = 'itemrow';
+    row.innerHTML = `<div class="grow"><strong>${esc(c.nom)}</strong>
+      <div class="rowhint">fabriqué le ${dateCourt(c.date)}${c.dlc?' · DLC '+new Date(c.dlc+'T12:00:00').toLocaleDateString('fr-FR'):''}</div></div>`;
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button'; bDel.textContent = '✕';
+    bDel.title = 'Retirer ce composant';
+    bDel.addEventListener('click', ()=>{ composantsSel = composantsSel.filter(x=>x!==c); renderComposants(); });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+}
+function ajouterComposant(prodId){
+  const r = productionsRecentes().find(x=>x.prodId===prodId);
+  if(!r) return;
+  if(composantsSel.some(c=>c.prodId===prodId)){ toast('Composant déjà ajouté'); return; }
+  composantsSel.push(r); renderComposants();
+}
+/* nom d'entremets connu → pré-sélectionne le composant le plus récent de chaque type */
+function chargerEntremets(){
+  const nomN = norm(el('nomEntremets').value);
+  const e = entremetsLib.find(x=>norm(x.nom)===nomN);
+  if(!e) return;
+  const recents = productionsRecentes();
+  composantsSel = [];
+  for(const cn of e.composants){
+    const match = recents.find(r=>norm(r.nom)===norm(cn));
+    if(match && !composantsSel.some(c=>c.prodId===match.prodId)) composantsSel.push(match);
+  }
+  renderComposants();
+  toast(composantsSel.length ? '✅ Composants récents pré-sélectionnés' : 'Entremets connu — aucun composant récent trouvé, ajoutez-les à la main');
+}
+function dlcEntremets(){ return calcDLC(jourEntremets(), el('selConservE').value, el('selCongelMoisE').value); }
+function majDLCE(){
+  const congel = el('selConservE').value === 'congel';
+  el('fieldCongelE').hidden = !congel;
+  el('dlcInfoE').textContent = (congel ? '🧊' : '❄️') + ' DLC : ' +
+    new Date(dlcEntremets()+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'long',year:'numeric'});
+}
+function enregistrerEntremets(){
+  const nom = el('nomEntremets').value.trim();
+  if(!nom){ toast('Indiquez le nom de l\'entremets'); el('nomEntremets').focus(); return; }
+  if(!composantsSel.length){ toast('Ajoutez au moins un composant (produits des 5 derniers jours)'); return; }
+  const d = jourEntremets();
+  const noms = composantsSel.map(c=>c.nom);
+  const e = entremetsLib.find(x=>norm(x.nom)===norm(nom));
+  if(e){ e.nom = nom; e.composants = noms; } else entremetsLib.push({id: uid('el'), nom, composants: noms});
+  saveEntremetsLib();
+  jour(d).productions.push({
+    id: uid('en'), heure: heureNow(), nom, type:'entremets',
+    conservation: el('selConservE').value, dlc: dlcEntremets(), ingredients: [],
+    composants: composantsSel.map(c=>({prodId: c.prodId, date: c.date, nom: c.nom, dlc: c.dlc, conservation: c.conservation}))
+  });
+  save();
+  el('nomEntremets').value = ''; composantsSel = [];
+  renderDlEntremets(); renderComposants(); renderEntremetsJour(); renderHisto();
+  toast('✅ Entremets enregistré — « ' + nom + ' »');
+  driveAutoJour(d);
+}
+function renderEntremetsJour(){
+  const d = jourEntremets();
+  const ents = jour(d).productions.filter(pr=>pr.composants);
+  el('entremetsJourCard').hidden = ents.length === 0;
+  const box = el('entremetsJourList'); box.innerHTML = '';
+  for(const pr of ents){
+    const row = document.createElement('div'); row.className = 'itemrow';
+    const cons = pr.dlc ? ' — ' + (pr.conservation==='congel'?'🧊 congél.':'❄️ frigo') + ', DLC ' + new Date(pr.dlc+'T12:00:00').toLocaleDateString('fr-FR') : '';
+    row.innerHTML = `<div class="grow"><strong>${esc(pr.nom)}</strong>
+      <div class="rowhint">${pr.heure?'à '+esc(pr.heure)+' — ':''}${pr.composants.length} composant${pr.composants.length>1?'s':''} : ${esc(pr.composants.map(c=>c.nom).join(', '))}${cons}</div></div>`;
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button'; bDel.textContent = '✕';
+    bDel.title = 'Supprimer cet entremets';
+    bDel.addEventListener('click', ()=>{
+      if(!confirm('Supprimer l\'entremets « ' + pr.nom + ' » ?')) return;
+      const j = jour(d); j.productions = j.productions.filter(x=>x.id!==pr.id);
+      save(); renderEntremetsJour(); renderHisto();
     });
     row.appendChild(bDel);
     box.appendChild(row);
@@ -1462,10 +1635,13 @@ async function pdfRecap(d){
     titreSection('Productions du jour');
     for(const pr of j.productions){
       const cons = pr.dlc ? ' — ' + (pr.conservation==='congel'?'congélateur':'frigo') + ' · DLC ' + fdate(pr.dlc) : '';
-      ligne(pr.nom + (pr.heure?' — '+pr.heure:'') + cons, 11, true, 0, 2);
+      ligne(pr.nom + (pr.composants?' (entremets)':'') + (pr.heure?' — '+pr.heure:'') + cons, 11, true, 0, 2);
       for(const it of pr.ingredients){
         const p = it.photoId ? photoById[it.photoId] : null;
         ligne('• ' + it.nom + '  ->  ' + (p ? numM[p.id] + ' ' + (p.nom||'') + '  (lot ' + (p.lot||'—') + ', DLC ' + fdate(p.dlc) + ')' : '—'), 9, false, 14, 2);
+      }
+      if(pr.composants) for(const c of pr.composants){
+        ligne('• ' + c.nom + '  (composant fabriqué le ' + fdate(c.date) + ', DLC ' + fdate(c.dlc) + ')', 9, false, 14, 2);
       }
       y -= 5;
     }
@@ -1660,7 +1836,7 @@ async function exporter(){
       try{ const data = photoCache[p.id] || await photoGet(p.id); if(data) photos[p.id] = data; }catch(e){}
     }
   }
-  const blob = new Blob([JSON.stringify({app:'tracabilite', version:1, produits, journal, photos})],
+  const blob = new Blob([JSON.stringify({app:'tracabilite', version:1, produits, entremetsLib, journal, photos})],
     {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1675,12 +1851,13 @@ async function importer(file){
     if(data.app !== 'tracabilite') throw new Error('mauvais fichier');
     if(!confirm('Restaurer ce fichier ? Les données actuelles de l\'appareil seront remplacées.')) return;
     produits = data.produits || [];
+    entremetsLib = data.entremetsLib || [];
     journal = data.journal || {};
     for(const id of Object.keys(data.photos || {})){
       await photoPut(id, data.photos[id]);
       photoCache[id] = data.photos[id];
     }
-    save();
+    save(); saveEntremetsLib();
     renderTout();
     toast('⬆ Données restaurées');
   }catch(e){ alert('Fichier illisible : choisissez une sauvegarde créée par cette application (.json).'); }
@@ -1692,15 +1869,18 @@ async function importer(file){
 function activerOnglet(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===id));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===id));
+  if(id==='entremets'){ renderSelComposant(); renderEntremetsJour(); }   // rafraîchit les produits récents
   try{ localStorage.setItem('trac_tab', id); }catch(e){}
 }
 function renderTout(){
   renderPhotos(); renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
+  renderSelComposant(); renderDlEntremets(); renderComposants(); renderEntremetsJour();
 }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   el('jourMatin').value = aujourdhui();
   el('jourProd').value = aujourdhui();
+  el('jourEntremets').value = aujourdhui();
 
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>activerOnglet(t.dataset.tab)));
   let tab0 = 'matin';
@@ -1769,6 +1949,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   el('selCongelMois').addEventListener('change', majDLC);
   el('btnEnregistrerProd').addEventListener('click', enregistrerProduction);
   majDLC();
+
+  /* entremets */
+  el('selComposant').addEventListener('change', ()=>{
+    if(el('selComposant').value){ ajouterComposant(el('selComposant').value); el('selComposant').value = ''; }
+  });
+  el('nomEntremets').addEventListener('change', chargerEntremets);
+  el('nomEntremets').addEventListener('blur', chargerEntremets);
+  el('jourEntremets').addEventListener('change', ()=>{ majDLCE(); renderEntremetsJour(); });
+  el('selConservE').addEventListener('change', majDLCE);
+  el('selCongelMoisE').addEventListener('change', majDLCE);
+  el('btnEnregistrerEntremets').addEventListener('click', enregistrerEntremets);
+  majDLCE();
 
   /* bibliothèque */
   el('btnEditSave').addEventListener('click', ()=>{

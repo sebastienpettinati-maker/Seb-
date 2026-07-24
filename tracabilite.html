@@ -208,7 +208,7 @@
   <nav class="tabs">
     <button class="tab" data-tab="matin" type="button"><span class="ico">📷</span><span class="lbl">Matin</span></button>
     <button class="tab" data-tab="production" type="button"><span class="ico">🍳</span><span class="lbl">Production</span></button>
-    <button class="tab" data-tab="entremets" type="button"><span class="ico">🎂</span><span class="lbl">Entremets</span></button>
+    <button class="tab" data-tab="entremets" type="button"><span class="ico">🍰</span><span class="lbl">Entremets</span></button>
     <button class="tab" data-tab="magasin" type="button"><span class="ico">🏬</span><span class="lbl">Magasin</span></button>
     <button class="tab" data-tab="produits" type="button"><span class="ico">📁</span><span class="lbl">Produits</span></button>
     <button class="tab" data-tab="historique" type="button"><span class="ico">📅</span><span class="lbl">Historique</span></button>
@@ -332,10 +332,11 @@
   <!-- ==================== Onglet ENTREMETS ==================== -->
   <section class="panel" data-panel="entremets">
     <section class="card">
-      <h2>🎂 Fabrication d'entremets</h2>
-      <p class="hint">Assemblez un entremets à partir des produits que vous avez fabriqués ces 5 derniers jours
-         (biscuit, mousse, crémeux, glaçage…). Chaque composant garde sa traçabilité — date de fabrication, DLC
-         et, en remontant, ses propres marchandises.</p>
+      <h2>🍰 Fabrication d'entremets</h2>
+      <p class="hint">Assemblez un entremets à partir des produits que vous avez fabriqués (biscuit, mousse, crémeux,
+         glaçage…). Seuls les produits <strong>encore utilisables</strong> apparaissent : gardés au frigo jusqu'à
+         4 jours, ou congelés jusqu'à 6 mois. Chaque composant garde sa traçabilité — date de fabrication, DLC et,
+         en remontant, ses propres marchandises.</p>
       <div class="toolbar">
         <div class="field"><label for="jourEntremets">Journée</label><input type="date" id="jourEntremets"></div>
         <div class="field" style="flex:1;min-width:220px">
@@ -345,12 +346,12 @@
         </div>
       </div>
       <div class="field" style="margin-top:12px">
-        <label for="selComposant">Ajouter un composant — produits fabriqués les 5 derniers jours</label>
+        <label for="selComposant">Ajouter un composant — produits encore utilisables (frigo ≤ 4 j, congelé ≤ 6 mois)</label>
         <select id="selComposant"><option value="">— choisir un produit fabriqué —</option></select>
       </div>
       <div id="composantsList" style="margin-top:8px"></div>
       <p class="footnote" id="composantsVide" style="margin:0">Aucun composant ajouté. Choisissez dans la liste ci-dessus
-         (les produits des 5 derniers jours y apparaissent).</p>
+         (les produits encore bons — frigo 4 jours, congelé 6 mois — y apparaissent).</p>
 
       <div class="toolbar" style="margin-top:16px">
         <div class="field">
@@ -1360,13 +1361,26 @@ function ilya(nJours){
   const dt = new Date(aujourdhui()+'T12:00:00'); dt.setDate(dt.getDate()-nJours);
   return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
 }
-/* productions (hors entremets) fabriquées ces 5 derniers jours, plus récentes d'abord */
+/* un produit reste utilisable jusqu'à 4 jours au frigo, 6 mois au congélateur,
+   à compter de sa fabrication */
+function encoreUtilisable(fabDateISO, conservation, refISO){
+  const fab = new Date(fabDateISO + 'T12:00:00');
+  const ref = new Date((refISO || aujourdhui()) + 'T12:00:00');
+  if(ref < fab) return false;                       // pas encore fabriqué à cette date
+  const lim = new Date(fab);
+  if(conservation === 'congel') lim.setMonth(lim.getMonth() + 6);
+  else lim.setDate(lim.getDate() + 4);
+  return ref <= lim;
+}
+/* productions (hors entremets) encore utilisables à la date de montage, plus récentes d'abord */
 function productionsRecentes(){
-  const min = ilya(4), out = [];   // aujourd'hui + 4 jours en arrière = 5 jours
+  const ref = (typeof jourEntremets === 'function' && el('jourEntremets')) ? jourEntremets() : aujourdhui();
+  const min = ilya(200), out = [];   // borne de balayage : un peu plus de 6 mois
   for(const date of Object.keys(journal)){
     if(date < min) continue;
     for(const pr of journal[date].productions){
       if(pr.composants) continue;
+      if(!encoreUtilisable(date, pr.conservation, ref)) continue;
       out.push({prodId: pr.id, date, nom: pr.nom, dlc: pr.dlc, conservation: pr.conservation, heure: pr.heure||''});
     }
   }
@@ -1375,7 +1389,7 @@ function productionsRecentes(){
 function renderSelComposant(){
   const recents = productionsRecentes();
   el('selComposant').innerHTML = '<option value="">— choisir un produit fabriqué —</option>' +
-    recents.map(r=>`<option value="${esc(r.prodId)}">${esc(r.nom)} — ${dateCourt(r.date)}${r.dlc?' · DLC '+dateCourt(r.dlc):''}</option>`).join('');
+    recents.map(r=>`<option value="${esc(r.prodId)}">${esc(r.nom)} — ${r.conservation==='congel'?'🧊':'❄️'} fab. ${dateCourt(r.date)}${r.dlc?' · DLC '+dateCourt(r.dlc):''}</option>`).join('');
 }
 function renderDlEntremets(){
   const tri = [...entremetsLib].sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
@@ -2125,7 +2139,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   });
   el('nomEntremets').addEventListener('change', chargerEntremets);
   el('nomEntremets').addEventListener('blur', chargerEntremets);
-  el('jourEntremets').addEventListener('change', ()=>{ majDLCE(); renderEntremetsJour(); });
+  el('jourEntremets').addEventListener('change', ()=>{ majDLCE(); renderSelComposant(); renderEntremetsJour(); });
   el('selConservE').addEventListener('change', majDLCE);
   el('selCongelMoisE').addEventListener('change', majDLCE);
   el('btnEnregistrerEntremets').addEventListener('click', enregistrerEntremets);

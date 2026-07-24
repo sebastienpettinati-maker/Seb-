@@ -209,6 +209,7 @@
     <button class="tab" data-tab="matin" type="button"><span class="ico">📷</span><span class="lbl">Matin</span></button>
     <button class="tab" data-tab="production" type="button"><span class="ico">🍳</span><span class="lbl">Production</span></button>
     <button class="tab" data-tab="entremets" type="button"><span class="ico">🎂</span><span class="lbl">Entremets</span></button>
+    <button class="tab" data-tab="magasin" type="button"><span class="ico">🏬</span><span class="lbl">Magasin</span></button>
     <button class="tab" data-tab="produits" type="button"><span class="ico">📁</span><span class="lbl">Produits</span></button>
     <button class="tab" data-tab="historique" type="button"><span class="ico">📅</span><span class="lbl">Historique</span></button>
   </nav>
@@ -378,6 +379,34 @@
     <section class="card" id="entremetsJourCard" hidden>
       <h2>🧾 Entremets montés ce jour-là</h2>
       <div id="entremetsJourList"></div>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet SORTIE MAGASIN ==================== -->
+  <section class="panel" data-panel="magasin">
+    <section class="card">
+      <h2>🏬 Sortie congélateur → magasin</h2>
+      <p class="hint">Choisissez les gâteaux (entremets) sortis du congélateur pour le magasin — vous pouvez remonter
+         jusqu'à une semaine en arrière. Le bon de sortie PDF, indépendant, indique pour chaque gâteau quand il a été
+         surgelé, quand il est sorti, sa DLC et sa composition, pour que le magasin puisse vérifier.</p>
+      <div class="toolbar">
+        <div class="field"><label for="jourSortie">Date de sortie</label><input type="date" id="jourSortie"></div>
+        <div class="field" style="flex:1;min-width:200px">
+          <label for="magasinNom">Magasin / destinataire (facultatif)</label>
+          <input type="text" id="magasinNom" placeholder="ex. Boutique centre-ville" autocomplete="off">
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label for="selSortie">Ajouter un gâteau — entremets fabriqués la semaine passée</label>
+        <select id="selSortie"><option value="">— choisir un entremets —</option></select>
+      </div>
+      <div id="sortieList" style="margin-top:8px"></div>
+      <p class="footnote" id="sortieVide" style="margin:0">Aucun gâteau ajouté. Choisissez dans la liste ci-dessus
+         (les entremets des 7 derniers jours y apparaissent).</p>
+      <div class="recipe-actions">
+        <button class="primary" id="btnSortiePDF" type="button">📄 Bon de sortie (PDF)</button>
+        <button id="btnSortieShare" type="button">📤 Envoyer au magasin</button>
+      </div>
     </section>
   </section>
 
@@ -1436,6 +1465,82 @@ function renderEntremetsJour(){
 }
 
 /* =====================================================================
+   ONGLET 🏬 SORTIE MAGASIN — gâteaux sortis du congélateur, bon de sortie PDF
+===================================================================== */
+let sortieSel = [];   // [{entremetsId, fabDate, nom, dlc, conservation, heure, qte, composants:[{nom,date,dlc}]}]
+function jourSortie(){ return el('jourSortie').value || aujourdhui(); }
+/* entremets fabriqués les 7 derniers jours */
+function entremetsRecents(){
+  const min = ilya(6), out = [];
+  for(const date of Object.keys(journal)){
+    if(date < min) continue;
+    for(const pr of journal[date].productions){
+      if(!pr.composants) continue;
+      out.push({entremetsId: pr.id, fabDate: date, nom: pr.nom, dlc: pr.dlc, conservation: pr.conservation, heure: pr.heure||'', composants: pr.composants});
+    }
+  }
+  return out.sort((a,b)=>(b.fabDate+(b.heure||'')).localeCompare(a.fabDate+(a.heure||'')));
+}
+function renderSelSortie(){
+  const rec = entremetsRecents();
+  el('selSortie').innerHTML = '<option value="">— choisir un entremets —</option>' +
+    rec.map(r=>`<option value="${esc(r.entremetsId)}">${esc(r.nom)} — fab. ${dateCourt(r.fabDate)}${r.conservation==='congel'?' 🧊':''}${r.dlc?' · DLC '+dateCourt(r.dlc):''}</option>`).join('');
+}
+function renderSortie(){
+  const box = el('sortieList'); box.innerHTML = '';
+  el('sortieVide').hidden = sortieSel.length > 0;
+  for(const l of sortieSel){
+    const row = document.createElement('div'); row.className = 'itemrow';
+    const info = document.createElement('div'); info.className = 'grow';
+    info.innerHTML = `<strong>${esc(l.nom)}</strong><div class="rowhint">surgelé/fabriqué le ${dateCourt(l.fabDate)}${l.dlc?' · DLC '+new Date(l.dlc+'T12:00:00').toLocaleDateString('fr-FR'):''} · ${l.composants.length} composant${l.composants.length>1?'s':''}</div>`;
+    row.appendChild(info);
+    const qte = document.createElement('input'); qte.type = 'number'; qte.min = '1'; qte.value = l.qte||1;
+    qte.title = 'Quantité'; qte.style.width = '66px';
+    qte.addEventListener('input', ()=>{ l.qte = Math.max(1, parseInt(qte.value,10)||1); });
+    row.appendChild(qte);
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button'; bDel.textContent = '✕';
+    bDel.title = 'Retirer ce gâteau';
+    bDel.addEventListener('click', ()=>{ sortieSel = sortieSel.filter(x=>x!==l); renderSortie(); });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+}
+function ajouterSortie(id){
+  const r = entremetsRecents().find(x=>x.entremetsId===id);
+  if(!r) return;
+  if(sortieSel.some(l=>l.entremetsId===id)){ toast('Ce gâteau est déjà dans la liste'); return; }
+  sortieSel.push({entremetsId: r.entremetsId, fabDate: r.fabDate, nom: r.nom, dlc: r.dlc, conservation: r.conservation,
+    heure: r.heure, qte: 1, composants: r.composants.map(c=>({nom: c.nom, date: c.date, dlc: c.dlc}))});
+  renderSortie();
+}
+function sortieCourante(){ return { date: jourSortie(), magasin: el('magasinNom').value.trim(), lignes: sortieSel }; }
+async function telechargerSortie(){
+  if(!sortieSel.length){ toast('Ajoutez au moins un gâteau'); return; }
+  toast('📄 Création du bon de sortie…');
+  try{
+    const bytes = pdfSortie(sortieCourante());
+    const blob = new Blob([bytes], {type:'application/pdf'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nomPDFSortie(jourSortie()); a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    toast('⬇ Bon de sortie téléchargé');
+  }catch(e){ toast('⚠️ Création du PDF impossible'); }
+}
+async function partagerSortie(){
+  if(!sortieSel.length){ toast('Ajoutez au moins un gâteau'); return; }
+  toast('📄 Préparation…');
+  let bytes; try{ bytes = pdfSortie(sortieCourante()); }catch(e){ toast('⚠️ Création du PDF impossible'); return; }
+  const fichier = new File([bytes], nomPDFSortie(jourSortie()), {type:'application/pdf'});
+  if(navigator.canShare && navigator.canShare({files:[fichier]})){
+    try{ await navigator.share({files:[fichier], title: nomPDFSortie(jourSortie()), text:'Bon de sortie magasin'}); toast('📤 Envoyé'); }catch(e){}
+    return;
+  }
+  const blob = new Blob([bytes], {type:'application/pdf'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nomPDFSortie(jourSortie()); a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('⬇ Bon de sortie téléchargé — ouvrez-le puis partagez-le');
+}
+
+/* =====================================================================
    ONGLET 📁 MES PRODUITS
 ===================================================================== */
 let editId = null;
@@ -1671,7 +1776,13 @@ async function pdfRecap(d){
   put(M, 10, false, 'Date : ...........................');
   ops.push('BT /F1 10 Tf 1 0 0 1 ' + (M+280) + ' ' + y.toFixed(2) + ' Tm (' + escPDF('Signature : ...........................') + ') Tj ET');
 
-  /* --- assemblage des octets du PDF --- */
+  return assemblerPDF(pages, imgs);
+}
+/* assemblage final des octets du PDF (pages = tableaux d'opérateurs texte,
+   imgs = images JPEG intégrées). Réutilisé par la feuille et le bon de sortie. */
+function assemblerPDF(pages, imgs){
+  imgs = imgs || [];
+  const PW = 595, PH = 842;
   const enc = s => { const u = new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i] = s.charCodeAt(i)&0xff; return u; };
   const parts = []; let len = 0; const off = {};
   const push = u => { parts.push(u); len += u.length; };
@@ -1711,7 +1822,62 @@ async function pdfRecap(d){
   for(const u of parts){ out.set(u, o); o += u.length; }
   return out;
 }
+/* --- petit moteur de mise en page texte (partagé avec le bon de sortie) --- */
+function moteurTexte(){
+  const PW = 595, PH = 842, M = 42, RIGHT = PW - M;
+  const pages = []; let ops, y;
+  const nl = ()=>{ ops = []; pages.push(ops); y = PH - M; };
+  const room = h => { if(y - h < M) nl(); };
+  const put = (x, size, bold, str)=>ops.push('BT /' + (bold?'F2':'F1') + ' ' + size + ' Tf 1 0 0 1 ' + x.toFixed(2) + ' ' + y.toFixed(2) + ' Tm (' + escPDF(str) + ') Tj ET');
+  function ligne(str, size, bold, indent, gap){
+    size = size||10; indent = indent||0; gap = gap==null?3:gap;
+    const maxw = RIGHT - M - indent, mots = String(str).split(' ');
+    let cur = '';
+    const flush = ()=>{ room(size + gap); y -= size; put(M + indent, size, bold, cur); y -= gap; cur = ''; };
+    for(const w of mots){ const t = cur ? cur + ' ' + w : w; if(cur && t.length*size*0.5 > maxw){ flush(); cur = w; } else cur = t; }
+    if(cur) flush();
+  }
+  function titreSection(str){
+    y -= 8; room(22); y -= 13; put(M, 13, true, str);
+    y -= 6; ops.push(M + ' ' + y.toFixed(2) + ' ' + RIGHT + ' ' + y.toFixed(2) + ' 0.6 w 0.5 G ' + M + ' ' + y.toFixed(2) + ' m ' + RIGHT + ' ' + y.toFixed(2) + ' l S 0 G');
+    y -= 8;
+  }
+  return {
+    M, RIGHT, pages,
+    titre(str){ nl(); y -= 24; put(M, 20, true, str); y -= 2; },
+    ligne, titreSection,
+    saut(v){ y -= v; },
+    signature(g, dr){ y -= 22; room(30); put(M, 10, false, g);
+      ops.push('BT /F1 10 Tf 1 0 0 1 ' + (M+280) + ' ' + y.toFixed(2) + ' Tm (' + escPDF(dr) + ') Tj ET'); }
+  };
+}
 function nomPDF(d){ return 'traçabilité-' + d + '.pdf'; }
+function nomPDFSortie(d){ return 'sortie-magasin-' + d + '.pdf'; }
+
+/* bon de sortie magasin — PDF indépendant : pour chaque gâteau sorti du
+   congélateur, date de surgélation, date de sortie, DLC et composition */
+function pdfSortie(sortie){
+  const fdate = iso => iso ? new Date(iso+'T12:00:00').toLocaleDateString('fr-FR') : '—';
+  const m = moteurTexte();
+  m.titre('Bon de sortie — magasin');
+  const dj = dateFr(sortie.date), djc = dj.charAt(0).toUpperCase() + dj.slice(1);
+  m.ligne('Sortie du ' + djc + (sortie.magasin ? '     Destinataire : ' + sortie.magasin : ''), 10, false, 0, 3);
+  m.ligne('Gâteaux sortis du congélateur et expédiés au magasin. Pour chacun : date de surgélation, date de sortie, DLC et composition — pour vérification.', 8, false, 0, 6);
+  for(const l of sortie.lignes){
+    m.titreSection(l.nom + (l.qte > 1 ? '     x ' + l.qte : ''));
+    m.ligne('Surgelé / fabriqué le : ' + fdate(l.fabDate) + (l.heure ? ' à ' + l.heure : ''), 10, false, 6, 3);
+    m.ligne('Sorti du congélateur le : ' + fdate(sortie.date), 10, false, 6, 3);
+    m.ligne('DLC : ' + fdate(l.dlc), 10, true, 6, 3);
+    if(l.composants && l.composants.length){
+      m.ligne('Composition :', 9, true, 6, 2);
+      for(const c of l.composants)
+        m.ligne('• ' + c.nom + '  (fabriqué le ' + fdate(c.date) + ', DLC ' + fdate(c.dlc) + ')', 9, false, 16, 2);
+    }
+    m.saut(4);
+  }
+  m.signature('Sorti par : ...........................', 'Reçu par (magasin) : ...................');
+  return assemblerPDF(m.pages, []);
+}
 async function telechargerPDF(d){
   toast('📄 Création du PDF…');
   try{
@@ -1870,17 +2036,20 @@ function activerOnglet(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===id));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===id));
   if(id==='entremets'){ renderSelComposant(); renderEntremetsJour(); }   // rafraîchit les produits récents
+  if(id==='magasin'){ renderSelSortie(); }                               // rafraîchit les entremets récents
   try{ localStorage.setItem('trac_tab', id); }catch(e){}
 }
 function renderTout(){
   renderPhotos(); renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
   renderSelComposant(); renderDlEntremets(); renderComposants(); renderEntremetsJour();
+  renderSelSortie(); renderSortie();
 }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   el('jourMatin').value = aujourdhui();
   el('jourProd').value = aujourdhui();
   el('jourEntremets').value = aujourdhui();
+  el('jourSortie').value = aujourdhui();
 
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>activerOnglet(t.dataset.tab)));
   let tab0 = 'matin';
@@ -1961,6 +2130,13 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   el('selCongelMoisE').addEventListener('change', majDLCE);
   el('btnEnregistrerEntremets').addEventListener('click', enregistrerEntremets);
   majDLCE();
+
+  /* sortie magasin */
+  el('selSortie').addEventListener('change', ()=>{
+    if(el('selSortie').value){ ajouterSortie(el('selSortie').value); el('selSortie').value = ''; }
+  });
+  el('btnSortiePDF').addEventListener('click', telechargerSortie);
+  el('btnSortieShare').addEventListener('click', partagerSortie);
 
   /* bibliothèque */
   el('btnEditSave').addEventListener('click', ()=>{

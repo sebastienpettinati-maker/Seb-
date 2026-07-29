@@ -202,6 +202,8 @@
     background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:10px 14px;
     position:sticky;top:0;z-index:101}
   .apercu-hint{font-size:.78rem;color:var(--ink-2)}
+  .pdfroot{position:fixed;left:-10000px;top:0;max-width:none;width:210mm;
+    box-shadow:none;border-radius:0;margin:0}
   .docview{max-width:860px;margin:0 auto;background:#fff;color:#000;border-radius:8px;padding:26px;
     font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
   .docview h1{font-size:20px;margin:0 0 2px}
@@ -583,9 +585,9 @@ function reponse(o) {
 <!-- ===================== Aperçu avant impression ===================== -->
 <div id="apercu" hidden>
   <div class="apercu-bar">
-    <button class="primary" id="apercuPrint">🖨 Imprimer / Enregistrer en PDF</button>
-    <button id="apercuClose">✕ Fermer l'aperçu</button>
-    <span class="apercu-hint">Dans la fenêtre d'impression, choisissez « Enregistrer au format PDF » comme destination.</span>
+    <button class="primary" id="apercuPdf">⬇ Enregistrer le PDF</button>
+    <button id="apercuClose">✕ Fermer</button>
+    <span class="apercu-hint" id="apercuHint">Le PDF est enregistré directement dans vos fichiers (dossier Téléchargements).</span>
   </div>
   <div id="apercuContent" class="docview"></div>
 </div>
@@ -2243,6 +2245,81 @@ function driveAuto(fichiers){
 }
 
 /* =====================================================================
+   GÉNÉRATION PDF DIRECTE (sans passer par l'impression du navigateur —
+   fiable sur Android/Xiaomi et en application installée)
+   jsPDF + html2canvas hébergés avec l'application (dossier lib/).
+===================================================================== */
+let pdfLibP = null, pdfBase = 'glacerie';
+function chargerPdfLib(){
+  if(window.jspdf && window.html2canvas) return Promise.resolve();
+  if(!pdfLibP) pdfLibP = new Promise((res, rej)=>{
+    const base = new URL('lib', location.href).href;
+    let restant = 2; const ok = ()=>{ if(--restant===0) res(); };
+    const charge = (src, test)=>{
+      if(test()){ ok(); return; }
+      const s = document.createElement('script'); s.src = src;
+      s.onload = ok; s.onerror = ()=>{ pdfLibP = null; rej(new Error('lib')); };
+      document.head.appendChild(s);
+    };
+    charge(base + '/jspdf.umd.min.js', ()=>window.jspdf);
+    charge(base + '/html2canvas.min.js', ()=>window.html2canvas);
+  });
+  return pdfLibP;
+}
+const PX_MM = 96/25.4;   // pixels CSS par millimètre
+async function enregistrerPDF(){
+  const btn = el('apercuPdf'), avant = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ Création du PDF…';
+  let root = null;
+  try{
+    await chargerPdfLib();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:'mm', format:'a4', orientation:'portrait'});
+    const A4W = 210, A4H = 297;
+    root = document.createElement('div');
+    root.className = 'docview pdfroot';
+    root.innerHTML = el('apercuContent').innerHTML;
+    document.body.appendChild(root);
+    const grids = root.querySelectorAll('.labelgrid');
+    let premier = true;
+    if(grids.length){
+      // étiquettes : chaque planche placée à sa taille réelle en mm (précision)
+      root.style.padding = '0';
+      for(const g of grids){
+        const cv = await html2canvas(g, {scale:3, backgroundColor:'#ffffff', logging:false});
+        const rect = g.getBoundingClientRect();
+        const wmm = rect.width / PX_MM, hmm = rect.height / PX_MM;
+        if(!premier) doc.addPage(); premier = false;
+        doc.addImage(cv.toDataURL('image/jpeg', 0.95), 'JPEG',
+          Math.max(0,(A4W - wmm)/2), 12, Math.min(A4W, wmm), hmm);
+      }
+    }else{
+      // document (recette, fiche) : rendu pleine largeur puis découpe en pages A4
+      root.style.padding = '10mm 12mm';
+      const cv = await html2canvas(root, {scale:2, backgroundColor:'#ffffff', logging:false, windowWidth:root.scrollWidth});
+      const imgW = A4W, imgH = cv.height * A4W / cv.width;
+      const pxParPage = cv.width * A4H / A4W;
+      let y = 0;
+      while(y < cv.height - 2){
+        const hpx = Math.min(pxParPage, cv.height - y);
+        const part = document.createElement('canvas');
+        part.width = cv.width; part.height = hpx;
+        part.getContext('2d').drawImage(cv, 0, y, cv.width, hpx, 0, 0, cv.width, hpx);
+        if(!premier) doc.addPage(); premier = false;
+        doc.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, imgW, hpx * A4W / cv.width);
+        y += hpx;
+      }
+    }
+    doc.save(pdfBase + '.pdf');
+  }catch(e){
+    alert('Création du PDF impossible ici. Ouvrez l’application depuis son adresse web (le PDF a besoin d’internet la première fois), puis réessayez.');
+  }finally{
+    if(root && root.parentNode) root.parentNode.removeChild(root);
+    btn.disabled = false; btn.innerHTML = avant;
+  }
+}
+
+/* =====================================================================
    MES RECETTES — dossier de recettes enregistrées sur l'appareil
 ===================================================================== */
 let recettes = [];
@@ -2449,8 +2526,12 @@ function init(){
   for(const id of ['tracDuree','tracLot','tracNb']) el(id).addEventListener('input', saveTrac);
   // aperçu à l'écran (le document est visible même si l'impression est
   // indisponible dans le navigateur), puis impression / enregistrement PDF
-  const ouvrirApercu = ()=>{
+  const ouvrirApercu = (base)=>{
     el('apercuContent').innerHTML = el('printArea').innerHTML;
+    if(base) pdfBase = base;
+    el('apercuHint').textContent = printMode==='etiquettes'
+      ? 'Planches d’étiquettes 100 × 30 mm — le PDF est enregistré dans vos fichiers. Imprimez-le à l’échelle 100 %.'
+      : 'Le PDF est enregistré directement dans vos fichiers (dossier Téléchargements).';
     el('apercu').hidden = false;
     el('apercu').scrollTop = 0;
     document.body.style.overflow = 'hidden';
@@ -2463,10 +2544,12 @@ function init(){
     if(!el('photoView').hidden) el('photoView').hidden = true;
     else if(!el('apercu').hidden) fermerApercu();
   });
-  el('apercuPrint').addEventListener('click', ()=>{ try{ window.print(); }catch(e){ alert('Impression indisponible dans ce navigateur : ouvrez le fichier dans Safari ou Chrome pour imprimer.'); } });
+  el('apercuPdf').addEventListener('click', enregistrerPDF);
 
   el('btnEtiquettes').addEventListener('click',()=>{
-    printMode='etiquettes'; buildLabels(); ouvrirApercu();
+    printMode='etiquettes'; buildLabels();
+    const d = donneesTrac();
+    ouvrirApercu(`${d.dateISO}_${slugFichier(d.nom)}_etiquettes`);
     driveAuto([docTracabilite(), docEtiquettes()]);
   });
   el('btnDlEtiquettes').addEventListener('click',()=>{
@@ -2474,7 +2557,7 @@ function init(){
     telechargerFichier(f.nom, f.contenu);
     driveAuto([f]);
   });
-  el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); ouvrirApercu(); driveAuto([docRecette()]); });
+  el('btnPDF').addEventListener('click',()=>{ printMode='recette'; buildPrint(); const d=donneesTrac(); ouvrirApercu(`${d.dateISO}_${slugFichier(d.nom)}_recette`); driveAuto([docRecette()]); });
 
   // --- photos & lots fournisseurs ---
   el('lotPhotoInput').addEventListener('change', async ()=>{
@@ -2495,7 +2578,7 @@ function init(){
   });
   el('photoView').addEventListener('click', ()=>{ el('photoView').hidden = true; });
   el('btnFiche').addEventListener('click', ()=>{
-    printMode = 'fiche'; buildFiche(); ouvrirApercu(); driveAuto([docTracabilite()]);
+    printMode = 'fiche'; buildFiche(); const d=donneesTrac(); ouvrirApercu(`${d.dateISO}_${slugFichier(d.nom)}_fiche-fabrication`); driveAuto([docTracabilite()]);
   });
   chargerPhotos();
 

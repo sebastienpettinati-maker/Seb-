@@ -1,8 +1,9 @@
 /* Service worker du calculateur de glacerie — cache hors-ligne.
    Stratégie : réseau d'abord pour la page (pour recevoir les mises à jour),
    cache en secours (fonctionnement 100 % hors-ligne une fois visitée). */
-const CACHE = 'glacerie-v13';
-const FICHIERS = ['./glacerie.html', './glacerie.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE = 'glacerie-v15';
+const FICHIERS = ['./glacerie.html', './glacerie.webmanifest', './icon-192.png', './icon-512.png',
+  './lib/jspdf.umd.min.js', './lib/html2canvas.min.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FICHIERS)));

@@ -271,7 +271,8 @@
          Sinon, saisissez-la une fois — elle sera enregistrée pour la prochaine fois.</p>
       <div class="toolbar">
         <div class="field"><label for="jourProd">Journée</label><input type="date" id="jourProd"></div>
-        <div class="field" style="flex:1;min-width:220px">
+        <div class="field"><label for="heureProd">Heure de fabrication</label><input type="time" id="heureProd" style="width:130px"></div>
+        <div class="field" style="flex:1;min-width:200px">
           <label for="selProduit">Produits déjà enregistrés</label>
           <select id="selProduit"><option value="">— choisir dans la liste —</option></select>
         </div>
@@ -318,6 +319,12 @@
         </div>
       </div>
       <p class="footnote" id="dlcInfo" style="margin:8px 0 0;font-weight:700"></p>
+      <label id="refroidBloc" style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="refroidChk" style="margin-top:3px">
+        <span>❄️ Refroidissement en cellule : refroidie à +4 °C en moins de 2 h
+          <span class="footnote" style="display:block;font-weight:400">Pour les préparations cuites à refroidir (crème pâtissière…). Reporté sur la feuille de traçabilité.</span>
+        </span>
+      </label>
       <div class="recipe-actions">
         <button class="primary" id="btnEnregistrerProd" type="button">✅ Enregistrer la production</button>
       </div>
@@ -388,7 +395,7 @@
     <section class="card">
       <h2>🏬 Sortie congélateur → magasin</h2>
       <p class="hint">Choisissez les gâteaux (entremets) sortis du congélateur pour le magasin — vous pouvez remonter
-         jusqu'à une semaine en arrière. Le bon de sortie PDF, indépendant, indique pour chaque gâteau quand il a été
+         jusqu'au dernier mois. Le bon de sortie PDF, indépendant, indique pour chaque gâteau quand il a été
          surgelé, quand il est sorti, sa DLC et sa composition, pour que le magasin puisse vérifier.</p>
       <div class="toolbar">
         <div class="field"><label for="jourSortie">Date de sortie</label><input type="date" id="jourSortie"></div>
@@ -398,12 +405,12 @@
         </div>
       </div>
       <div class="field" style="margin-top:12px">
-        <label for="selSortie">Ajouter un gâteau — entremets fabriqués la semaine passée</label>
+        <label for="selSortie">Ajouter un gâteau — entremets fabriqués le dernier mois</label>
         <select id="selSortie"><option value="">— choisir un entremets —</option></select>
       </div>
       <div id="sortieList" style="margin-top:8px"></div>
       <p class="footnote" id="sortieVide" style="margin:0">Aucun gâteau ajouté. Choisissez dans la liste ci-dessus
-         (les entremets des 7 derniers jours y apparaissent).</p>
+         (les entremets des 30 derniers jours y apparaissent).</p>
       <div class="recipe-actions">
         <button class="primary" id="btnSortiePDF" type="button">📄 Bon de sortie (PDF)</button>
         <button id="btnSortieShare" type="button">📤 Envoyer au magasin</button>
@@ -1172,6 +1179,11 @@ function chargerCompo(){
   const libre = zone.value.trim() && zone.value !== derniereAuto;
   const n = norm(el('nomProduit').value);
   if(n.includes('glace') || n.includes('sorbet')) el('selCongelMois').value = '12';
+  /* crème pâtissière : refroidissement cellule coché et heure de fabrication à 10 h */
+  if(n.includes('patissiere')){
+    el('refroidChk').checked = true;
+    el('heureProd').value = '10:00';
+  }
   if(p){
     if(!libre){ zone.value = p.ingredients.join('\n'); derniereAuto = zone.value; }
     el('compoInfo').textContent = '✅ Produit connu — composition retrouvée (' + p.ingredients.length + ' ingrédients). Modifiable si besoin.';
@@ -1309,13 +1321,15 @@ function enregistrerProduction(){
   const d = jourProd();
   const produit = upsertProduit(nom, compo);
   jour(d).productions.push({
-    id: uid('pd'), heure: heureNow(), produitId: produit.id, nom: produit.nom,
+    id: uid('pd'), heure: el('heureProd').value || heureNow(), produitId: produit.id, nom: produit.nom,
     conservation: el('selConserv').value, dlc: dlcCourante(),
+    refroidissement: el('refroidChk').checked ? '+4 °C en moins de 2 h en cellule' : '',
     ingredients: compo.map(ing=>({nom: ing, photoId: liensSel[norm(ing)] || ''}))
   });
   save();
   el('nomProduit').value = ''; el('compoTexte').value = ''; el('compoInfo').textContent = '';
   el('selProduit').value = ''; derniereAuto = '';
+  el('refroidChk').checked = false; el('heureProd').value = heureNow();
   liensSel = {};
   renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
   toast('✅ Production enregistrée — « ' + produit.nom + ' »');
@@ -1334,7 +1348,7 @@ function renderProdJour(){
     const conserv = pr.dlc ? ' — ' + (pr.conservation==='congel' ? '🧊 congél.' : '❄️ frigo') +
       ', DLC ' + new Date(pr.dlc+'T12:00:00').toLocaleDateString('fr-FR') : '';
     row.innerHTML = `<div class="grow"><strong>${esc(pr.nom)}</strong>
-      <div class="rowhint">${pr.heure ? 'à ' + esc(pr.heure) + ' — ' : ''}${pr.ingredients.length} ingrédients, ${lies} relié${lies>1?'s':''} aux photos${conserv}</div></div>`;
+      <div class="rowhint">${pr.heure ? 'à ' + esc(pr.heure) + ' — ' : ''}${pr.ingredients.length} ingrédients, ${lies} relié${lies>1?'s':''} aux photos${conserv}${pr.refroidissement ? ' — ❄️ refroidi cellule' : ''}</div></div>`;
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
     bDel.title = 'Supprimer cette production'; bDel.textContent = '✕';
     bDel.addEventListener('click', ()=>{
@@ -1483,9 +1497,9 @@ function renderEntremetsJour(){
 ===================================================================== */
 let sortieSel = [];   // [{entremetsId, fabDate, nom, dlc, conservation, heure, qte, composants:[{nom,date,dlc}]}]
 function jourSortie(){ return el('jourSortie').value || aujourdhui(); }
-/* entremets fabriqués les 7 derniers jours */
+/* entremets fabriqués le dernier mois (30 jours) */
 function entremetsRecents(){
-  const min = ilya(6), out = [];
+  const min = ilya(30), out = [];
   for(const date of Object.keys(journal)){
     if(date < min) continue;
     for(const pr of journal[date].productions){
@@ -1762,6 +1776,7 @@ async function pdfRecap(d){
       if(pr.composants) for(const c of pr.composants){
         ligne('• ' + c.nom + '  (composant fabriqué le ' + fdate(c.date) + ', DLC ' + fdate(c.dlc) + ')', 9, false, 14, 2);
       }
+      if(pr.refroidissement) ligne('Refroidissement : refroidie à ' + pr.refroidissement, 9, true, 14, 2);
       y -= 5;
     }
   }
@@ -2062,6 +2077,7 @@ function renderTout(){
 document.addEventListener('DOMContentLoaded', async ()=>{
   el('jourMatin').value = aujourdhui();
   el('jourProd').value = aujourdhui();
+  el('heureProd').value = heureNow();
   el('jourEntremets').value = aujourdhui();
   el('jourSortie').value = aujourdhui();
 

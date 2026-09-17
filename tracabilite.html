@@ -224,7 +224,8 @@
       <p class="hint">En arrivant le matin, touchez chaque case : prenez la photo de l'étiquette du produit correspondant
          <strong>ou choisissez-la dans votre galerie</strong> — le beurre dans la case Beurre, la crème dans la case
          Crème. La photo se range toute seule au bon endroit et l'étiquette est lue automatiquement : n° de lot et
-         DLC pré-remplis. Une case verte ✅ = produit fait.</p>
+         DLC pré-remplis. Une case verte ✅ = produit fait. <strong>Les photos restent d'un jour à l'autre</strong> :
+         inutile de tout refaire chaque matin — reprenez seulement le produit qui change en le rephotographiant.</p>
       <div class="toolbar" style="margin-bottom:14px">
         <div class="field"><label for="jourMatin">Journée</label><input type="date" id="jourMatin"></div>
       </div>
@@ -555,6 +556,47 @@ function save(){
 }
 function jour(d){ return journal[d] || (journal[d] = {photos:[], productions:[]}); }
 
+/* ---- report des photos de marchandises d'un jour à l'autre ----
+   Les produits ne sont pas reçus tous les jours : tant qu'aucune nouvelle
+   photo n'est prise pour une journée, on réutilise celles du dernier jour
+   qui en avait (elles restent « en mémoire » jusqu'à être remplacées). */
+function dernierJourAvecPhotos(avant){
+  let best = null;
+  for(const date of Object.keys(journal)){
+    if(date >= avant) continue;
+    if((journal[date].photos||[]).length && (best===null || date > best)) best = date;
+  }
+  return best;
+}
+function photosEffectives(d){
+  const j = jour(d);
+  if(j.photos.length) return j.photos;
+  const src = dernierJourAvecPhotos(d);
+  return src ? journal[src].photos : j.photos;
+}
+/* recopie (mêmes id de photo) les marchandises reportées dans la journée d,
+   pour pouvoir les modifier/remplacer sans toucher à l'historique */
+function materialiser(d){
+  const j = jour(d);
+  if(j.photos.length) return j.photos;
+  const src = dernierJourAvecPhotos(d);
+  if(src){
+    j.photos = journal[src].photos.map(p=>({id:p.id, nom:p.nom, lot:p.lot, dlc:p.dlc, heure:p.heure, ocr:p.ocr}));
+    save();
+  }
+  return j.photos;
+}
+/* une photo (id) est-elle encore utilisée par une autre journée ? */
+function photoUtiliseeAilleurs(id, sauf){
+  for(const date of Object.keys(journal)){
+    if(date === sauf) continue;
+    const j = journal[date];
+    if((j.photos||[]).some(p=>p.id===id)) return true;
+    for(const pr of (j.productions||[])) for(const it of (pr.ingredients||[])) if(it.photoId===id) return true;
+  }
+  return false;
+}
+
 /* ---- photos (IndexedDB) ---- */
 let photoCache = {};
 let idbP = null;
@@ -609,6 +651,7 @@ function lirePhoto(file){
   });
 }
 async function chargerPhotosJour(d){
+  materialiser(d);   // reprend les photos de la veille si la journée est vide
   for(const p of jour(d).photos){
     if(!photoCache[p.id]){
       try{ const data = await photoGet(p.id); if(data) photoCache[p.id] = data; }catch(e){}
@@ -631,8 +674,10 @@ function ouvrirChoixSource(nomCase){
 /* suppression d'une photo incorrecte : depuis la liste, une case ou la visionneuse */
 function supprimerPhoto(id){
   if(!confirm('Supprimer cette photo ?')) return;
-  photoDel(id); delete photoCache[id];
-  const j = jour(jourMatin()); j.photos = j.photos.filter(x=>x.id!==id);
+  const d = jourMatin();
+  materialiser(d);
+  const j = jour(d); j.photos = j.photos.filter(x=>x.id!==id);
+  if(!photoUtiliseeAilleurs(id, d)){ photoDel(id); delete photoCache[id]; }   // garde le blob s'il sert ailleurs
   save();
   el('photoView').hidden = true; photoVueId = null;
   renderPhotos(); renderLiens();
@@ -665,14 +710,14 @@ function photoPourCase(nomCase, photos){
 }
 function renderCases(){
   const box = el('casesGrid'); if(!box) return;
-  const photos = jour(jourMatin()).photos;
+  const photos = photosEffectives(jourMatin());
   box.innerHTML = '';
   for(const nomCase of casesRisque){
     const p = photoPourCase(nomCase, photos);
     const c = document.createElement('div'); c.className = 'case' + (p ? ' faite' : '');
     c.setAttribute('role','button'); c.tabIndex = 0;
     if(p){
-      c.title = 'Voir la photo de ' + nomCase;
+      c.title = 'Reprendre la photo de ' + nomCase;
       const coche = document.createElement('span'); coche.className = 'coche'; coche.textContent = '✅';
       c.appendChild(coche);
       if(photoCache[p.id]){
@@ -685,7 +730,7 @@ function renderCases(){
       const info = document.createElement('div'); info.className = 'cinfo';
       info.textContent = p.lot ? 'lot ' + p.lot : '…';
       c.appendChild(info);
-      c.addEventListener('click', ()=>voirPhoto(p.id));
+      c.addEventListener('click', ()=>ouvrirChoixSource(nomCase));   // reprendre = remplacer la marchandise
     } else {
       c.title = 'Photographier ' + nomCase;
       const ic = document.createElement('div'); ic.className = 'cico'; ic.textContent = '📷'; c.appendChild(ic);
@@ -706,6 +751,7 @@ function dlIngredients(){
 }
 
 function renderPhotos(){
+  materialiser(jourMatin());   // reprend les marchandises de la veille si journée vide
   renderCases();
   const d = jourMatin(), box = el('photosList');
   const photos = jour(d).photos;
@@ -800,15 +846,26 @@ function renderPhotos(){
 
 async function ajouterPhoto(file){
   const d = jourMatin();
+  const nomCase = pendingCase;
   try{
     const dataUrl = await lirePhoto(file);
-    const p = {id: uid('ph'), nom: pendingCase || '', lot:'', dlc:'', heure: heureNow()};
+    materialiser(d);   // reprend d'abord les marchandises de la veille, on complète/remplace ensuite
+    const p = {id: uid('ph'), nom: nomCase || '', lot:'', dlc:'', heure: heureNow()};
     pendingCase = null;
     await photoPut(p.id, dataUrl);
     photoCache[p.id] = dataUrl;
+    /* photo prise pour une case : remplace la marchandise de même nom déjà présente */
+    if(nomCase){
+      const j = jour(d);
+      const remplaces = j.photos.filter(x=>norm(x.nom)===norm(nomCase));
+      j.photos = j.photos.filter(x=>norm(x.nom)!==norm(nomCase));
+      for(const anc of remplaces){
+        if(!photoUtiliseeAilleurs(anc.id, d)){ photoDel(anc.id); delete photoCache[anc.id]; }
+      }
+    }
     jour(d).photos.push(p);
     save(); renderPhotos(); renderLiens();
-    if(p.nom) toast('✅ ' + p.nom + ' — photo rangée dans sa case');
+    if(p.nom) toast('✅ ' + p.nom + ' — photo mise à jour');
     analysePhoto(p);   // lecture automatique : produit (si case vide), n° de lot, DLC
   }catch(e){ pendingCase = null; toast('⚠️ Photo illisible, réessayez'); }
 }
@@ -1278,7 +1335,7 @@ function renderLiens(){
   card.hidden = compo.length === 0;
   if(compo.length === 0) return;
 
-  const photos = jour(jourProd()).photos.filter(p=>p.nom || p.lot || photoCache[p.id]);
+  const photos = photosEffectives(jourProd()).filter(p=>p.nom || p.lot || photoCache[p.id]);
   el('liensVide').hidden = photos.length > 0;
 
   const box = el('liensList');
@@ -1319,6 +1376,7 @@ function enregistrerProduction(){
   if(!compo.length){ toast('Indiquez la composition (un ingrédient par ligne)'); el('compoTexte').focus(); return; }
 
   const d = jourProd();
+  materialiser(d);   // fige les marchandises reportées dans la journée pour la traçabilité
   const produit = upsertProduit(nom, compo);
   jour(d).productions.push({
     id: uid('pd'), heure: el('heureProd').value || heureNow(), produitId: produit.id, nom: produit.nom,
@@ -1340,7 +1398,7 @@ function renderProdJour(){
   el('prodJourCard').hidden = prods.length === 0;
   const box = el('prodJourList');
   box.innerHTML = '';
-  const photos = jour(d).photos;
+  const photos = photosEffectives(d);
   for(const pr of prods){
     if(pr.composants) continue;   // les entremets ont leur propre onglet
     const lies = pr.ingredients.filter(i=>i.photoId && photos.some(p=>p.id===i.photoId)).length;
@@ -1658,8 +1716,8 @@ function renderHisto(){
     bDel.title = 'Supprimer cette journée'; bDel.textContent = '✕';
     bDel.addEventListener('click', ()=>{
       if(!confirm('Supprimer la journée du ' + dateFr(d) + ' (photos et productions) ?')) return;
-      for(const p of j.photos){ photoDel(p.id); delete photoCache[p.id]; }
       delete journal[d];
+      for(const p of j.photos){ if(!photoUtiliseeAilleurs(p.id, d)){ photoDel(p.id); delete photoCache[p.id]; } }
       save(); renderHisto(); renderPhotos(); renderProdJour();
     });
     row.appendChild(bDel);

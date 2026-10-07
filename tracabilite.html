@@ -172,9 +172,10 @@
   @media(max-width:720px){
     .top{min-height:52px}
     nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface-1);
-      border-top:1px solid var(--grid);padding:6px 8px calc(6px + env(safe-area-inset-bottom));
-      justify-content:space-around}
-    .tab{flex-direction:column;gap:2px;padding:6px 10px;font-size:.68rem}
+      border-top:1px solid var(--grid);padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      justify-content:flex-start;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    nav.tabs::-webkit-scrollbar{display:none}
+    .tab{flex:0 0 auto;flex-direction:column;gap:2px;padding:6px 10px;font-size:.66rem}
     .tab .ico{font-size:1.3rem}
     .wrap{padding:14px 14px 110px}
     .card{padding:16px;border-radius:16px}
@@ -210,6 +211,7 @@
     <button class="tab" data-tab="production" type="button"><span class="ico">🍳</span><span class="lbl">Production</span></button>
     <button class="tab" data-tab="entremets" type="button"><span class="ico">🍰</span><span class="lbl">Entremets</span></button>
     <button class="tab" data-tab="magasin" type="button"><span class="ico">🏬</span><span class="lbl">Magasin</span></button>
+    <button class="tab" data-tab="livraison" type="button"><span class="ico">🚚</span><span class="lbl">Livraison</span></button>
     <button class="tab" data-tab="produits" type="button"><span class="ico">📁</span><span class="lbl">Produits</span></button>
     <button class="tab" data-tab="historique" type="button"><span class="ico">📅</span><span class="lbl">Historique</span></button>
   </nav>
@@ -416,6 +418,45 @@
         <button class="primary" id="btnSortiePDF" type="button">📄 Bon de sortie (PDF)</button>
         <button id="btnSortieShare" type="button">📤 Envoyer au magasin</button>
       </div>
+    </section>
+  </section>
+
+  <!-- ==================== Onglet LIVRAISON ==================== -->
+  <section class="panel" data-panel="livraison">
+    <section class="card">
+      <h2>🚚 Livraison</h2>
+      <p class="hint">Notez les produits finis que vous livrez, avec une quantité par produit. La date de fabrication
+         du jour est ajoutée automatiquement. Le bon de livraison PDF joint <strong>obligatoirement la traçabilité
+         des 4 derniers jours de production</strong>, pour relier le produit fini à ce qui a été fabriqué au labo.</p>
+      <div class="toolbar">
+        <div class="field"><label for="jourLivraison">Date de fabrication</label><input type="date" id="jourLivraison"></div>
+        <div class="field" style="flex:1;min-width:200px">
+          <label for="livDest">Magasin livré</label>
+          <input type="text" id="livDest" list="dlDest" placeholder="ex. Carrefour Lingostière" autocomplete="off">
+          <datalist id="dlDest"></datalist>
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label for="selLivProduit">Ajouter un produit au bon de livraison</label>
+        <select id="selLivProduit"><option value="">— choisir un produit —</option></select>
+      </div>
+      <div id="livraisonList" style="margin-top:8px"></div>
+      <p class="footnote" id="livraisonVide" style="margin:0">Aucun produit ajouté. Choisissez dans la liste ci-dessus,
+         puis indiquez la quantité.</p>
+      <p class="footnote" id="livraisonTotal" style="margin:8px 0 0;font-weight:700"></p>
+      <div class="recipe-actions">
+        <button class="primary" id="btnLivraisonPDF" type="button">📄 Bon de livraison (PDF)</button>
+        <button id="btnLivraisonShare" type="button">📤 Envoyer</button>
+      </div>
+      <details class="more"><summary>✏️ Modifier la liste des produits livrables</summary>
+        <p class="footnote" style="margin:8px 0 6px">Une ligne commençant par <code>#</code> crée une catégorie ;
+           les autres lignes sont les produits.</p>
+        <textarea id="catalogueTexte" style="min-height:220px"></textarea>
+        <div class="recipe-actions" style="margin-top:8px">
+          <button class="small" id="btnCatalogueSave" type="button">💾 Enregistrer la liste</button>
+          <button class="small" id="btnCatalogueDefaut" type="button">↩ Liste d'origine</button>
+        </div>
+      </details>
     </section>
   </section>
 
@@ -1627,6 +1668,162 @@ async function partagerSortie(){
 }
 
 /* =====================================================================
+   ONGLET 🚚 LIVRAISON — produits finis livrés + bon de livraison PDF
+   (avec la traçabilité obligatoire des 4 derniers jours de production)
+===================================================================== */
+const CATALOGUE_DEFAUT = [
+  {cat:'Viennoiseries', produits:['BRIOCHE AU SUCRE','BRIOCHE FLEUR D\'ORANGER','BRIOCHE NOISETTE PRALINE','CROISSANT','CROISSANT FRUITS ROUGES','FEUILLETE POMME','PAIN CHOCOLAT','PAIN SUISSE','ROULE CANELLE','VIENNOISERIE DU JOUR']},
+  {cat:'Goûters', produits:['BROOKIE','BROWNIE DU MOMENT','CAKE CHOCO','CRINKEL DU JOUR','FINGER BUENO','FINGER COOKIE','FINGER COOKIE BEURRE DE CACAHUETE','FINGER COOKIE CARAMEL','FINGER COOKIE DU JOUR','FINGER COOKIE NUTELLA','FINGER COOKIE PRALINE','FINGER OREO','FINGER PISTACHE','FINGER SPECULOOS','MINI CAKE DU JOUR','MINI CAKE INDIV','MOELLEUX FRUITS ROUGES','MOELLEUX MARRON']},
+  {cat:'Entremets', produits:['CACAHUETES','ENTREMET DU JOUR','ENTREMET DU JOUR 6','FLAN','FLAN PRALINE','PASSION','PISTACHE','POIRE SPECULOOS','POMME CANELLE','ROYAL','ROYAL 6 PERS','TARTE CITRON','TARTE DU JOUR 6','TARTE POIRE CHOCO']}
+];
+const DEST_DEFAUT = ['Carrefour Lingostière', 'Carrefour Carros'];
+let catalogue = null;
+try{ catalogue = JSON.parse(localStorage.getItem('trac_catalogue')); }catch(e){}
+if(!Array.isArray(catalogue) || !catalogue.length) catalogue = CATALOGUE_DEFAUT.map(c=>({cat:c.cat, produits:[...c.produits]}));
+let destinations = null;
+try{ destinations = JSON.parse(localStorage.getItem('trac_destinations')); }catch(e){}
+if(!Array.isArray(destinations) || !destinations.length) destinations = [...DEST_DEFAUT];
+let livraisonSel = [];   // [{cat, nom, qte}]
+
+function saveCatalogue(){ try{ localStorage.setItem('trac_catalogue', JSON.stringify(catalogue)); }catch(e){} }
+function saveDestinations(){ try{ localStorage.setItem('trac_destinations', JSON.stringify(destinations)); }catch(e){} }
+function jourLivraison(){ return el('jourLivraison').value || aujourdhui(); }
+function parseCatalogue(txt){
+  const out = []; let cur = null;
+  for(const raw of txt.split('\n')){
+    const line = raw.trim();
+    if(!line) continue;
+    if(line.startsWith('#')){ cur = {cat: line.replace(/^#+\s*/, '') || 'Produits', produits: []}; out.push(cur); }
+    else { if(!cur){ cur = {cat:'Produits', produits:[]}; out.push(cur); } cur.produits.push(line); }
+  }
+  return out.filter(c=>c.produits.length);
+}
+function catalogueTexte(){ return catalogue.map(c=>'# ' + c.cat + '\n' + c.produits.join('\n')).join('\n\n'); }
+
+function renderSelLivraison(){
+  el('selLivProduit').innerHTML = '<option value="">— choisir un produit —</option>' +
+    catalogue.map(c=>'<optgroup label="' + esc(c.cat) + '">' +
+      c.produits.map(pr=>'<option value="' + esc(c.cat + '|' + pr) + '">' + esc(pr) + '</option>').join('') +
+      '</optgroup>').join('');
+  el('dlDest').innerHTML = destinations.map(d=>'<option value="' + esc(d) + '">').join('');
+}
+function renderLivraison(){
+  const box = el('livraisonList'); box.innerHTML = '';
+  el('livraisonVide').hidden = livraisonSel.length > 0;
+  let total = 0;
+  for(const l of livraisonSel){
+    total += (+l.qte || 0);
+    const row = document.createElement('div'); row.className = 'itemrow';
+    const info = document.createElement('div'); info.className = 'grow';
+    info.innerHTML = `<strong>${esc(l.nom)}</strong><div class="rowhint">${esc(l.cat)}</div>`;
+    row.appendChild(info);
+    const qte = document.createElement('input'); qte.type = 'number'; qte.min = '1'; qte.value = l.qte || 1;
+    qte.title = 'Quantité'; qte.style.width = '70px';
+    qte.addEventListener('input', ()=>{ l.qte = Math.max(1, parseInt(qte.value, 10) || 1); majTotalLivraison(); });
+    row.appendChild(qte);
+    const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button'; bDel.textContent = '✕';
+    bDel.title = 'Retirer ce produit';
+    bDel.addEventListener('click', ()=>{ livraisonSel = livraisonSel.filter(x=>x!==l); renderLivraison(); });
+    row.appendChild(bDel);
+    box.appendChild(row);
+  }
+  majTotalLivraison();
+}
+function majTotalLivraison(){
+  const total = livraisonSel.reduce((s,l)=>s + (+l.qte || 0), 0);
+  el('livraisonTotal').textContent = livraisonSel.length ? 'Total : ' + total + ' article' + (total>1?'s':'') + ' · ' + livraisonSel.length + ' référence' + (livraisonSel.length>1?'s':'') : '';
+}
+function ajouterLivraison(val){
+  const i = val.indexOf('|'); if(i < 0) return;
+  const cat = val.slice(0, i), nom = val.slice(i+1);
+  const ex = livraisonSel.find(l=>l.nom===nom && l.cat===cat);
+  if(ex){ ex.qte = (+ex.qte || 1) + 1; } else livraisonSel.push({cat, nom, qte: 1});
+  renderLivraison();
+}
+function livraisonCourante(){
+  if(el('livDest').value.trim() && !destinations.some(d=>norm(d)===norm(el('livDest').value))){
+    destinations.push(el('livDest').value.trim()); saveDestinations(); renderSelLivraison();
+  }
+  return { date: jourLivraison(), destination: el('livDest').value.trim(), lignes: livraisonSel };
+}
+/* bon de livraison PDF : produits livrés + traçabilité des 4 derniers jours de production */
+function pdfLivraison(liv){
+  const fdate = iso => iso ? new Date(iso+'T12:00:00').toLocaleDateString('fr-FR') : '—';
+  const m = moteurTexte();
+  m.titre('Bon de livraison');
+  const dj = dateFr(liv.date), djc = dj.charAt(0).toUpperCase() + dj.slice(1);
+  m.ligne('Livraison du ' + djc + (liv.destination ? '     Magasin : ' + liv.destination : ''), 10, false, 0, 3);
+  m.ligne('Date de fabrication : ' + fdate(liv.date), 10, false, 0, 6);
+
+  m.titreSection('Produits livrés');
+  const parCat = {};
+  for(const l of liv.lignes){ (parCat[l.cat] = parCat[l.cat] || []).push(l); }
+  for(const cat of Object.keys(parCat)){
+    m.ligne(cat, 10, true, 0, 2);
+    for(const l of parCat[cat]) m.ligne(l.qte + '  x   ' + l.nom, 10, false, 12, 2);
+    m.saut(2);
+  }
+  const total = liv.lignes.reduce((s,l)=>s + (+l.qte || 0), 0);
+  m.ligne('Total : ' + total + ' articles', 10, true, 0, 4);
+
+  m.titreSection('Traçabilité — production des 4 derniers jours');
+  const jours = Object.keys(journal).filter(d=>(journal[d].productions||[]).length).sort().reverse().slice(0, 4);
+  if(!jours.length) m.ligne('Aucune production enregistrée.', 9, false, 6, 2);
+  for(const d of jours){
+    const j = jour(d);
+    const photoById = {}; for(const ph of (j.photos||[])) photoById[ph.id] = ph;
+    const dd = dateFr(d);
+    m.ligne('Production du ' + dd.charAt(0).toUpperCase() + dd.slice(1), 11, true, 0, 3);
+    for(const pr of j.productions){
+      const cons = pr.dlc ? (pr.conservation==='congel'?'congél.':'frigo') + ' DLC ' + fdate(pr.dlc) : '';
+      m.ligne('• ' + pr.nom + (pr.composants?' (entremets)':'') + (pr.heure?' — '+pr.heure:'') + (cons?' — '+cons:''), 10, true, 6, 2);
+      for(const it of (pr.ingredients||[])){
+        const p = it.photoId ? photoById[it.photoId] : null;
+        m.ligne('- ' + it.nom + (p ? '  (lot ' + (p.lot||'—') + ', DLC ' + fdate(p.dlc) + ')' : ''), 9, false, 16, 1);
+      }
+      if(pr.composants) for(const c of pr.composants)
+        m.ligne('- ' + c.nom + '  (fabriqué le ' + fdate(c.date) + ', DLC ' + fdate(c.dlc) + ')', 9, false, 16, 1);
+      if(pr.refroidissement) m.ligne('- Refroidissement : refroidie à ' + pr.refroidissement, 9, false, 16, 1);
+    }
+    m.saut(4);
+  }
+  m.signature('Livré par : ...........................', 'Reçu par : ...........................');
+  return assemblerPDF(m.pages, []);
+}
+function nomPDFLivraison(d, dest){
+  const suf = dest ? '-' + norm(dest).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') : '';
+  return 'livraison-' + d + suf + '.pdf';
+}
+async function telechargerLivraison(){
+  if(!livraisonSel.length){ toast('Ajoutez au moins un produit'); return; }
+  toast('📄 Création du bon de livraison…');
+  try{
+    const liv = livraisonCourante();
+    const bytes = pdfLivraison(liv);
+    const blob = new Blob([bytes], {type:'application/pdf'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nomPDFLivraison(liv.date, liv.destination); a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    toast('⬇ Bon de livraison téléchargé');
+  }catch(e){ toast('⚠️ Création du PDF impossible'); }
+}
+async function partagerLivraison(){
+  if(!livraisonSel.length){ toast('Ajoutez au moins un produit'); return; }
+  toast('📄 Préparation…');
+  let liv, bytes;
+  try{ liv = livraisonCourante(); bytes = pdfLivraison(liv); }catch(e){ toast('⚠️ Création du PDF impossible'); return; }
+  const nom = nomPDFLivraison(liv.date, liv.destination);
+  const fichier = new File([bytes], nom, {type:'application/pdf'});
+  if(navigator.canShare && navigator.canShare({files:[fichier]})){
+    try{ await navigator.share({files:[fichier], title: nom, text:'Bon de livraison' + (liv.destination?' — '+liv.destination:'')}); toast('📤 Envoyé'); }catch(e){}
+    return;
+  }
+  const blob = new Blob([bytes], {type:'application/pdf'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nom; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('⬇ Bon de livraison téléchargé — ouvrez-le puis partagez-le');
+}
+
+/* =====================================================================
    ONGLET 📁 MES PRODUITS
 ===================================================================== */
 let editId = null;
@@ -2089,7 +2286,7 @@ async function exporter(){
       try{ const data = photoCache[p.id] || await photoGet(p.id); if(data) photos[p.id] = data; }catch(e){}
     }
   }
-  const blob = new Blob([JSON.stringify({app:'tracabilite', version:1, produits, entremetsLib, journal, photos})],
+  const blob = new Blob([JSON.stringify({app:'tracabilite', version:1, produits, entremetsLib, catalogue, destinations, journal, photos})],
     {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2105,12 +2302,15 @@ async function importer(file){
     if(!confirm('Restaurer ce fichier ? Les données actuelles de l\'appareil seront remplacées.')) return;
     produits = data.produits || [];
     entremetsLib = data.entremetsLib || [];
+    if(Array.isArray(data.catalogue) && data.catalogue.length) catalogue = data.catalogue;
+    if(Array.isArray(data.destinations) && data.destinations.length) destinations = data.destinations;
     journal = data.journal || {};
     for(const id of Object.keys(data.photos || {})){
       await photoPut(id, data.photos[id]);
       photoCache[id] = data.photos[id];
     }
-    save(); saveEntremetsLib();
+    save(); saveEntremetsLib(); saveCatalogue(); saveDestinations();
+    el('catalogueTexte').value = catalogueTexte();
     renderTout();
     toast('⬆ Données restaurées');
   }catch(e){ alert('Fichier illisible : choisissez une sauvegarde créée par cette application (.json).'); }
@@ -2124,12 +2324,14 @@ function activerOnglet(id){
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===id));
   if(id==='entremets'){ renderSelComposant(); renderEntremetsJour(); }   // rafraîchit les produits récents
   if(id==='magasin'){ renderSelSortie(); }                               // rafraîchit les entremets récents
+  if(id==='livraison'){ renderSelLivraison(); }
   try{ localStorage.setItem('trac_tab', id); }catch(e){}
 }
 function renderTout(){
   renderPhotos(); renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
   renderSelComposant(); renderDlEntremets(); renderComposants(); renderEntremetsJour();
   renderSelSortie(); renderSortie();
+  renderSelLivraison(); renderLivraison();
 }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
@@ -2138,6 +2340,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   el('heureProd').value = heureNow();
   el('jourEntremets').value = aujourdhui();
   el('jourSortie').value = aujourdhui();
+  el('jourLivraison').value = aujourdhui();
 
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>activerOnglet(t.dataset.tab)));
   let tab0 = 'matin';
@@ -2225,6 +2428,25 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   });
   el('btnSortiePDF').addEventListener('click', telechargerSortie);
   el('btnSortieShare').addEventListener('click', partagerSortie);
+
+  /* livraison */
+  el('catalogueTexte').value = catalogueTexte();
+  el('selLivProduit').addEventListener('change', ()=>{
+    if(el('selLivProduit').value){ ajouterLivraison(el('selLivProduit').value); el('selLivProduit').value = ''; }
+  });
+  el('btnLivraisonPDF').addEventListener('click', telechargerLivraison);
+  el('btnLivraisonShare').addEventListener('click', partagerLivraison);
+  el('btnCatalogueSave').addEventListener('click', ()=>{
+    const c = parseCatalogue(el('catalogueTexte').value);
+    if(!c.length){ toast('La liste ne peut pas être vide'); return; }
+    catalogue = c; saveCatalogue(); renderSelLivraison();
+    toast('💾 Liste des produits enregistrée');
+  });
+  el('btnCatalogueDefaut').addEventListener('click', ()=>{
+    catalogue = CATALOGUE_DEFAUT.map(c=>({cat:c.cat, produits:[...c.produits]})); saveCatalogue();
+    el('catalogueTexte').value = catalogueTexte(); renderSelLivraison();
+    toast('↩ Liste d\'origine restaurée');
+  });
 
   /* bibliothèque */
   el('btnEditSave').addEventListener('click', ()=>{

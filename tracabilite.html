@@ -1767,7 +1767,7 @@ function pdfLivraison(liv){
   m.ligne('Total : ' + total + ' articles', 10, true, 0, 4);
 
   m.titreSection('Traçabilité — production des 4 derniers jours');
-  const jours = Object.keys(journal).filter(d=>(journal[d].productions||[]).length).sort().reverse().slice(0, 4);
+  const jours = Object.keys(journal).filter(d=>(journal[d].productions||[]).length && d <= liv.date).sort().reverse().slice(0, 4);
   if(!jours.length) m.ligne('Aucune production enregistrée.', 9, false, 6, 2);
   for(const d of jours){
     const j = jour(d);
@@ -1794,6 +1794,17 @@ function nomPDFLivraison(d, dest){
   const suf = dest ? '-' + norm(dest).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') : '';
   return 'livraison-' + d + suf + '.pdf';
 }
+/* trace de la livraison dans l'historique (pour re-générer le bon plus tard) */
+function enregistrerLivraisonHisto(liv){
+  const j = jour(liv.date);
+  j.livraisons = j.livraisons || [];
+  const sig = JSON.stringify({d: liv.destination, l: liv.lignes});
+  if(j.livraisons.some(x=>JSON.stringify({d:x.destination, l:x.lignes})===sig)) return;   // évite le doublon
+  j.livraisons.push({id: uid('lv'), heure: heureNow(), destination: liv.destination,
+    lignes: liv.lignes.map(l=>({cat:l.cat, nom:l.nom, qte:l.qte}))});
+  save();
+  renderHisto();
+}
 async function telechargerLivraison(){
   if(!livraisonSel.length){ toast('Ajoutez au moins un produit'); return; }
   toast('📄 Création du bon de livraison…');
@@ -1803,7 +1814,8 @@ async function telechargerLivraison(){
     const blob = new Blob([bytes], {type:'application/pdf'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nomPDFLivraison(liv.date, liv.destination); a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-    toast('⬇ Bon de livraison téléchargé');
+    enregistrerLivraisonHisto(liv);
+    toast('⬇ Bon téléchargé — livraison enregistrée dans l\'historique');
   }catch(e){ toast('⚠️ Création du PDF impossible'); }
 }
 async function partagerLivraison(){
@@ -1811,7 +1823,32 @@ async function partagerLivraison(){
   toast('📄 Préparation…');
   let liv, bytes;
   try{ liv = livraisonCourante(); bytes = pdfLivraison(liv); }catch(e){ toast('⚠️ Création du PDF impossible'); return; }
+  enregistrerLivraisonHisto(liv);
   const nom = nomPDFLivraison(liv.date, liv.destination);
+  const fichier = new File([bytes], nom, {type:'application/pdf'});
+  if(navigator.canShare && navigator.canShare({files:[fichier]})){
+    try{ await navigator.share({files:[fichier], title: nom, text:'Bon de livraison' + (liv.destination?' — '+liv.destination:'')}); toast('📤 Envoyé — livraison enregistrée'); }catch(e){}
+    return;
+  }
+  const blob = new Blob([bytes], {type:'application/pdf'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nom; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('⬇ Bon téléchargé — livraison enregistrée dans l\'historique');
+}
+/* re-génération d'un bon de livraison enregistré */
+function livraisonHistoVers(d, liv){ return {date: d, destination: liv.destination, lignes: liv.lignes}; }
+function telechargerLivraisonHisto(d, liv){
+  try{
+    const bytes = pdfLivraison(livraisonHistoVers(d, liv));
+    const blob = new Blob([bytes], {type:'application/pdf'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nomPDFLivraison(d, liv.destination); a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    toast('⬇ Bon de livraison régénéré');
+  }catch(e){ toast('⚠️ PDF impossible'); }
+}
+async function partagerLivraisonHisto(d, liv){
+  let bytes; try{ bytes = pdfLivraison(livraisonHistoVers(d, liv)); }catch(e){ toast('⚠️ PDF impossible'); return; }
+  const nom = nomPDFLivraison(d, liv.destination);
   const fichier = new File([bytes], nom, {type:'application/pdf'});
   if(navigator.canShare && navigator.canShare({files:[fichier]})){
     try{ await navigator.share({files:[fichier], title: nom, text:'Bon de livraison' + (liv.destination?' — '+liv.destination:'')}); toast('📤 Envoyé'); }catch(e){}
@@ -1820,7 +1857,7 @@ async function partagerLivraison(){
   const blob = new Blob([bytes], {type:'application/pdf'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nom; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-  toast('⬇ Bon de livraison téléchargé — ouvrez-le puis partagez-le');
+  toast('⬇ Bon de livraison régénéré');
 }
 
 /* =====================================================================
@@ -1878,14 +1915,15 @@ function renderHisto(){
   const box = el('histoList');
   box.innerHTML = '';
   const jours = Object.keys(journal)
-    .filter(d=>journal[d].photos.length || journal[d].productions.length)
+    .filter(d=>journal[d].photos.length || journal[d].productions.length || (journal[d].livraisons||[]).length)
     .sort().reverse();
   el('histoVide').hidden = jours.length > 0;
   for(const d of jours){
     const j = journal[d];
     const row = document.createElement('div'); row.className = 'itemrow';
     const chips = j.productions.map(pr=>`<span class="chip">${esc(pr.nom)}</span>`).join('') +
-      (j.photos.length ? `<span class="chip gris">📷 ${j.photos.length} photo${j.photos.length>1?'s':''}</span>` : '');
+      (j.photos.length ? `<span class="chip gris">📷 ${j.photos.length} photo${j.photos.length>1?'s':''}</span>` : '') +
+      ((j.livraisons||[]).length ? `<span class="chip gris">🚚 ${j.livraisons.length} livraison${j.livraisons.length>1?'s':''}</span>` : '');
     row.innerHTML = `<div class="grow"><strong style="text-transform:capitalize">${esc(dateFr(d))}</strong>
       <div class="chips">${chips || '<span class="chip gris">vide</span>'}</div></div>`;
 
@@ -1919,6 +1957,33 @@ function renderHisto(){
     });
     row.appendChild(bDel);
     box.appendChild(row);
+
+    /* livraisons enregistrées ce jour-là : régénérer / partager / supprimer le bon */
+    for(const liv of (j.livraisons||[])){
+      const lr = document.createElement('div'); lr.className = 'itemrow';
+      lr.style.paddingLeft = '14px';
+      const total = liv.lignes.reduce((s,l)=>s+(+l.qte||0), 0);
+      const info = document.createElement('div'); info.className = 'grow';
+      info.innerHTML = `<span class="rowhint">🚚 ${esc(liv.destination||'(magasin ?)')} — ${total} article${total>1?'s':''}${liv.heure?' · '+esc(liv.heure):''}</span>`;
+      lr.appendChild(info);
+      const bL = document.createElement('button'); bL.className = 'small'; bL.type = 'button'; bL.textContent = '📄 Bon';
+      bL.title = 'Régénérer le bon de livraison (PDF)';
+      bL.addEventListener('click', ()=>telechargerLivraisonHisto(d, liv));
+      lr.appendChild(bL);
+      const bLS = document.createElement('button'); bLS.className = 'small'; bLS.type = 'button'; bLS.textContent = '📤';
+      bLS.title = 'Partager le bon de livraison';
+      bLS.addEventListener('click', ()=>partagerLivraisonHisto(d, liv));
+      lr.appendChild(bLS);
+      const bLD = document.createElement('button'); bLD.className = 'ghost'; bLD.type = 'button'; bLD.textContent = '✕';
+      bLD.title = 'Supprimer cette livraison';
+      bLD.addEventListener('click', ()=>{
+        if(!confirm('Supprimer cette livraison (' + (liv.destination||'') + ') de l\'historique ?')) return;
+        j.livraisons = j.livraisons.filter(x=>x.id!==liv.id);
+        save(); renderHisto();
+      });
+      lr.appendChild(bLD);
+      box.appendChild(lr);
+    }
   }
 }
 /* =====================================================================

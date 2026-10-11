@@ -485,10 +485,13 @@
     </section>
 
     <section class="card">
-      <h2>☁️ Sauvegarde</h2>
-      <p class="hint">Tout est enregistré sur cet appareil. Pour protéger ou transférer vos données (produits,
-         journées, photos) :</p>
+      <h2>☁️ Sauvegarde &amp; partage</h2>
+      <p class="hint">Tout est enregistré sur cet appareil. Pour transférer vos données (produits, journées, photos,
+         livraisons…) vers un autre appareil ou un collègue : <strong>« Partager la sauvegarde »</strong> envoie le
+         fichier via le menu du téléphone (mail, Drive, AirDrop, WhatsApp…) ; sur l'autre appareil, on ouvre l'appli
+         et on touche <strong>« Restaurer un fichier »</strong>.</p>
       <div class="recipe-actions" style="margin-top:0">
+        <button class="primary small" id="btnPartagerSauv" type="button">📤 Partager la sauvegarde</button>
         <button class="small" id="btnExport" type="button">⬇ Sauvegarder (fichier)</button>
         <button class="small" id="btnImport" type="button">⬆ Restaurer un fichier</button>
         <input type="file" id="importFile" accept=".json,application/json" hidden>
@@ -2344,21 +2347,39 @@ const CODE_APPS_SCRIPT =
 /* =====================================================================
    SAUVEGARDE / RESTAURATION (fichier JSON, photos comprises)
 ===================================================================== */
-async function exporter(){
+async function donneesSauvegarde(){
   const photos = {};
   for(const d of Object.keys(journal)){
     for(const p of journal[d].photos){
       try{ const data = photoCache[p.id] || await photoGet(p.id); if(data) photos[p.id] = data; }catch(e){}
     }
   }
-  const blob = new Blob([JSON.stringify({app:'tracabilite', version:1, produits, entremetsLib, catalogue, destinations, journal, photos})],
-    {type:'application/json'});
+  return {app:'tracabilite', version:1, produits, entremetsLib, catalogue, destinations, casesRisque, journal, photos};
+}
+async function exporter(){
+  const blob = new Blob([JSON.stringify(await donneesSauvegarde())], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'tracabilite-' + aujourdhui() + '.json';
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
   toast('⬇ Sauvegarde téléchargée');
+}
+async function partagerSauvegarde(){
+  toast('📦 Préparation de la sauvegarde…');
+  let blob;
+  try{ blob = new Blob([JSON.stringify(await donneesSauvegarde())], {type:'application/json'}); }
+  catch(e){ toast('⚠️ Sauvegarde impossible'); return; }
+  const nom = 'tracabilite-' + aujourdhui() + '.json';
+  const fichier = new File([blob], nom, {type:'application/json'});
+  if(navigator.canShare && navigator.canShare({files:[fichier]})){
+    try{ await navigator.share({files:[fichier], title: nom, text:'Sauvegarde Traçabilité'}); toast('📤 Sauvegarde partagée'); }
+    catch(e){ /* annulé */ }
+    return;
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nom; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('⬇ Sauvegarde téléchargée — envoyez le fichier à l\'autre appareil');
 }
 async function importer(file){
   try{
@@ -2369,6 +2390,7 @@ async function importer(file){
     entremetsLib = data.entremetsLib || [];
     if(Array.isArray(data.catalogue) && data.catalogue.length) catalogue = data.catalogue;
     if(Array.isArray(data.destinations) && data.destinations.length) destinations = data.destinations;
+    if(Array.isArray(data.casesRisque) && data.casesRisque.length){ casesRisque = data.casesRisque; saveCases(); if(el('casesTexte')) el('casesTexte').value = casesRisque.join('\n'); }
     journal = data.journal || {};
     for(const id of Object.keys(data.photos || {})){
       await photoPut(id, data.photos[id]);
@@ -2529,6 +2551,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   el('btnEditCancel').addEventListener('click', ()=>{ el('editCard').hidden = true; editId = null; });
 
   /* sauvegarde */
+  el('btnPartagerSauv').addEventListener('click', partagerSauvegarde);
   el('btnExport').addEventListener('click', exporter);
   el('btnImport').addEventListener('click', ()=>el('importFile').click());
   el('importFile').addEventListener('change', e=>{

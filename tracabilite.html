@@ -47,8 +47,12 @@
 
   /* --- barre supérieure --- */
   .top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;
-    background:var(--surface-1);border-bottom:1px solid var(--grid);padding:0 16px;min-height:58px}
-  .brand{font-family:var(--serif);font-weight:400;font-size:1.12rem;letter-spacing:.1em;white-space:nowrap}
+    background:var(--surface-1);border-bottom:1px solid var(--grid);padding:0 16px;min-height:60px;
+    box-shadow:0 2px 12px rgba(40,70,45,.05)}
+  .brand{display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .brand .blogo{font-size:1.2rem;line-height:1}
+  .brand .btxt{font-family:var(--serif);font-weight:400;font-size:1.16rem;letter-spacing:.14em;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   nav.tabs{display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto}
   .tab{display:flex;align-items:center;gap:7px;border:none;background:none;box-shadow:none;
     padding:9px 14px;border-radius:999px;font:inherit;font-weight:600;color:var(--ink-2);
@@ -67,6 +71,7 @@
     padding:22px;margin-bottom:16px;box-shadow:var(--shadow)}
   .card h2{display:flex;align-items:center;gap:10px;margin:0 0 16px;
     font-family:var(--serif);font-weight:400;font-size:1rem;letter-spacing:.13em;text-transform:uppercase}
+  .card h2::before{content:"";flex:0 0 auto;width:4px;height:16px;border-radius:3px;background:var(--grad)}
   .card h2::after{content:"";flex:1;height:1px;background:var(--grid);min-width:24px}
   .hint{font-size:.85rem;color:var(--ink-2);margin:0 0 14px;max-width:80ch}
   .footnote{font-size:.8rem;color:var(--ink-3)}
@@ -91,6 +96,7 @@
   button.primary{background:var(--grad);border:none;color:#fff;padding:12px 22px;
     box-shadow:0 4px 14px rgba(46,139,87,.32)}
   button.primary:hover{color:#fff;filter:brightness(1.07)}
+  button.primary:active{filter:brightness(.96);transform:translateY(1px)}
   button.small{padding:8px 14px;min-height:38px;font-size:.84rem}
   button.ghost{border:none;background:none;color:var(--ink-3);padding:4px 9px;min-height:0;font-size:1.05rem;box-shadow:none}
   button.ghost:hover{color:var(--bad);background:var(--bad-bg);transform:none;box-shadow:none}
@@ -107,7 +113,8 @@
   .case .cico{font-size:1.6rem;opacity:.45}
   .case .cnom{font-size:.78rem;font-weight:700;color:var(--ink-2);line-height:1.25;overflow-wrap:anywhere}
   .case .cinfo{font-size:.68rem;color:var(--ink-3)}
-  .case.faite{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+  .case.faite{border-style:solid;border-color:var(--accent);background:var(--accent-soft);
+    box-shadow:0 3px 12px rgba(46,139,87,.14)}
   .case.faite .cnom{color:var(--accent)}
   .case img{width:50px;height:50px;object-fit:cover;border-radius:10px}
   .case .coche{position:absolute;top:5px;right:8px;font-size:.9rem}
@@ -175,8 +182,10 @@
       border-top:1px solid var(--grid);padding:6px 4px calc(6px + env(safe-area-inset-bottom));
       justify-content:flex-start;overflow-x:auto;-webkit-overflow-scrolling:touch}
     nav.tabs::-webkit-scrollbar{display:none}
-    .tab{flex:0 0 auto;flex-direction:column;gap:2px;padding:6px 10px;font-size:.66rem}
-    .tab .ico{font-size:1.3rem}
+    .tab{flex:0 0 auto;flex-direction:column;gap:2px;padding:8px 11px 6px;font-size:.66rem;position:relative;border-radius:14px}
+    .tab .ico{font-size:1.3rem;transition:transform .15s}
+    .tab.active .ico{transform:translateY(-1px) scale(1.08)}
+    .tab.active::before{content:"";position:absolute;top:0;left:12px;right:12px;height:3px;border-radius:0 0 3px 3px;background:var(--grad)}
     .wrap{padding:14px 14px 110px}
     .card{padding:16px;border-radius:16px}
   }
@@ -205,7 +214,7 @@
 <body>
 
 <header class="top">
-  <div class="brand">📋 TRAÇABILITÉ</div>
+  <div class="brand"><span class="blogo">📋</span><span class="btxt">TRAÇABILITÉ</span></div>
   <nav class="tabs">
     <button class="tab" data-tab="matin" type="button"><span class="ico">📷</span><span class="lbl">Matin</span></button>
     <button class="tab" data-tab="production" type="button"><span class="ico">🍳</span><span class="lbl">Production</span></button>
@@ -437,6 +446,7 @@
       <h2>📁 Mes produits</h2>
       <p class="hint">Les produits que vous avez déjà réalisés, avec leur composition. Ils se remplissent tout seuls :
          chaque production enregistrée met la bibliothèque à jour.</p>
+      <input type="text" id="produitsSearch" placeholder="🔎 Rechercher un produit…" autocomplete="off" style="width:100%;margin-bottom:12px">
       <div id="produitsList"></div>
       <p class="footnote" id="produitsVide" style="margin-bottom:0">Aucun produit enregistré pour l'instant :
          enregistrez une première production dans l'onglet 🍳.</p>
@@ -1766,7 +1776,13 @@ function renderProduits(){
   const box = el('produitsList');
   box.innerHTML = '';
   el('produitsVide').hidden = produits.length > 0;
-  const tri = [...produits].sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+  const q = norm(el('produitsSearch') ? el('produitsSearch').value : '');
+  let tri = [...produits].sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+  if(q) tri = tri.filter(p=>norm(p.nom).includes(q) || p.ingredients.some(i=>norm(i).includes(q)));
+  if(produits.length && !tri.length){
+    box.innerHTML = '<p class="footnote" style="margin:0">Aucun produit ne correspond à « ' + esc(el('produitsSearch').value) + ' ».</p>';
+    return;
+  }
   for(const p of tri){
     const row = document.createElement('div'); row.className = 'itemrow';
     const apercu = p.ingredients.slice(0,5).join(', ') + (p.ingredients.length>5 ? '…' : '');
@@ -2279,6 +2295,9 @@ async function importer(file){
 function activerOnglet(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===id));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===id));
+  const actif = document.querySelector('.tab.active');
+  if(actif){ try{ actif.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }catch(e){} }
+  try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); }
   if(id==='entremets'){ renderSelComposant(); renderEntremetsJour(); }   // rafraîchit les produits récents
   if(id==='livraison'){ renderSelLivraison(); }
   try{ localStorage.setItem('trac_tab', id); }catch(e){}
@@ -2409,6 +2428,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     toast('💾 Produit mis à jour');
   });
   el('btnEditCancel').addEventListener('click', ()=>{ el('editCard').hidden = true; editId = null; });
+  el('produitsSearch').addEventListener('input', renderProduits);
 
   /* sauvegarde */
   el('btnPartagerSauv').addEventListener('click', partagerSauvegarde);

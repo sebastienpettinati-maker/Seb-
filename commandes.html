@@ -149,6 +149,12 @@
   .b-large{display:block;width:100%;border:1.5px solid var(--bord);background:var(--carte);border-radius:13px;padding:13px;font-size:15px;
     font-weight:700;color:var(--encre);cursor:pointer;margin-top:9px;text-align:left}
   .note{font-size:13px;color:var(--encre-2);margin-top:6px}
+  .note ol{margin:6px 0 0;padding-left:20px;line-height:1.6}
+  .etat-drive{margin-top:10px;font-size:14px;font-weight:700;border-radius:12px;padding:9px 12px;background:#f3eef0;color:var(--encre-2)}
+  .etat-drive.ok{background:var(--ok-doux);color:var(--ok)}
+  .etat-drive.ko{background:var(--ko-doux);color:var(--ko)}
+  .b-entete.sync{font-size:16px;position:relative}
+  .b-entete.sync.ko::after{content:"";position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#ffcf4a}
 
   .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
     background:var(--encre);color:#fff;padding:11px 16px;border-radius:13px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;
@@ -172,7 +178,8 @@
 <header class="entete">
   <div class="ligne">
     <h1>🎂 Commandes gâteaux<small id="sousTitre">—</small></h1>
-    <button class="b-entete" id="bReglages" title="Réglages et sauvegarde">⚙️</button>
+    <button class="b-entete sync" id="bSync" title="Drive commun" hidden>☁️</button>
+    <button class="b-entete" id="bReglages" title="Réglages, Drive commun et sauvegarde">⚙️</button>
   </div>
   <div class="recherche">
     <span class="loupe">🔍</span>
@@ -284,6 +291,27 @@
     </div>
     <div class="corps">
       <div class="bloc">
+        <h4>☁️ Drive commun (toute l'équipe)</h4>
+        <div class="note">Une fois relié, chaque téléphone envoie ses commandes et ses photos sur le Google Drive de la boutique, et récupère celles des autres toutes les minutes.</div>
+        <label class="ch">Adresse du script Google (se termine par /exec)<input type="url" id="rDriveUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+        <div class="etat-drive" id="rDriveEtat">Non relié : les commandes restent sur ce téléphone.</div>
+        <button class="b-large" id="rDriveSync">🔄 Synchroniser maintenant</button>
+        <button class="b-large" id="rDriveLien">🔗 Envoyer le lien d'accès à un collègue</button>
+        <details class="lu">
+          <summary>Première installation (5 min, une seule fois, sur un ordinateur)</summary>
+          <div class="note"><ol>
+            <li>Avec le compte Google de la boutique, allez sur <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> ▸ <b>Nouveau projet</b>.</li>
+            <li>Effacez le contenu, collez le code (bouton ci-dessous), puis 💾 Enregistrer.</li>
+            <li><b>Déployer ▸ Nouveau déploiement</b> ▸ type <b>Application Web</b> ; « Exécuter en tant que : <b>moi</b> » ; « Qui a accès : <b>tout le monde</b> » ▸ <b>Déployer</b>, puis autorisez l'accès à Drive.</li>
+            <li>Copiez l'<b>URL de l'application Web</b> (…/exec) et collez-la dans le champ ci-dessus.</li>
+            <li>Touchez « 🔗 Envoyer le lien d'accès » pour relier les téléphones des collègues en un clic.</li>
+          </ol>
+          Sur le Drive apparaît un dossier <b>Commandes gâteaux</b> avec un tableau lisible de toutes les commandes et un sous-dossier <b>Photos</b>.
+          L'adresse du script donne accès aux commandes : ne la partagez qu'avec l'équipe.</div>
+          <button class="b-large" id="rDriveCode">📋 Copier le code du script</button>
+        </details>
+      </div>
+      <div class="bloc">
         <h4>Ajouter des photos</h4>
         <button class="b-large" id="rGalerie">🖼 Importer des fiches depuis la galerie</button>
         <div class="note">Une commande est créée par photo choisie.</div>
@@ -299,7 +327,7 @@
         <button class="b-large" id="rPartager">📤 Partager la sauvegarde</button>
         <button class="b-large" id="rExporter">⬇ Télécharger la sauvegarde</button>
         <button class="b-large" id="rImporter">⬆ Restaurer une sauvegarde</button>
-        <div class="note">Les commandes sont stockées sur cet appareil uniquement. Faites une sauvegarde régulièrement, ou pour passer sur un autre téléphone.</div>
+        <div class="note">Sans Drive commun, les commandes ne sont stockées que sur cet appareil : faites une sauvegarde régulièrement.</div>
       </div>
       <div class="bloc">
         <h4>Ménage</h4>
@@ -343,9 +371,35 @@ let commandes = [];
 try{ commandes = JSON.parse(localStorage.getItem('cmd_commandes')) || []; }catch(e){}
 let reglages = {lecture:true, cle:''};
 try{ reglages = Object.assign(reglages, JSON.parse(localStorage.getItem('cmd_reglages')) || {}); }catch(e){}
-function save(){
+/* ---- état de la synchronisation avec le Drive commun ----
+   empreintes : contenu de chaque commande tel que connu du Drive
+   photosOk   : photos déjà présentes sur le Drive
+   suppr      : suppressions pas encore transmises */
+let sync = {url:'', empreintes:{}, photosOk:{}, suppr:[], dernier:0};
+try{ sync = Object.assign(sync, JSON.parse(localStorage.getItem('cmd_sync')) || {}); }catch(e){}
+function saveSync(){ try{ localStorage.setItem('cmd_sync', JSON.stringify(sync)); }catch(e){} }
+function cle(c){ return JSON.stringify(Object.assign({}, c, {modifie:0})); }
+const derniereCle = {};   // pour dater chaque modification
+commandes.forEach(c=>{ derniereCle[c.id] = cle(c); });
+
+function ecrireLocal(){
   try{ localStorage.setItem('cmd_commandes', JSON.stringify(commandes)); }
   catch(e){ alert('Mémoire pleine : faites une sauvegarde puis supprimez d\'anciennes commandes.'); }
+}
+function save(){
+  for(const c of commandes){
+    const k = cle(c);
+    if(derniereCle[c.id] !== k){ derniereCle[c.id] = k; c.modifie = Date.now(); }
+  }
+  ecrireLocal();
+  planifierSync();
+}
+function supprimerCommande(c){
+  for(const p of c.photos) photoDel(p);
+  commandes = commandes.filter(x=>x.id !== c.id);
+  if(driveActif() || sync.empreintes[c.id]) sync.suppr.push({id: c.id, supprime: true, modifie: Date.now(), photos: c.photos});
+  delete sync.empreintes[c.id]; delete derniereCle[c.id];
+  saveSync();
 }
 function saveReglages(){ try{ localStorage.setItem('cmd_reglages', JSON.stringify(reglages)); }catch(e){} }
 function trouver(id){ return commandes.find(c=>c.id===id); }
@@ -370,13 +424,26 @@ async function photoPut(id, data){
     tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
   });
 }
-async function photoGet(id){
+async function photoLocale(id){
   if(photoCache[id]) return photoCache[id];
   const db = await idb();
-  const data = await new Promise((res, rej)=>{
+  return new Promise((res, rej)=>{
     const q = db.transaction('photos').objectStore('photos').get(id);
     q.onsuccess = ()=>res(q.result || null); q.onerror = ()=>rej(q.error);
   });
+}
+const photoTelech = {};
+async function photoGet(id){
+  if(photoCache[id]) return photoCache[id];
+  let data = null;
+  try{ data = await photoLocale(id); }catch(e){}
+  if(!data && driveActif()){
+    // photo prise sur un autre téléphone : récupérée sur le Drive puis gardée ici
+    if(!photoTelech[id]) photoTelech[id] = appelDrive({action:'photo', id}).then(j=>j.data || null).catch(()=>null)
+      .finally(()=>setTimeout(()=>delete photoTelech[id], 30000));
+    data = await photoTelech[id];
+    if(data){ try{ await photoPut(id, data); }catch(e){} sync.photosOk[id] = 1; }
+  }
   if(data) photoCache[id] = data;
   return data;
 }
@@ -716,7 +783,9 @@ function fermerFiche(enregistrer){
   if(!ficheId) return;
   const c = enregistrer ? lireFormulaire() : trouver(ficheId);
   // une fiche neuve sans aucune info ni photo n'est pas gardée
-  if(c && ficheNouvelle && !enregistrer && !c.photos.length) commandes = commandes.filter(x=>x.id !== c.id);
+  const abandon = c && ficheNouvelle && !enregistrer && !c.photos.length;
+  if(abandon) commandes = commandes.filter(x=>x.id !== c.id);
+  ficheNouvelle = false;
   save();
   if(enregistrer && c){
     toast('💾 Commande enregistrée');
@@ -844,10 +913,230 @@ async function importer(file){
       if(ids.has(c.id)){ const i = ids.get(c.id); if((c.modifie||0) > (commandes[i].modifie||0)) commandes[i] = c; }
       else commandes.push(c);
     }
-  } else commandes = data.commandes || [];
+  } else {
+    for(const c of commandes) if(!(data.commandes || []).some(x=>x.id === c.id)) supprimerCommande(c);
+    commandes = data.commandes || [];
+  }
+  commandes.forEach(c=>{ derniereCle[c.id] = cle(c); });
   save(); render();
   toast('⬆ Commandes restaurées');
 }
+
+/* =====================================================================
+   DRIVE COMMUN — synchronisation via un script Google Apps Script
+   (le script range un tableau « Commandes gâteaux » et un dossier Photos)
+===================================================================== */
+function driveActif(){ return /^https:\/\/script\.google\.com\/.+\/exec/.test(sync.url || ''); }
+async function appelDrive(params, corps){
+  const url = sync.url + (params ? '?' + new URLSearchParams(params) : '');
+  const r = await fetch(url, corps
+    ? {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(corps)}
+    : {cache:'no-store'});
+  const t = await r.text();
+  let j;
+  try{ j = JSON.parse(t); }
+  catch(e){ throw new Error(/accounts\.google|<html/i.test(t) ? 'acces' : 'reponse'); }
+  if(!j.ok) throw new Error(j.erreur || 'reponse');
+  return j;
+}
+let syncEnCours = false, syncRelance = false, syncMinuteur = null, syncEtat = {msg:'', err:false};
+function planifierSync(){
+  if(!driveActif()) return;
+  clearTimeout(syncMinuteur); syncMinuteur = setTimeout(synchroniser, 1500);
+}
+function afficherEtatSync(msg, err){
+  syncEtat = {msg, err};
+  const b = el('bSync');
+  b.hidden = !driveActif();
+  b.textContent = syncEnCours ? '⏳' : '☁️';
+  b.classList.toggle('ko', !!err);
+  b.title = msg;
+  const e = el('rDriveEtat');
+  e.textContent = driveActif() ? msg : 'Non relié : les commandes restent sur ce téléphone.';
+  e.className = 'etat-drive' + (!driveActif() ? '' : err ? ' ko' : ' ok');
+}
+function enAttente(){
+  let n = sync.suppr.length;
+  for(const c of commandes) if(sync.empreintes[c.id] !== cle(c) && !(c.id === ficheId && ficheNouvelle)) n++;
+  return n;
+}
+async function synchroniser(){
+  if(!driveActif()) return;
+  if(syncEnCours){ syncRelance = true; return; }
+  syncEnCours = true; afficherEtatSync('Synchronisation…', false);
+  try{
+    // 1. suppressions
+    for(const t of [...sync.suppr]){
+      await appelDrive(null, {action:'enregistrer', commande: t});
+      sync.suppr = sync.suppr.filter(x=>x !== t); saveSync();
+    }
+    // 2. nouvelles photos, puis commandes modifiées (une fiche neuve encore ouverte attend)
+    for(const c of [...commandes]){
+      if(c.id === ficheId && ficheNouvelle) continue;
+      for(const p of c.photos){
+        if(sync.photosOk[p]) continue;
+        const d = await photoLocale(p).catch(()=>null);
+        if(d) await appelDrive(null, {action:'photo', id: p, nom: ((c.date || 'sans date') + ' ' + (c.client || '')).trim(), data: d});
+        sync.photosOk[p] = 1; saveSync();
+      }
+      const k = cle(c);
+      if(sync.empreintes[c.id] === k) continue;
+      await appelDrive(null, {action:'enregistrer', commande: c});
+      sync.empreintes[c.id] = k; saveSync();
+    }
+    // 3. récupération des commandes des autres téléphones
+    const j = await appelDrive({action:'liste'});
+    let change = false;
+    for(const r of j.commandes || []){
+      const i = commandes.findIndex(c=>c.id === r.id);
+      const local = commandes[i];
+      if(local && local.id === ficheId) continue;            // fiche en cours de modification
+      if(r.supprime){
+        if(local && (local.modifie || 0) <= (r.modifie || 0)){
+          for(const p of local.photos) photoDel(p);
+          commandes.splice(i, 1); delete derniereCle[r.id]; change = true;
+        }
+        if(!local || (local.modifie || 0) <= (r.modifie || 0)) delete sync.empreintes[r.id];
+        continue;
+      }
+      if(sync.suppr.some(t=>t.id === r.id)) continue;
+      r.photos = r.photos || [];
+      if(!local || (r.modifie || 0) > (local.modifie || 0)){
+        if(local) commandes[i] = r; else commandes.push(r);
+        r.photos.forEach(p=>{ sync.photosOk[p] = 1; });
+        const k = cle(r); sync.empreintes[r.id] = k; derniereCle[r.id] = k;
+        change = true;
+      }
+    }
+    sync.dernier = Date.now(); saveSync();
+    if(change){ ecrireLocal(); render(); }
+    syncEnCours = false;
+    const n = enAttente();
+    afficherEtatSync(n ? `${n} modification(s) en attente d'envoi` : '✓ Drive à jour — ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}), !!n);
+  }catch(e){
+    syncEnCours = false;
+    const n = enAttente();
+    afficherEtatSync(e.message === 'acces'
+      ? 'Le script demande une connexion Google : dans « Déployer ▸ Gérer les déploiements », réglez « Qui a accès » sur « Tout le monde ».'
+      : `Drive injoignable (pas de réseau ?)${n ? ' — ' + n + ' modification(s) seront envoyées plus tard' : ''}. Les commandes restent utilisables.`, true);
+  }finally{
+    syncEnCours = false;
+    if(syncRelance){ syncRelance = false; setTimeout(synchroniser, 300); }
+  }
+}
+
+/* code du script Google Apps Script à coller dans script.google.com */
+const CODE_APPS_SCRIPT =
+`// Commandes gâteaux — stockage partagé sur Google Drive
+var DOSSIER = 'Commandes gâteaux';
+var ENTETES = ['id', 'modifié', 'supprimé', 'Date de retrait', 'Heure', 'Client', 'Téléphone', 'Parts', 'Parfums',
+  'Thème / déco', 'Inscription', 'Prix', 'Acompte', 'Payé', 'Statut', 'Lieu', 'Notes', 'Photos', 'données (ne pas modifier)'];
+
+function doGet(e) {
+  var p = e.parameter || {};
+  if (p.action === 'liste') return json_({ok: true, commandes: lireTout_()});
+  if (p.action === 'photo') {
+    var f = dossierPhotos_().searchFiles("title contains '" + String(p.id).replace(/[^a-z0-9]/gi, '') + "' and trashed = false");
+    if (!f.hasNext()) return json_({ok: true, data: null});
+    return json_({ok: true, data: 'data:image/jpeg;base64,' + Utilities.base64Encode(f.next().getBlob().getBytes())});
+  }
+  return json_({ok: true, app: 'commandes'});
+}
+
+function doPost(e) {
+  var d = JSON.parse(e.postData.contents);
+  var verrou = LockService.getScriptLock();
+  verrou.waitLock(30000);
+  try {
+    if (d.action === 'photo') {
+      var id = String(d.id).replace(/[^a-z0-9]/gi, '');
+      var dos = dossierPhotos_();
+      var ex = dos.searchFiles("title contains '" + id + "' and trashed = false");
+      while (ex.hasNext()) ex.next().setTrashed(true);
+      var nom = String(d.nom || '').replace(/[\\\\/:*?"<>|']/g, ' ').trim();
+      var octets = Utilities.base64Decode(String(d.data).split(',')[1]);
+      dos.createFile(Utilities.newBlob(octets, 'image/jpeg', (nom ? nom + ' — ' : '') + id + '.jpg'));
+      return json_({ok: true});
+    }
+    if (d.action === 'enregistrer') { enregistrer_(d.commande); return json_({ok: true}); }
+    return json_({ok: false, erreur: 'action inconnue'});
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+function enregistrer_(c) {
+  var f = feuille_();
+  var n = f.getLastRow();
+  var ids = n > 1 ? f.getRange(2, 1, n - 1, 2).getValues() : [];
+  var ligne = -1;
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === c.id) {
+      if (Number(ids[i][1]) >= Number(c.modifie)) return;   // version plus récente déjà enregistrée
+      ligne = i + 2; break;
+    }
+  }
+  if (c.supprime) (c.photos || []).forEach(function (p) {
+    var ex = dossierPhotos_().searchFiles("title contains '" + String(p).replace(/[^a-z0-9]/gi, '') + "' and trashed = false");
+    while (ex.hasNext()) ex.next().setTrashed(true);
+  });
+  var v = ligne_(c);
+  if (ligne > 0) f.getRange(ligne, 1, 1, v.length).setValues([v]);
+  else f.getRange(n + 1, 1, 1, v.length).setValues([v]);
+}
+
+function ligne_(c) {
+  var t = function (s) { return s == null || s === '' ? '' : "'" + s; };   // toujours du texte
+  var nb = function (x) { return x == null ? '' : x; };
+  var st = {afaire: 'À faire', pret: 'Prêt', retire: 'Retiré'};
+  return [t(c.id), c.modifie || 0, c.supprime ? 'oui' : '', t(c.date), t(c.heure), t(c.client), t(c.tel), nb(c.parts),
+    t(c.parfums), t(c.theme), t(c.inscription), nb(c.prix), nb(c.acompte), c.paye ? 'oui' : '', st[c.statut] || '',
+    t(c.lieu), t(c.notes), (c.photos || []).length, t(JSON.stringify(c))];
+}
+
+function lireTout_() {
+  var f = feuille_();
+  var n = f.getLastRow();
+  if (n < 2) return [];
+  return f.getRange(2, 1, n - 1, ENTETES.length).getValues().map(function (r) {
+    try {
+      var c = JSON.parse(r[ENTETES.length - 1]);
+      if (r[2] === 'oui') c.supprime = true;
+      return c;
+    } catch (e) { return null; }
+  }).filter(function (c) { return c && c.id; });
+}
+
+function feuille_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('feuille');
+  if (id) { try { return SpreadsheetApp.openById(id).getSheets()[0]; } catch (e) {} }
+  var ss = SpreadsheetApp.create('Commandes gâteaux');
+  DriveApp.getFileById(ss.getId()).moveTo(dossier_());
+  var f = ss.getSheets()[0];
+  f.setName('Commandes');
+  f.getRange(1, 1, 1, ENTETES.length).setValues([ENTETES]).setFontWeight('bold');
+  f.setFrozenRows(1);
+  f.hideColumns(1, 2);
+  f.hideColumns(ENTETES.length);
+  props.setProperty('feuille', ss.getId());
+  return f;
+}
+
+function dossier_() {
+  var it = DriveApp.getFoldersByName(DOSSIER);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(DOSSIER);
+}
+
+function dossierPhotos_() {
+  var p = dossier_(), it = p.getFoldersByName('Photos');
+  return it.hasNext() ? it.next() : p.createFolder('Photos');
+}
+
+function json_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}
+`;
 
 /* =====================================================================
    ÉVÉNEMENTS
@@ -888,8 +1177,7 @@ for(const id of Object.values(CHAMPS)) el(id).addEventListener('input', ()=>{ el
 el('fSupprimer').onclick = async ()=>{
   const c = trouver(ficheId); if(!c) return;
   if(!confirm(`Supprimer la commande${c.client ? ' de ' + c.client : ''} et ses photos ?`)) return;
-  for(const p of c.photos) await photoDel(p);
-  commandes = commandes.filter(x=>x.id !== c.id);
+  supprimerCommande(c);
   save();
   ficheId = null; el('voileFiche').hidden = true; document.body.style.overflow = '';
   render(); toast('🗑 Commande supprimée');
@@ -899,11 +1187,15 @@ el('vFermer').onclick = ()=>{ el('visio').hidden = true; visioId = null; };
 el('vImg').onclick = ()=>el('visio').classList.toggle('zoom');
 el('vPivoter').onclick = async ()=>{
   if(!visioId) return;
+  const c = trouver(ficheId); if(!c) return;
   const d = await pivoter(await photoGet(visioId));
-  await photoPut(visioId, d); photoCache[visioId] = d;
+  const nid = nouvelId();
+  await photoPut(nid, d); photoCache[nid] = d;
+  c.photos = c.photos.map(p=>p === visioId ? nid : p);
+  await photoDel(visioId);
+  visioId = nid;
   el('vImg').src = d;
-  const c = trouver(ficheId); if(c) renderPhotosFiche(c);
-  render();
+  save(); renderPhotosFiche(c); render();
 };
 el('vRelire').onclick = ()=>{
   if(!visioId || !ficheId) return;
@@ -921,7 +1213,34 @@ el('vSupp').onclick = async ()=>{
 };
 
 function fermerReglages(){ el('voileReglages').hidden = true; document.body.style.overflow = ''; }
+el('bSync').onclick = ()=>{ el('bReglages').onclick(); synchroniser(); };
+el('rDriveUrl').onchange = ()=>{
+  const u = el('rDriveUrl').value.trim();
+  if(u && !/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){
+    afficherEtatSync('Adresse incorrecte : elle doit commencer par https://script.google.com/ et finir par /exec', true); return;
+  }
+  sync.url = u;
+  if(!u){ sync.empreintes = {}; sync.photosOk = {}; }
+  saveSync(); afficherEtatSync('', false); synchroniser();
+};
+el('rDriveSync').onclick = ()=>{
+  if(!driveActif()){ afficherEtatSync('Collez d\'abord l\'adresse du script.', true); return; }
+  synchroniser();
+};
+el('rDriveCode').onclick = async ()=>{
+  try{ await navigator.clipboard.writeText(CODE_APPS_SCRIPT); toast('📋 Code copié — collez-le dans script.google.com'); }
+  catch(e){ prompt('Copiez ce code dans votre projet script.google.com :', CODE_APPS_SCRIPT); }
+};
+el('rDriveLien').onclick = async ()=>{
+  if(!driveActif()){ afficherEtatSync('Collez d\'abord l\'adresse du script.', true); return; }
+  const lien = location.href.split('#')[0] + '#drive=' + encodeURIComponent(sync.url);
+  const texte = 'Commandes gâteaux : ouvrez ce lien pour voir les commandes de l\'équipe';
+  if(navigator.share){ try{ await navigator.share({title:'Commandes gâteaux', text: texte, url: lien}); }catch(e){} return; }
+  try{ await navigator.clipboard.writeText(lien); toast('🔗 Lien copié'); }catch(e){ prompt('Lien à envoyer :', lien); }
+};
 el('bReglages').onclick = ()=>{
+  el('rDriveUrl').value = sync.url || '';
+  afficherEtatSync(syncEtat.msg, syncEtat.err);
   el('rLecture').checked = !!reglages.lecture;
   el('rCle').value = reglages.cle || '';
   el('voileReglages').hidden = false; document.body.style.overflow = 'hidden';
@@ -940,9 +1259,7 @@ el('rPurger').onclick = async ()=>{
   const vieilles = commandes.filter(c=>c.statut === 'retire' && c.date && c.date < limite);
   if(!vieilles.length){ toast('Rien à supprimer'); return; }
   if(!confirm(`Supprimer ${vieilles.length} commande${vieilles.length>1?'s':''} retirée${vieilles.length>1?'s':''} avant le ${dateLongue(limite)} ?\nPensez à faire une sauvegarde avant.`)) return;
-  for(const c of vieilles) for(const p of c.photos) await photoDel(p);
-  const ids = new Set(vieilles.map(c=>c.id));
-  commandes = commandes.filter(c=>!ids.has(c.id));
+  for(const c of vieilles) supprimerCommande(c);
   save(); render(); toast('🧹 Ménage fait');
 };
 
@@ -953,7 +1270,21 @@ window.addEventListener('keydown', e=>{
   else if(!el('voileReglages').hidden) fermerReglages();
 });
 
+// lien d'accès envoyé par un collègue : …/commandes.html#drive=<adresse du script>
+{
+  const m = location.hash.match(/drive=([^&]+)/);
+  if(m){
+    const u = decodeURIComponent(m[1]);
+    if(/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){ sync.url = u; saveSync(); toast('☁️ Relié au Drive commun'); }
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
 render();
+afficherEtatSync(driveActif() ? 'Connexion au Drive…' : '', false);
+synchroniser();
+setInterval(()=>{ if(document.visibilityState === 'visible') synchroniser(); }, 60000);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') synchroniser(); });
+window.addEventListener('online', ()=>synchroniser());
 if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
 if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){
   navigator.serviceWorker.register('commandes-sw.js').catch(()=>{});

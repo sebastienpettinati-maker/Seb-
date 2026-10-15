@@ -1,7 +1,7 @@
 /* Service worker de l'application des commandes — cache hors-ligne.
    Stratégie : réseau d'abord pour la page (pour recevoir les mises à jour),
    cache en secours (fonctionnement 100 % hors-ligne une fois visitée). */
-const CACHE = 'commandes-v2';
+const CACHE = 'commandes-v3';
 const FICHIERS = ['./commandes.html', './commandes.webmanifest', './commandes-192.png', './commandes-512.png'];
 
 self.addEventListener('install', e => {

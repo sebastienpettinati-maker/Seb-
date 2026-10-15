@@ -89,7 +89,7 @@
   .flottants .dedans{max-width:720px;margin:0 auto;display:flex;gap:10px}
   .b-photo{flex:1;border:none;border-radius:16px;padding:16px;font-size:17px;font-weight:800;color:#fff;
     background:var(--grad);box-shadow:0 6px 16px rgba(156,47,85,.35);cursor:pointer}
-  .b-main{border:1.5px solid var(--bord);background:var(--carte);border-radius:16px;padding:0 16px;font-size:14px;
+  .b-main{border:1.5px solid var(--bord);background:var(--carte);border-radius:16px;padding:0 12px;font-size:13px;line-height:1.25;
     font-weight:700;color:var(--encre-2);cursor:pointer}
 
   /* ===== feuille (fiche) ===== */
@@ -197,7 +197,8 @@
 <div class="flottants">
   <div class="dedans">
     <button class="b-photo" id="bPhoto">📷 Photographier une fiche</button>
-    <button class="b-main" id="bManuel" title="Saisir une commande sans photo">✍️ Saisir</button>
+    <button class="b-main" id="bGalerie" title="Importer des fiches déjà photographiées">🖼<br>Importer</button>
+    <button class="b-main" id="bManuel" title="Saisir une commande sans photo">✍️<br>Saisir</button>
   </div>
 </div>
 
@@ -314,7 +315,7 @@
       <div class="bloc">
         <h4>Ajouter des photos</h4>
         <button class="b-large" id="rGalerie">🖼 Importer des fiches depuis la galerie</button>
-        <div class="note">Une commande est créée par photo choisie.</div>
+        <div class="note">Pour reprendre les commandes déjà faites : choisissez plusieurs photos d'un coup. Une commande est créée par photo, lue puis classée à sa date ; celles dont la date est passée sont marquées « Retiré ».</div>
       </div>
       <div class="bloc">
         <h4>Lecture automatique</h4>
@@ -585,7 +586,8 @@ function extraire(texte){
     let n = l.replace(/\b([01]?\d|2[0-3])\s*[hH:]\s*([0-5]\d)?\b/g, '').replace(/[^A-Za-zÀ-ÿ' \-]/g, ' ').replace(/\s+/g, ' ').trim();
     const ns = sansAccent(n);
     if(n.length < 2 || /^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|pour|le)\b/.test(ns)) continue;
-    if(MOIS.some(([p])=>new RegExp('\\b'+p).test(ns)) && /\d/.test(l)) continue;
+    if(/\b\d{1,2}\s*(?:er)?\s+(?:jan|fev|mar|avr|mai|juin|juil|aou|sep|oct|nov|dec)/.test(sansAccent(l))) continue;
+    if(/^\s*\d{1,2}\s*[\/.\-]\s*\d{1,2}/.test(l) && n.length < 3) continue;
     res.client = n.toLowerCase().replace(/(^|[\s\-'])\S/g, s=>s.toUpperCase());
     break;
   }
@@ -593,7 +595,15 @@ function extraire(texte){
 }
 
 const lecturesEnCours = new Set();
-async function lireFiche(cmdId, photoId, forcer){
+let fileLecture = Promise.resolve();
+/* import de plusieurs fiches : lectures l'une après l'autre (le service gratuit limite les envois simultanés) */
+function lireEnFile(cmdId, photoId, passee){
+  lecturesEnCours.add(photoId);
+  fileLecture = fileLecture.then(()=>lireFiche(cmdId, photoId, false, passee)).catch(()=>{})
+    .finally(()=>{ lecturesEnCours.delete(photoId); majLecture(); });
+  return fileLecture;
+}
+async function lireFiche(cmdId, photoId, forcer, passee){
   const c = trouver(cmdId); if(!c) return;
   const data = await photoGet(photoId); if(!data) return;
   lecturesEnCours.add(photoId); majLecture();
@@ -611,6 +621,8 @@ async function lireFiche(cmdId, photoId, forcer){
         c2[k] = x[k]; rempli.push(k);
       }
     }
+    // ancienne commande reprise depuis la galerie : déjà retirée
+    if(passee && c2.date && c2.date < aujourdhui() && (c2.statut || 'afaire') === 'afaire'){ c2.statut = 'retire'; rempli.push('statut'); }
     c2.modifie = Date.now();
     save();
     if(ficheId === cmdId) remplirFormulaire(c2, rempli);
@@ -834,7 +846,7 @@ function majReste(){
 
 /* ---- ajout de photos ---- */
 let cibleAjout = null;   // id de la commande à compléter, ou null pour une nouvelle
-async function ajouterPhotos(files, cible){
+async function ajouterPhotos(files, cible, galerie){
   files = [...files].filter(f=>f.type.startsWith('image/') || !f.type);
   if(!files.length) return;
   let derniere = null;
@@ -849,11 +861,15 @@ async function ajouterPhotos(files, cible){
     c.photos.push(pid); c.modifie = Date.now();
     save();
     derniere = c;
-    if(reglages.lecture) lireFiche(c.id, pid);
+    if(reglages.lecture){ if(galerie) lireEnFile(c.id, pid, true); else lireFiche(c.id, pid); }
   }
   if(!derniere) return;
   if(ficheId === derniere.id) renderPhotosFiche(derniere);
   else if(files.length === 1) ouvrirFiche(derniere.id, true);
+  else if(reglages.lecture){
+    toast(`📷 ${files.length} fiches ajoutées — lecture en cours, elles se classent toutes seules par date`);
+    fileLecture.then(()=>toast(`✅ ${files.length} fiches lues et classées — vérifiez « Sans date » pour celles illisibles`));
+  }
   else { toast(`📷 ${files.length} fiches ajoutées`); changerVue('nondatees'); }
   render();
   majLecture();
@@ -1154,7 +1170,8 @@ el('liste').addEventListener('click', e=>{ const c = e.target.closest('.carte');
 
 el('bPhoto').onclick = ()=>{ cibleAjout = null; el('inCamera').value = ''; el('inCamera').click(); };
 el('inCamera').onchange = e=>ajouterPhotos(e.target.files, cibleAjout);
-el('inGalerie').onchange = e=>{ fermerReglages(); ajouterPhotos(e.target.files, null); };
+el('inGalerie').onchange = e=>{ fermerReglages(); ajouterPhotos(e.target.files, null, true); };
+el('bGalerie').onclick = ()=>{ el('inGalerie').value = ''; el('inGalerie').click(); };
 el('bManuel').onclick = ()=>{ const c = nouvelleCommande(); ouvrirFiche(c.id, true); el('fClient').focus(); };
 
 el('fFermer').onclick = ()=>{

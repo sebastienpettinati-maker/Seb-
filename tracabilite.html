@@ -405,7 +405,8 @@
   <section class="panel" data-panel="livraison">
     <section class="card">
       <h2>🚚 Livraison</h2>
-      <p class="hint">Notez les produits finis que vous livrez, avec une quantité par produit. La date de fabrication
+      <p class="hint">Notez les produits finis que vous livrez, avec une quantité par produit — ou
+         <strong>importez le PDF de commande</strong> pour remplir la fiche automatiquement. La date de fabrication
          du jour est ajoutée automatiquement. Le bon de livraison PDF joint <strong>obligatoirement la traçabilité
          des 4 derniers jours de production</strong>, pour relier le produit fini à ce qui a été fabriqué au labo.</p>
       <div class="toolbar">
@@ -415,6 +416,14 @@
           <input type="text" id="livDest" list="dlDest" placeholder="ex. Carrefour Lingostière" autocomplete="off">
           <datalist id="dlDest"></datalist>
         </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Importer la commande (PDF) — remplit la fiche automatiquement</label>
+        <div class="recipe-actions" style="margin-top:0">
+          <button class="primary small" id="btnImportCmd" type="button">📄 Importer un PDF de commande</button>
+        </div>
+        <span class="footnote" id="cmdStatus" style="margin-top:6px"></span>
+        <input type="file" id="cmdInput" accept=".pdf,application/pdf" hidden>
       </div>
       <div class="field" style="margin-top:12px">
         <label for="selLivProduit">Ajouter un produit au bon de livraison</label>
@@ -1648,6 +1657,95 @@ function ajouterLivraison(val){
   if(ex){ ex.qte = (+ex.qte || 1) + 1; } else livraisonSel.push({cat, nom, qte: 1});
   renderLivraison();
 }
+/* --- import d'un PDF de commande : lit le texte (pdf.js embarqué), reconnaît
+   les produits du catalogue et leurs quantités, et remplit la fiche --- */
+let pdfjsP = null;
+function chargerPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if(!pdfjsP) pdfjsP = new Promise((res, rej)=>{
+    const s = document.createElement('script'); s.src = 'pdfjs/pdf.min.js';
+    s.onload = ()=>{ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.js'; }catch(e){} res(window.pdfjsLib); };
+    s.onerror = ()=>{ pdfjsP = null; s.remove(); rej(new Error('pdf.js indisponible')); };
+    document.head.appendChild(s);
+  });
+  return pdfjsP;
+}
+async function lignesPDF(file){
+  const lib = await chargerPdfJs();
+  const buf = await file.arrayBuffer();
+  const pdf = await lib.getDocument({data: new Uint8Array(buf)}).promise;
+  const lignes = [];
+  for(let n=1; n<=pdf.numPages; n++){
+    const page = await pdf.getPage(n);
+    const tc = await page.getTextContent();
+    const parLigne = {};
+    for(const it of tc.items){
+      if(!it.str || !it.str.trim()) continue;
+      const y = Math.round(it.transform[5] / 2) * 2;   // regroupe les fragments d'une même ligne
+      (parLigne[y] = parLigne[y] || []).push({x: it.transform[4], s: it.str});
+    }
+    for(const y of Object.keys(parLigne).map(Number).sort((a,b)=>b-a)){
+      const ligne = parLigne[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim();
+      if(ligne) lignes.push(ligne);
+    }
+  }
+  try{ await pdf.destroy(); }catch(e){}
+  return lignes;
+}
+function tousLesProduits(){
+  const out = []; for(const c of catalogue) for(const nom of c.produits) out.push({cat: c.cat, nom});
+  return out;
+}
+function qteDansLigne(ligne){
+  let m = ligne.match(/(?:x|qt[ée]?\.?|quantit[ée]|nombre|nb)\s*[:.]?\s*(\d{1,4})\b/i);
+  if(m) return parseInt(m[1], 10);
+  m = ligne.match(/\b(\d{1,4})\s*(?:x\b|u\b|unit|pi[eè]ces?|pcs?|pces?)/i);
+  if(m) return parseInt(m[1], 10);
+  const nums = (ligne.match(/\b\d{1,4}\b/g) || []).map(Number).filter(n=>n>=1 && n<=999);
+  return nums.length ? nums[0] : 0;
+}
+function analyserCommande(lignes){
+  const prods = tousLesProduits(), res = {};
+  for(const ligne of lignes){
+    const nl = norm(ligne);
+    let best = null, bestLen = 0;
+    for(const pr of prods){
+      const k = norm(pr.nom);
+      if(k.length >= 4 && nl.includes(k) && k.length > bestLen){ best = pr; bestLen = k.length; }
+    }
+    if(!best) continue;
+    let qte = qteDansLigne(ligne); if(qte <= 0) qte = 1;
+    const key = best.cat + '|' + best.nom;
+    res[key] = (res[key] || 0) + qte;
+  }
+  return Object.keys(res).map(k=>{ const i = k.indexOf('|'); return {cat: k.slice(0,i), nom: k.slice(i+1), qte: res[k]}; });
+}
+function detecterDestination(lignes){
+  const t = norm(lignes.join(' '));
+  for(const d of destinations){ if(norm(d).length >= 4 && t.includes(norm(d))) return d; }
+  if(t.includes('lingosti')) return 'Carrefour Lingostière';
+  if(t.includes('carros')) return 'Carrefour Carros';
+  return '';
+}
+async function importerCommande(file){
+  el('cmdStatus').textContent = '📄 Lecture du PDF…';
+  let lignes;
+  try{ lignes = await lignesPDF(file); }
+  catch(e){ el('cmdStatus').innerHTML = '<strong style="color:var(--bad)">Lecture du PDF impossible (PDF scanné sans texte ?). Saisissez la commande à la main.</strong>'; return; }
+  const trouves = analyserCommande(lignes);
+  if(!trouves.length){
+    el('cmdStatus').innerHTML = '<strong style="color:var(--bad)">Aucun produit du catalogue reconnu dans ce PDF. Vérifiez que les noms correspondent (onglet ✏️), ou ajoutez-les à la main.</strong>';
+    return;
+  }
+  livraisonSel = trouves.map(t=>({cat: t.cat, nom: t.nom, qte: t.qte}));
+  const dest = detecterDestination(lignes);
+  if(dest) el('livDest').value = dest;
+  renderLivraison();
+  const total = trouves.reduce((s,t)=>s + t.qte, 0);
+  el('cmdStatus').innerHTML = '✅ ' + trouves.length + ' produit' + (trouves.length>1?'s':'') + ' reconnu' + (trouves.length>1?'s':'') +
+    ', ' + total + ' article' + (total>1?'s':'') + (dest ? ' — magasin : ' + esc(dest) : '') + '. Vérifiez et ajustez si besoin.';
+  toast('✅ Commande importée — vérifiez la fiche');
+}
 function livraisonCourante(){
   if(el('livDest').value.trim() && !destinations.some(d=>norm(d)===norm(el('livDest').value))){
     destinations.push(el('livDest').value.trim()); saveDestinations(); renderSelLivraison();
@@ -2400,6 +2498,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   el('selLivProduit').addEventListener('change', ()=>{
     if(el('selLivProduit').value){ ajouterLivraison(el('selLivProduit').value); el('selLivProduit').value = ''; }
   });
+  el('btnImportCmd').addEventListener('click', ()=>el('cmdInput').click());
+  el('cmdInput').addEventListener('change', e=>{ const f = e.target.files && e.target.files[0]; if(f) importerCommande(f); e.target.value = ''; });
   el('btnLivraisonPDF').addEventListener('click', telechargerLivraison);
   el('btnLivraisonShare').addEventListener('click', partagerLivraison);
   el('btnCatalogueSave').addEventListener('click', ()=>{

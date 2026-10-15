@@ -1,0 +1,16 @@
+{
+  "name": "Commandes gâteaux",
+  "short_name": "Commandes",
+  "description": "Photographier, classer et retrouver les fiches de commande de gâteaux : par date de retrait, avec statut, paiement et recherche.",
+  "lang": "fr",
+  "id": "commandes",
+  "start_url": "./commandes.html",
+  "scope": "./commandes.html",
+  "display": "standalone",
+  "background_color": "#f8f2f3",
+  "theme_color": "#b03a62",
+  "icons": [
+    { "src": "commandes-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "commandes-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

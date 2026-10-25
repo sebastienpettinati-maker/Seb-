@@ -108,6 +108,9 @@
     box-shadow:0 8px 24px rgba(46,139,87,.28)}
   .hero-date{font-family:var(--serif);font-size:1.35rem;letter-spacing:.04em;text-transform:capitalize}
   .hero-sub{opacity:.9;font-size:.9rem;margin-top:4px}
+  .hero .lienSync{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35);min-height:34px;
+    padding:6px 12px;font-size:.82rem;margin-top:8px;box-shadow:none}
+  .hero .lienSync:hover{background:rgba(255,255,255,.28);color:#fff}
   .progress{height:12px;border-radius:999px;background:var(--zebra);overflow:hidden;border:1px solid var(--grid)}
   .progress-bar{height:100%;width:0;background:var(--grad);border-radius:999px;transition:width .4s ease}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
@@ -267,6 +270,7 @@
     <section class="hero">
       <div class="hero-date" id="accDate"></div>
       <div class="hero-sub" id="accSub"></div>
+      <div class="hero-sub" id="accSync" hidden></div>
     </section>
 
     <section class="card">
@@ -570,34 +574,49 @@
       <p class="footnote" id="histoVide" style="margin-bottom:0">Aucune journée enregistrée pour l'instant.</p>
     </section>
 
-    <section class="card">
-      <h2>☁️ Enregistrer sur Google Drive</h2>
-      <p class="hint"><strong>Depuis le téléphone, le plus simple :</strong> dans la liste ci-dessus, touchez
-         « 📤 Enregistrer sur Drive » sur une journée — le menu de partage du téléphone s'ouvre, choisissez
-         <strong>Drive</strong> et le dossier voulu. Aucune installation.</p>
-      <p class="hint" style="margin-top:0"><strong>Automatique chaque jour (facultatif) :</strong> pour que la feuille
-         parte toute seule à chaque production, collez ci-dessous l'adresse d'un petit script Google. Cette
-         installation-là se fait <strong>une fois sur un ordinateur</strong> (voir « Première installation »).</p>
-      <div class="toolbar">
-        <div class="field" style="flex:1;min-width:260px">
-          <label for="driveUrl">Adresse du script Google (se termine par /exec)</label>
-          <input type="text" id="driveUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
-        </div>
-        <label style="display:flex;align-items:center;gap:8px;font-weight:600;padding-bottom:9px">
-          <input type="checkbox" id="driveAuto" checked> Envoi automatique chaque jour
+    <section class="card" id="syncCard">
+      <h2>🔄 Synchronisation entre appareils</h2>
+      <p class="hint">Branchez tous vos téléphones (et celui d'un collègue) sur <strong>le même script Google</strong> :
+         productions, photos, entremets, livraisons et produits deviennent <strong>les mêmes partout</strong>. Chaque
+         appareil envoie ses changements et récupère ceux des autres — à l'ouverture, après chaque modification et
+         toutes les 2 minutes. Sans connexion, l'appli continue de marcher et rattrape au retour du réseau.</p>
+      <div class="field">
+        <label for="driveUrl">Adresse du script Google (se termine par /exec)</label>
+        <input type="text" id="driveUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-top:12px">
+        <input type="checkbox" id="syncOn"> 🔄 Synchroniser mes données entre appareils
+      </label>
+      <div class="recipe-actions" style="margin-top:10px">
+        <button class="primary small" id="btnSyncNow" type="button">🔄 Synchroniser maintenant</button>
+      </div>
+      <p class="footnote" id="syncStatus" style="margin:10px 0 0"></p>
+      <p class="footnote" style="margin:8px 0 0">🔒 Les données sont rangées dans <strong>votre</strong> Google Drive
+         (dossier « Traçabilité »). Toute personne qui connaît l'adresse du script peut les lire : ne la partagez
+         qu'avec vos collègues.</p>
+      <details class="more"><summary>Feuille PDF du jour sur Drive</summary>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;margin-top:10px">
+          <input type="checkbox" id="driveAuto" checked> Envoyer aussi la feuille de traçabilité PDF à chaque production
         </label>
-      </div>
-      <div class="recipe-actions" style="margin-top:8px">
-        <button class="small" id="btnDriveTest" type="button">Tester la connexion</button>
-        <button class="small" id="btnDriveNow" type="button">☁️ Envoyer la journée d'aujourd'hui</button>
-      </div>
-      <p class="footnote" id="driveStatus" style="margin:10px 0 0"></p>
-      <details class="more"><summary>Première installation (5 min, une seule fois)</summary>
+        <div class="recipe-actions" style="margin-top:8px">
+          <button class="small" id="btnDriveTest" type="button">Tester l'envoi d'un PDF</button>
+          <button class="small" id="btnDriveNow" type="button">☁️ Envoyer la journée d'aujourd'hui</button>
+        </div>
+        <p class="footnote" id="driveStatus" style="margin:10px 0 0"></p>
+        <p class="footnote" style="margin:8px 0 0">Sans script : « 📤 Enregistrer sur Drive » sur une journée de l'historique
+           ouvre le partage du téléphone.</p>
+      </details>
+      <details class="more"><summary>Installation du script (une seule fois, sur ordinateur — 10 min)</summary>
         <ol class="footnote" style="margin:8px 0 0;padding-left:20px;line-height:1.7">
-          <li>Sur un ordinateur, allez sur <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> et créez un <strong>Nouveau projet</strong>.</li>
-          <li>Effacez le contenu et collez le code fourni ci-dessous (bouton « Copier le code du script »).</li>
-          <li>Cliquez sur <strong>Déployer ▸ Nouveau déploiement</strong>, type <strong>Application Web</strong>, « Exécuter en tant que : moi », « Accès : tout le monde », puis <strong>Déployer</strong> et autorisez.</li>
-          <li>Copiez l'<strong>URL de l'application Web</strong> (elle se termine par <code>/exec</code>), collez-la dans le champ ci-dessus, puis touchez « Tester la connexion ».</li>
+          <li>Sur un ordinateur, ouvrez <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a>
+              (avec le compte Google qui gardera les données) et créez un <strong>Nouveau projet</strong>.</li>
+          <li>Effacez tout et collez le code (bouton ci-dessous). <strong>Si vous aviez déjà un script</strong>, remplacez son code
+              par celui-ci : il gère maintenant aussi la synchronisation.</li>
+          <li><strong>Déployer ▸ Nouveau déploiement</strong> ▸ type <strong>Application Web</strong> ▸ « Exécuter en tant que :
+              <strong>moi</strong> » ▸ « Qui a accès : <strong>Tout le monde</strong> » ▸ Déployer ▸ autorisez l'accès à Drive.
+              (Script déjà déployé : <strong>Gérer les déploiements ▸ ✏️ ▸ Version : Nouvelle version</strong>.)</li>
+          <li>Copiez l'<strong>URL de l'application Web</strong> (…/exec), collez-la ci-dessus sur <strong>chaque</strong> appareil,
+              cochez « Synchroniser » et touchez « Synchroniser maintenant ».</li>
         </ol>
         <div class="recipe-actions" style="margin-top:10px">
           <button class="small" id="btnDriveCode" type="button">📋 Copier le code du script</button>
@@ -685,6 +704,7 @@ function save(){
     localStorage.setItem('trac_produits', JSON.stringify(produits));
     localStorage.setItem('trac_journal', JSON.stringify(journal));
   }catch(e){ toast('⚠️ Enregistrement impossible (stockage plein ?)'); }
+  try{ planifierSync(); }catch(e){}
 }
 function jour(d){ return journal[d] || (journal[d] = {photos:[], productions:[]}); }
 
@@ -808,6 +828,17 @@ function renderAccueil(){
     b.addEventListener('click', ()=>activerOnglet(go));
     kb.appendChild(b);
   }
+
+  /* synchro pas encore activée : raccourci vers le réglage */
+  const as = el('accSync');
+  if(!syncActive()){
+    as.hidden = false;
+    as.innerHTML = '<button type="button" class="lienSync">🔄 Relier mes appareils (mêmes données partout) →</button>';
+    as.querySelector('button').addEventListener('click', ()=>{
+      activerOnglet('historique');
+      setTimeout(()=>el('syncCard').scrollIntoView({behavior:'smooth', block:'start'}), 300);
+    });
+  }
 }
 
 /* ---- photos (IndexedDB) ---- */
@@ -911,7 +942,7 @@ const CASES_DEFAUT = ['Beurre','Crème liquide','Crème fraîche','Lait','Œufs'
 let casesRisque = null;
 try{ casesRisque = JSON.parse(localStorage.getItem('trac_cases')); }catch(e){}
 if(!Array.isArray(casesRisque) || !casesRisque.length) casesRisque = [...CASES_DEFAUT];
-function saveCases(){ try{ localStorage.setItem('trac_cases', JSON.stringify(casesRisque)); }catch(e){} }
+function saveCases(){ try{ localStorage.setItem('trac_cases', JSON.stringify(casesRisque)); }catch(e){} try{ planifierSync(); }catch(e){} }
 let pendingCase = null;
 
 function photoPourCase(nomCase, photos){
@@ -1647,7 +1678,7 @@ function renderProdJour(){
 ===================================================================== */
 let entremetsLib = [];
 try{ entremetsLib = JSON.parse(localStorage.getItem('trac_entremets')) || []; }catch(e){}
-function saveEntremetsLib(){ try{ localStorage.setItem('trac_entremets', JSON.stringify(entremetsLib)); }catch(e){} }
+function saveEntremetsLib(){ try{ localStorage.setItem('trac_entremets', JSON.stringify(entremetsLib)); }catch(e){} try{ planifierSync(); }catch(e){} }
 let composantsSel = [];   // composants choisis : [{prodId, date, nom, dlc, conservation, heure}]
 
 function jourEntremets(){ return el('jourEntremets').value || aujourdhui(); }
@@ -1793,8 +1824,8 @@ try{ destinations = JSON.parse(localStorage.getItem('trac_destinations')); }catc
 if(!Array.isArray(destinations) || !destinations.length) destinations = [...DEST_DEFAUT];
 let livraisonSel = [];   // [{cat, nom, qte}]
 
-function saveCatalogue(){ try{ localStorage.setItem('trac_catalogue', JSON.stringify(catalogue)); }catch(e){} }
-function saveDestinations(){ try{ localStorage.setItem('trac_destinations', JSON.stringify(destinations)); }catch(e){} }
+function saveCatalogue(){ try{ localStorage.setItem('trac_catalogue', JSON.stringify(catalogue)); }catch(e){} try{ planifierSync(); }catch(e){} }
+function saveDestinations(){ try{ localStorage.setItem('trac_destinations', JSON.stringify(destinations)); }catch(e){} try{ planifierSync(); }catch(e){} }
 function jourLivraison(){ return el('jourLivraison').value || aujourdhui(); }
 function parseCatalogue(txt){
   const out = []; let cur = null;
@@ -2448,7 +2479,7 @@ async function partagerPDF(d){
 /* =====================================================================
    GOOGLE DRIVE — envoi automatique de la feuille PDF (script /exec)
 ===================================================================== */
-let driveCfg = {url:'', auto:true};
+let driveCfg = {url:'', auto:true, sync:false};
 try{ driveCfg = Object.assign(driveCfg, JSON.parse(localStorage.getItem('trac_drive'))||{}); }catch(e){}
 function persistDrive(){ try{ localStorage.setItem('trac_drive', JSON.stringify(driveCfg)); }catch(e){} }
 function driveStatus(msg, err){
@@ -2508,20 +2539,250 @@ async function envoyerDrivePDF(d, silencieux){
 }
 function driveAutoJour(d){ if(driveCfg.auto && driveCfg.url) envoyerDrivePDF(d, true); }
 
-/* code du script Google Apps Script à coller (décode le base64 en PDF) */
+/* code du script Google Apps Script à coller : synchronisation entre appareils
+   (état + photos rangés dans le dossier « Traçabilité » du Drive) et envoi des
+   feuilles PDF. Concurrence gérée par numéro de version + verrou. */
 const CODE_APPS_SCRIPT =
-`function doPost(e) {
+`// Traçabilité — synchronisation entre appareils + feuilles PDF
+function dossier_() {
+  var it = DriveApp.getFoldersByName('Traçabilité');
+  return it.hasNext() ? it.next() : DriveApp.createFolder('Traçabilité');
+}
+function photos_() {
+  var d = dossier_(), it = d.getFoldersByName('photos');
+  return it.hasNext() ? it.next() : d.createFolder('photos');
+}
+function json_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}
+function lireEtat_() {
+  var it = dossier_().getFilesByName('synchro.json');
+  return it.hasNext() ? JSON.parse(it.next().getBlob().getDataAsString()) : { version: 0, etat: null };
+}
+function ecrireEtat_(o) {
+  var d = dossier_(), it = d.getFilesByName('synchro.json'), txt = JSON.stringify(o);
+  if (it.hasNext()) it.next().setContent(txt); else d.createFile('synchro.json', txt, 'application/json');
+}
+function doGet(e) {
+  var p = e.parameter || {};
+  if (p.action === 'photo') {
+    var f = photos_().getFilesByName(p.id + '.txt');
+    return json_({ id: p.id, data: f.hasNext() ? f.next().getBlob().getDataAsString() : null });
+  }
+  var s = lireEtat_(), ids = [], fs = photos_().getFiles();
+  while (fs.hasNext()) ids.push(fs.next().getName().replace(/\\.txt$/, ''));
+  return json_({ version: s.version, etat: s.etat, photos: ids });
+}
+function doPost(e) {
   var d = JSON.parse(e.postData.contents);
-  var dossiers = DriveApp.getFoldersByName('Traçabilité');
-  var dossier = dossiers.hasNext() ? dossiers.next() : DriveApp.createFolder('Traçabilité');
-  var octets = Utilities.base64Decode(d.contenu);
-  var blob = Utilities.newBlob(octets, d.type || 'application/pdf', d.nom);
-  // remplace le fichier du même nom s'il existe déjà (une version par jour)
-  var existants = dossier.getFilesByName(d.nom);
-  while (existants.hasNext()) existants.next().setTrashed(true);
+  if (d.action === 'sync') {
+    var verrou = LockService.getScriptLock(); verrou.waitLock(25000);
+    try {
+      var s = lireEtat_();
+      if (s.version !== d.baseVersion) return json_({ conflit: true, version: s.version, etat: s.etat });
+      ecrireEtat_({ version: s.version + 1, etat: d.etat });
+      return json_({ ok: true, version: s.version + 1 });
+    } finally { verrou.releaseLock(); }
+  }
+  if (d.action === 'photo') {
+    var pd = photos_();
+    if (!pd.getFilesByName(d.id + '.txt').hasNext()) pd.createFile(d.id + '.txt', d.data, 'text/plain');
+    return json_({ ok: true });
+  }
+  // feuille PDF : remplace le fichier du même nom (une version par jour)
+  var dossier = dossier_();
+  var blob = Utilities.newBlob(Utilities.base64Decode(d.contenu), d.type || 'application/pdf', d.nom);
+  var ex = dossier.getFilesByName(d.nom);
+  while (ex.hasNext()) ex.next().setTrashed(true);
   dossier.createFile(blob);
   return ContentService.createTextOutput('OK');
 }`;
+
+/* =====================================================================
+   SYNCHRONISATION ENTRE APPAREILS (via le script Google Drive)
+   Fusion à 3 voies par enregistrement (id) : on compare la version locale
+   et la version distante à la dernière version synchronisée (« base »),
+   ce qui distingue un ajout, une modification et une suppression sans
+   horloge commune. Les photos (lourdes) circulent à part, une par une.
+===================================================================== */
+function trierCles(o){
+  if(Array.isArray(o)) return o.map(trierCles);
+  if(o && typeof o === 'object'){ const r = {}; for(const k of Object.keys(o).sort()) r[k] = trierCles(o[k]); return r; }
+  return o;
+}
+const cleJ = o => JSON.stringify(trierCles(o === undefined ? null : o));   // comparaison stable (ordre des champs indifférent)
+const cloneJ = o => JSON.parse(JSON.stringify(o === undefined ? null : o));
+function fusionListe(base, loc, dist){
+  const B = new Map((base||[]).map(x=>[x.id, x])), L = new Map((loc||[]).map(x=>[x.id, x])), D = new Map((dist||[]).map(x=>[x.id, x]));
+  const choisir = id=>{
+    const b = B.get(id), l = L.get(id), d = D.get(id);
+    if(l && d){ if(!b) return l; return cleJ(l) !== cleJ(b) ? l : d; }      // modifié ici → ici ; sinon la version distante
+    if(l){ return (!b || cleJ(l) !== cleJ(b)) ? l : null; }                 // supprimé ailleurs, sauf si modifié ici
+    if(d){ return (!b || cleJ(d) !== cleJ(b)) ? d : null; }                 // supprimé ici, sauf si modifié ailleurs
+    return null;
+  };
+  const out = [], vus = new Set();
+  for(const x of (dist||[])){ if(vus.has(x.id)) continue; vus.add(x.id); const r = choisir(x.id); if(r) out.push(r); }
+  for(const x of (loc||[])){ if(vus.has(x.id)) continue; vus.add(x.id); const r = choisir(x.id); if(r) out.push(r); }
+  return out;
+}
+function fusionValeur(b, l, d){
+  if(d === undefined || d === null) return l;
+  return cleJ(l) !== cleJ(b) ? l : d;
+}
+function fusionJournal(b, l, d){
+  b = b || {}; l = l || {}; d = d || {};
+  const out = {};
+  for(const t of new Set([...Object.keys(l), ...Object.keys(d)])){
+    const jb = b[t] || {}, jl = l[t] || {}, jd = d[t] || {};
+    const j = {photos: fusionListe(jb.photos, jl.photos, jd.photos),
+               productions: fusionListe(jb.productions, jl.productions, jd.productions)};
+    const lv = fusionListe(jb.livraisons, jl.livraisons, jd.livraisons);
+    if(lv.length) j.livraisons = lv;
+    if(j.photos.length || j.productions.length || lv.length) out[t] = j;
+  }
+  return out;
+}
+function fusionner(b, l, d){
+  if(!d) return l;
+  const premier = !b; b = b || {};
+  const val = k => premier ? ((d[k] !== undefined && d[k] !== null) ? d[k] : l[k]) : fusionValeur(b[k], l[k], d[k]);
+  return {
+    produits: fusionListe(b.produits, l.produits, d.produits),
+    entremetsLib: fusionListe(b.entremetsLib, l.entremetsLib, d.entremetsLib),
+    catalogue: val('catalogue'), destinations: val('destinations'), casesRisque: val('casesRisque'),
+    journal: fusionJournal(b.journal, l.journal, d.journal)
+  };
+}
+function etatLocal(){
+  const j = {};   // journées normalisées : les journées vides (créées à l'affichage) ne comptent pas
+  for(const t of Object.keys(journal)){
+    const x = journal[t], lv = x.livraisons || [];
+    if(!(x.photos||[]).length && !(x.productions||[]).length && !lv.length) continue;
+    j[t] = {photos: x.photos || [], productions: x.productions || []};
+    if(lv.length) j[t].livraisons = lv;
+  }
+  return cloneJ({produits, entremetsLib, catalogue, destinations, casesRisque, journal: j});
+}
+function lireBaseSync(){ try{ return JSON.parse(localStorage.getItem('trac_syncbase')); }catch(e){ return null; } }
+function ecrireBaseSync(o){ try{ localStorage.setItem('trac_syncbase', JSON.stringify(o)); }catch(e){} }
+
+let syncEnCours = false, syncRelance = false, syncPlan = null, syncApplication = false, syncApresSaisie = false;
+function saisieEnCours(){
+  const a = document.activeElement;
+  return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && a.closest('.panel'));
+}
+function syncActive(){ return !!(driveCfg.sync && driveCfg.url && driveCfg.url.includes('script.google')); }
+function syncStatut(msg, err){
+  const s = el('syncStatus');
+  if(s) s.innerHTML = err ? '<strong style="color:var(--bad)">✗ ' + esc(msg) + '</strong>' : esc(msg);
+  const a = el('accSync');
+  if(a){ a.hidden = !syncActive(); a.textContent = (err ? '⚠️ ' : '') + msg; }
+}
+function planifierSync(){
+  if(syncApplication || !syncActive()) return;
+  clearTimeout(syncPlan); syncPlan = setTimeout(()=>synchroniser(false), 3000);
+}
+const estPageGoogle = t => /<html|accounts\.google|Sign ?in|Se connecter|autorisation requise/i.test(t);
+async function appelScript(params, corps){
+  const r = await fetch(driveCfg.url + (params ? '?' + params : ''),
+    corps ? {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(corps)} : {});
+  const t = await r.text();
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  if(estPageGoogle(t)) throw new Error('acces');
+  return JSON.parse(t);
+}
+/* applique l'état fusionné sans perdre ce qui a été saisi pendant l'échange réseau */
+function appliquerSync(fusion, localDebut){
+  const maintenant = etatLocal();
+  const final = fusionner(localDebut, maintenant, fusion);
+  const change = cleJ(final) !== cleJ(maintenant);
+  if(change){
+    syncApplication = true;
+    try{
+      produits = final.produits || []; entremetsLib = final.entremetsLib || [];
+      if(Array.isArray(final.catalogue) && final.catalogue.length) catalogue = final.catalogue;
+      if(Array.isArray(final.destinations) && final.destinations.length) destinations = final.destinations;
+      if(Array.isArray(final.casesRisque) && final.casesRisque.length) casesRisque = final.casesRisque;
+      journal = final.journal || {};
+      save(); saveEntremetsLib(); saveCatalogue(); saveDestinations(); saveCases();
+    }finally{ syncApplication = false; }
+  }
+  return {change, encoreLocal: cleJ(final) !== cleJ(fusion)};
+}
+async function rafraichirApresSync(){
+  try{ await chargerPhotosJour(jourMatin()); await chargerPhotosJour(jourProd()); }catch(e){}
+  if(el('catalogueTexte')) el('catalogueTexte').value = catalogueTexte();
+  if(el('casesTexte')) el('casesTexte').value = casesRisque.join('\n');
+  renderTout();
+}
+async function idsPhotosLocales(){
+  const db = await idb();
+  return new Promise(res=>{
+    const q = db.transaction('photos').objectStore('photos').getAllKeys();
+    q.onsuccess = ()=>res(new Set(q.result || [])); q.onerror = ()=>res(new Set());
+  });
+}
+/* envoie les photos qui manquent sur le Drive, récupère celles qui manquent ici */
+async function syncPhotos(etat, distantes){
+  const utiles = new Set();
+  for(const t of Object.keys(etat.journal || {})) for(const p of (etat.journal[t].photos || [])) utiles.add(p.id);
+  const locales = await idsPhotosLocales(), surDrive = new Set(distantes || []);
+  const aEnvoyer = [...utiles].filter(id=>locales.has(id) && !surDrive.has(id));
+  const aRecevoir = [...utiles].filter(id=>!locales.has(id) && surDrive.has(id));
+  let n = 0, recues = 0;
+  for(const id of aEnvoyer){
+    const data = photoCache[id] || await photoGet(id);
+    if(data){ await appelScript('', {action:'photo', id, data}); n++; syncStatut('🔄 Envoi des photos… ' + n + '/' + aEnvoyer.length); }
+  }
+  for(const id of aRecevoir){
+    const r = await appelScript('action=photo&id=' + encodeURIComponent(id));
+    if(r && r.data){ await photoPut(id, r.data); photoCache[id] = r.data; recues++; }
+    syncStatut('🔄 Réception des photos… ' + recues + '/' + aRecevoir.length);
+  }
+  return {envoyees: n, recues};
+}
+async function synchroniser(manuel){
+  if(!syncActive()){
+    if(manuel) syncStatut('Collez l\'adresse du script et cochez « Synchroniser ».', true);
+    return false;
+  }
+  if(syncEnCours){ syncRelance = true; return false; }
+  if(!manuel && saisieEnCours()){ syncApresSaisie = true; return false; }   // on n'interrompt pas une saisie
+  if(!navigator.onLine){ syncStatut('📴 Hors connexion — synchronisation au retour du réseau'); return false; }
+  syncEnCours = true; syncStatut('🔄 Synchronisation…');
+  try{
+    let distant = await appelScript('action=etat');
+    const base = lireBaseSync();
+    for(let essai = 0; essai < 4; essai++){
+      const localDebut = etatLocal();
+      const fusion = fusionner(base && base.etat, localDebut, distant.etat);
+      const rep = cleJ(fusion) === cleJ(distant.etat) ? {ok:true, version: distant.version}   // rien de neuf à envoyer
+        : await appelScript('', {action:'sync', baseVersion: distant.version || 0, etat: fusion});
+      if(rep.conflit){ distant = {version: rep.version, etat: rep.etat, photos: distant.photos}; continue; }
+      ecrireBaseSync({version: rep.version, etat: fusion});
+      const {change, encoreLocal} = appliquerSync(fusion, localDebut);
+      const ph = await syncPhotos(fusion, distant.photos);
+      if(change || ph.recues) await rafraichirApresSync();
+      if(encoreLocal) syncRelance = true;   // modifications faites pendant l'échange : nouvelle passe
+      const h = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+      syncStatut('✅ Synchronisé à ' + h + (change ? ' — nouveautés reçues' : ''));
+      if(manuel) toast(change ? '🔄 Données mises à jour depuis les autres appareils' : '✅ Tout est à jour');
+      return true;
+    }
+    throw new Error('conflits');
+  }catch(e){
+    const m = e.message === 'acces' ? 'Accès refusé : dans le script, « Qui a accès » doit être « Tout le monde » (puis nouvelle version).'
+      : e.message === 'conflits' ? 'Trop de modifications simultanées — nouvel essai bientôt.'
+      : 'Synchronisation impossible (réseau ou adresse du script). Nouvel essai automatique.';
+    syncStatut(m, true);
+    if(manuel) toast('⚠️ ' + m);
+    return false;
+  }finally{
+    syncEnCours = false;
+    if(syncRelance){ syncRelance = false; planifierSync(); }
+  }
+}
 
 /* =====================================================================
    SAUVEGARDE / RESTAURATION (fichier JSON, photos comprises)
@@ -2575,6 +2836,7 @@ async function importer(file){
       await photoPut(id, data.photos[id]);
       photoCache[id] = data.photos[id];
     }
+    try{ localStorage.removeItem('trac_syncbase'); }catch(e){}   // après restauration : la prochaine synchro fusionne sans rien effacer
     save(); saveEntremetsLib(); saveCatalogue(); saveDestinations();
     el('catalogueTexte').value = catalogueTexte();
     renderTout();
@@ -2745,7 +3007,23 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   /* Google Drive */
   el('driveUrl').value = driveCfg.url || '';
   el('driveAuto').checked = driveCfg.auto !== false;
-  el('driveUrl').addEventListener('input', ()=>{ driveCfg.url = el('driveUrl').value.trim(); persistDrive(); renderHisto(); });
+  el('driveUrl').addEventListener('input', ()=>{
+    const nouvelle = el('driveUrl').value.trim();
+    if(nouvelle !== driveCfg.url){ try{ localStorage.removeItem('trac_syncbase'); }catch(e){} }   // autre Drive : on repart d'une fusion complète
+    driveCfg.url = nouvelle; persistDrive(); renderHisto();
+  });
+  el('driveUrl').addEventListener('change', ()=>{ if(syncActive()) synchroniser(true); });
+  el('syncOn').checked = !!driveCfg.sync;
+  el('syncOn').addEventListener('change', ()=>{
+    driveCfg.sync = el('syncOn').checked; persistDrive();
+    if(driveCfg.sync) synchroniser(true); else syncStatut('Synchronisation désactivée sur cet appareil.');
+  });
+  el('btnSyncNow').addEventListener('click', ()=>synchroniser(true));
+  /* déclencheurs automatiques */
+  document.addEventListener('focusout', ()=>{ if(syncApresSaisie){ syncApresSaisie = false; planifierSync(); } });
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') synchroniser(false); });
+  window.addEventListener('online', ()=>synchroniser(false));
+  setInterval(()=>{ if(document.visibilityState === 'visible') synchroniser(false); }, 120000);
   el('driveAuto').addEventListener('change', ()=>{ driveCfg.auto = el('driveAuto').checked; persistDrive(); });
   el('btnDriveTest').addEventListener('click', ()=>envoyerDrivePDF(aujourdhui(), false));
   el('btnDriveNow').addEventListener('click', ()=>envoyerDrivePDF(aujourdhui(), false));
@@ -2759,6 +3037,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   await chargerPhotosJour(aujourdhui());
   renderTout();
+  if(syncActive()){ syncStatut('🔄 Synchronisation à l\'ouverture…'); synchroniser(false); }
 
   if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){
     navigator.serviceWorker.register('tracabilite-sw.js').catch(()=>{});

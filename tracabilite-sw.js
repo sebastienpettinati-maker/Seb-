@@ -1,7 +1,7 @@
 /* Service worker de l'application de traçabilité — cache hors-ligne.
    Stratégie : réseau d'abord pour la page (pour recevoir les mises à jour),
    cache en secours (fonctionnement 100 % hors-ligne une fois visitée). */
-const CACHE = 'tracabilite-v3';
+const CACHE = 'tracabilite-v4';
 const FICHIERS = ['./tracabilite.html', './tracabilite.webmanifest', './tracabilite-192.png', './tracabilite-512.png',
   './pdfjs/pdf.min.js', './pdfjs/pdf.worker.min.js'];
 

@@ -103,6 +103,36 @@
   button.bigphoto{width:100%;justify-content:center;display:flex;align-items:center;gap:10px;
     font-size:1.05rem;padding:16px}
 
+  /* --- accueil / tableau de bord --- */
+  .hero{background:var(--grad);color:#fff;border-radius:20px;padding:20px 22px;margin-bottom:16px;
+    box-shadow:0 8px 24px rgba(46,139,87,.28)}
+  .hero-date{font-family:var(--serif);font-size:1.35rem;letter-spacing:.04em;text-transform:capitalize}
+  .hero-sub{opacity:.9;font-size:.9rem;margin-top:4px}
+  .progress{height:12px;border-radius:999px;background:var(--zebra);overflow:hidden;border:1px solid var(--grid)}
+  .progress-bar{height:100%;width:0;background:var(--grad);border-radius:999px;transition:width .4s ease}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+  .kpi{background:var(--zebra);border:1px solid var(--grid);border-radius:14px;padding:12px 14px;cursor:pointer;
+    text-align:left;display:flex;flex-direction:column;gap:2px;min-height:0;font-weight:400;box-shadow:none}
+  .kpi:hover{transform:translateY(-1px)}
+  .kpi b{font-size:1.6rem;color:var(--accent);line-height:1.1}
+  .kpi span{font-size:.8rem;color:var(--ink-2)}
+  .actions-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .actions-grid button{display:flex;flex-direction:column;align-items:center;gap:6px;border-radius:16px;
+    padding:14px 8px;min-height:84px;font-size:.85rem;text-align:center}
+  .actions-grid button span{font-size:1.6rem;line-height:1}
+  .alerte{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;margin-bottom:8px;
+    border-left:4px solid var(--warn);background:rgba(244,168,20,.10)}
+  .alerte.perime{border-left-color:var(--bad);background:var(--bad-bg)}
+  .alerte .grow{flex:1;min-width:0}
+  .alerte .rowhint{font-size:.8rem;color:var(--ink-2)}
+  .ok-msg{color:var(--accent);font-weight:600;margin:0}
+  .dlcBadge{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:.6rem;font-weight:800;
+    padding:2px 7px;border-radius:999px;color:#fff;background:var(--warn);white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+  .dlcBadge.perime{background:var(--bad)}
+  .case.faite.alerte-perime{border-color:var(--bad);background:var(--bad-bg);box-shadow:0 3px 12px rgba(208,59,59,.16)}
+  .case.faite.alerte-perime .cnom{color:var(--bad)}
+  .case.avecBadge{padding-bottom:26px}
+
   /* --- cases des produits à risque --- */
   .cases{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;margin-bottom:14px}
   .case{position:relative;border:2px dashed var(--grid);border-radius:14px;padding:10px 8px;
@@ -174,6 +204,10 @@
     background:var(--ink-1);color:var(--page);padding:10px 20px;border-radius:999px;
     font-weight:600;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:90}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.avecAction{pointer-events:auto;display:flex;align-items:center;gap:12px;padding:8px 8px 8px 18px;max-width:calc(100vw - 32px)}
+  #toast .toastBtn{background:var(--accent-2);color:#fff;border:none;min-height:34px;padding:6px 14px;
+    font-size:.85rem;box-shadow:none;white-space:nowrap}
+  #toast .toastBtn:hover{filter:brightness(1.1);color:#fff;transform:none}
 
   /* --- téléphone : onglets en bas --- */
   @media(max-width:720px){
@@ -216,6 +250,7 @@
 <header class="top">
   <div class="brand"><span class="blogo">📋</span><span class="btxt">TRAÇABILITÉ</span></div>
   <nav class="tabs">
+    <button class="tab" data-tab="accueil" type="button"><span class="ico">🏠</span><span class="lbl">Accueil</span></button>
     <button class="tab" data-tab="matin" type="button"><span class="ico">📷</span><span class="lbl">Matin</span></button>
     <button class="tab" data-tab="production" type="button"><span class="ico">🍳</span><span class="lbl">Production</span></button>
     <button class="tab" data-tab="entremets" type="button"><span class="ico">🍰</span><span class="lbl">Entremets</span></button>
@@ -226,6 +261,41 @@
 </header>
 
 <main class="wrap">
+
+  <!-- ==================== Onglet ACCUEIL (tableau de bord) ==================== -->
+  <section class="panel" data-panel="accueil">
+    <section class="hero">
+      <div class="hero-date" id="accDate"></div>
+      <div class="hero-sub" id="accSub"></div>
+    </section>
+
+    <section class="card">
+      <h2>📷 Marchandises du matin</h2>
+      <div class="progress"><div class="progress-bar" id="accProg"></div></div>
+      <p class="hint" id="accMatinTxt" style="margin:10px 0 12px"></p>
+      <button class="small" type="button" data-go="matin">📷 Aller aux photos</button>
+    </section>
+
+    <section class="card" id="accAlertesCard">
+      <h2>⚠️ Alertes DLC</h2>
+      <div id="accAlertes"></div>
+    </section>
+
+    <section class="card">
+      <h2>🧾 Aujourd'hui</h2>
+      <div class="kpis" id="accKpis"></div>
+    </section>
+
+    <section class="card">
+      <h2>⚡ Actions rapides</h2>
+      <div class="actions-grid">
+        <button type="button" data-go="production"><span>🍳</span>Nouvelle production</button>
+        <button type="button" data-go="entremets"><span>🍰</span>Monter un entremets</button>
+        <button type="button" data-go="livraison"><span>🚚</span>Nouvelle livraison</button>
+        <button type="button" id="accFeuille"><span>📄</span>Feuille du jour (PDF)</button>
+      </div>
+    </section>
+  </section>
 
   <!-- ==================== Onglet PHOTOS DU MATIN ==================== -->
   <section class="panel" data-panel="matin">
@@ -566,10 +636,38 @@ const aujourdhui = () => { const d = new Date(); return d.getFullYear()+'-'+Stri
 const heureNow = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
 const dateFr = iso => { try{ return new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }catch(e){ return iso; } };
 
-function toast(msg){
-  const t = el('toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), 2600);
+/* message éphémère ; avec `action` ({label, fn, fin}) il porte un bouton
+   (ex. « Annuler ») — `fin` est exécuté si l'action n'a pas été utilisée */
+function toast(msg, action){
+  const t = el('toast');
+  const finPrec = toast._fin; toast._fin = null;
+  if(finPrec){ try{ finPrec(); }catch(e){} }   // valide l'action précédente encore en attente
+  t.innerHTML = '';
+  const span = document.createElement('span'); span.textContent = msg; t.appendChild(span);
+  t.classList.toggle('avecAction', !!action);
+  if(action){
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'toastBtn'; b.textContent = action.label;
+    b.addEventListener('click', ()=>{
+      clearTimeout(toast._h); toast._fin = null; t.classList.remove('show');
+      try{ action.fn(); }catch(e){ console.error(e); }
+    });
+    t.appendChild(b);
+    toast._fin = action.fin || null;
+  }
+  t.classList.add('show');
+  clearTimeout(toast._h);
+  toast._h = setTimeout(()=>{
+    t.classList.remove('show');
+    const f = toast._fin; toast._fin = null; if(f){ try{ f(); }catch(e){} }
+  }, action ? 6000 : 2600);
 }
+/* suppression annulable : la donnée est retirée tout de suite, « Annuler » la remet */
+function annulable(msg, restaurer, finaliser){
+  toast(msg, {label: 'Annuler', fn: ()=>{ restaurer(); toast('↩ Restauré'); }, fin: finaliser});
+}
+/* filet de sécurité : une erreur imprévue s'affiche au lieu de bloquer en silence */
+window.addEventListener('error', e=>{ try{ toast('⚠️ Erreur inattendue — réessayez (' + (e.message||'').slice(0,60) + ')'); }catch(_){} });
+window.addEventListener('unhandledrejection', e=>{ try{ console.warn(e.reason); }catch(_){} });
 
 /* =====================================================================
    DONNÉES
@@ -629,6 +727,87 @@ function photoUtiliseeAilleurs(id, sauf){
     for(const pr of (j.productions||[])) for(const it of (pr.ingredients||[])) if(it.photoId===id) return true;
   }
   return false;
+}
+
+/* ---- DLC : jours restants et état (périmé / proche) ---- */
+function joursRestants(iso, ref){
+  const a = new Date(iso + 'T12:00:00'), b = new Date((ref || aujourdhui()) + 'T12:00:00');
+  return Math.round((a - b) / 86400000);
+}
+function etatDLC(iso, ref){
+  if(!iso) return '';
+  const n = joursRestants(iso, ref);
+  return n < 0 ? 'perime' : (n <= 1 ? 'proche' : '');
+}
+function libelleDLC(iso, ref){
+  const n = joursRestants(iso, ref);
+  if(n < 0) return 'DLC dépassée de ' + (-n) + ' j';
+  if(n === 0) return 'DLC aujourd\'hui';
+  if(n === 1) return 'DLC demain';
+  return 'DLC dans ' + n + ' j';
+}
+
+/* =====================================================================
+   ONGLET 🏠 ACCUEIL — tableau de bord du jour
+===================================================================== */
+function renderAccueil(){
+  if(!el('accDate')) return;
+  const t = aujourdhui();
+  el('accDate').textContent = dateFr(t);
+  const j = journal[t] || {photos:[], productions:[]};
+  const src = (j.photos||[]).length ? null : dernierJourAvecPhotos(t);
+  const photos = photosEffectives(t);
+
+  /* progression des marchandises du matin */
+  const faites = casesRisque.filter(c=>photoPourCase(c, photos)).length, total = casesRisque.length;
+  el('accProg').style.width = (total ? Math.round(faites * 100 / total) : 0) + '%';
+  el('accMatinTxt').textContent = faites + ' / ' + total + ' produits à risque photographiés' +
+    (src ? ' — photos reprises du ' + new Date(src + 'T12:00:00').toLocaleDateString('fr-FR') : '') + '.';
+  el('accSub').textContent = total && faites === total ? '✅ Marchandises du matin à jour'
+    : '📷 ' + (total - faites) + ' marchandise' + (total - faites > 1 ? 's' : '') + ' à photographier';
+
+  /* alertes DLC : marchandises en cours + productions récentes */
+  const alertes = [];
+  for(const p of photos){
+    const e = etatDLC(p.dlc, t);
+    if(e) alertes.push({e, titre: '📦 ' + (p.nom || 'Marchandise'), detail: (p.lot ? 'lot ' + p.lot + ' · ' : '') + libelleDLC(p.dlc, t), go: 'matin'});
+  }
+  const min = ilya(10);
+  for(const d of Object.keys(journal)){
+    if(d < min) continue;
+    for(const pr of (journal[d].productions || [])){
+      const e = etatDLC(pr.dlc, t);
+      if(!e || joursRestants(pr.dlc, t) < -3) continue;   // au-delà de 3 jours : déjà écoulé, on n'alerte plus
+      alertes.push({e, titre: (pr.composants ? '🍰 ' : '🍳 ') + pr.nom,
+        detail: 'fabriqué le ' + new Date(d + 'T12:00:00').toLocaleDateString('fr-FR') + ' · ' + libelleDLC(pr.dlc, t),
+        go: pr.composants ? 'entremets' : 'production'});
+    }
+  }
+  alertes.sort((a,b)=>(a.e === 'perime' ? 0 : 1) - (b.e === 'perime' ? 0 : 1));
+  const box = el('accAlertes');
+  box.innerHTML = alertes.length ? '' : '<p class="ok-msg">✅ Aucune DLC dépassée ni proche.</p>';
+  for(const a of alertes){
+    const r = document.createElement('div'); r.className = 'alerte' + (a.e === 'perime' ? ' perime' : '');
+    r.innerHTML = `<div class="grow"><strong>${esc(a.titre)}</strong><div class="rowhint">${esc(a.detail)}</div></div>`;
+    r.style.cursor = 'pointer';
+    r.addEventListener('click', ()=>activerOnglet(a.go));
+    box.appendChild(r);
+  }
+
+  /* indicateurs du jour (cliquables) */
+  const prods = (j.productions || []).filter(p=>!p.composants), ents = (j.productions || []).filter(p=>p.composants);
+  const livs = j.livraisons || [], refr = prods.filter(p=>p.refroidissement).length;
+  const kpis = [[prods.length, 'production' + (prods.length > 1 ? 's' : ''), 'production'],
+                [ents.length, 'entremets', 'entremets'],
+                [livs.length, 'livraison' + (livs.length > 1 ? 's' : ''), 'livraison'],
+                [refr, 'refroidissement' + (refr > 1 ? 's' : '') + ' cellule', 'production']];
+  const kb = el('accKpis'); kb.innerHTML = '';
+  for(const [n, lbl, go] of kpis){
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'kpi';
+    b.innerHTML = '<b>' + n + '</b><span>' + esc(lbl) + '</span>';
+    b.addEventListener('click', ()=>activerOnglet(go));
+    kb.appendChild(b);
+  }
 }
 
 /* ---- photos (IndexedDB) ---- */
@@ -707,15 +886,16 @@ function ouvrirChoixSource(nomCase){
 }
 /* suppression d'une photo incorrecte : depuis la liste, une case ou la visionneuse */
 function supprimerPhoto(id){
-  if(!confirm('Supprimer cette photo ?')) return;
   const d = jourMatin();
   materialiser(d);
-  const j = jour(d); j.photos = j.photos.filter(x=>x.id!==id);
-  if(!photoUtiliseeAilleurs(id, d)){ photoDel(id); delete photoCache[id]; }   // garde le blob s'il sert ailleurs
+  const j = jour(d), avant = j.photos.slice();
+  j.photos = j.photos.filter(x=>x.id!==id);
   save();
   el('photoView').hidden = true; photoVueId = null;
-  renderPhotos(); renderLiens();
-  toast('🗑 Photo supprimée');
+  renderPhotos(); renderLiens(); renderAccueil();
+  annulable('🗑 Photo supprimée',
+    ()=>{ jour(d).photos = avant; save(); renderPhotos(); renderLiens(); renderAccueil(); },
+    ()=>{ if(!photoUtiliseeAilleurs(id, null)){ photoDel(id); delete photoCache[id]; } });   // blob effacé seulement s'il ne sert plus
 }
 
 /* =====================================================================
@@ -764,6 +944,13 @@ function renderCases(){
       const info = document.createElement('div'); info.className = 'cinfo';
       info.textContent = p.lot ? 'lot ' + p.lot : '…';
       c.appendChild(info);
+      const etat = etatDLC(p.dlc, jourMatin());
+      if(etat){   // badge DLC : périmé (rouge) ou aujourd'hui/demain (orange)
+        c.classList.add('avecBadge'); if(etat === 'perime') c.classList.add('alerte-perime');
+        const bd = document.createElement('span'); bd.className = 'dlcBadge' + (etat === 'perime' ? ' perime' : '');
+        bd.textContent = etat === 'perime' ? 'Périmé' : (joursRestants(p.dlc, jourMatin()) === 0 ? 'DLC auj.' : 'DLC demain');
+        c.appendChild(bd);
+      }
       c.addEventListener('click', ()=>ouvrirChoixSource(nomCase));   // reprendre = remplacer la marchandise
     } else {
       c.title = 'Photographier ' + nomCase;
@@ -1444,9 +1631,11 @@ function renderProdJour(){
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
     bDel.title = 'Supprimer cette production'; bDel.textContent = '✕';
     bDel.addEventListener('click', ()=>{
-      if(!confirm('Supprimer la production « ' + pr.nom + ' » de cette journée ?')) return;
-      const j = jour(d); j.productions = j.productions.filter(x=>x.id!==pr.id);
-      save(); renderProdJour(); renderHisto();
+      const j = jour(d), avant = j.productions.slice();
+      j.productions = j.productions.filter(x=>x.id!==pr.id);
+      save(); renderProdJour(); renderHisto(); renderAccueil();
+      annulable('🗑 « ' + pr.nom + ' » supprimée',
+        ()=>{ jour(d).productions = avant; save(); renderProdJour(); renderHisto(); renderAccueil(); });
     });
     row.appendChild(bDel);
     box.appendChild(row);
@@ -1575,9 +1764,11 @@ function renderEntremetsJour(){
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button'; bDel.textContent = '✕';
     bDel.title = 'Supprimer cet entremets';
     bDel.addEventListener('click', ()=>{
-      if(!confirm('Supprimer l\'entremets « ' + pr.nom + ' » ?')) return;
-      const j = jour(d); j.productions = j.productions.filter(x=>x.id!==pr.id);
-      save(); renderEntremetsJour(); renderHisto();
+      const j = jour(d), avant = j.productions.slice();
+      j.productions = j.productions.filter(x=>x.id!==pr.id);
+      save(); renderEntremetsJour(); renderHisto(); renderAccueil();
+      annulable('🗑 Entremets « ' + pr.nom + ' » supprimé',
+        ()=>{ jour(d).productions = avant; save(); renderEntremetsJour(); renderHisto(); renderAccueil(); });
     });
     row.appendChild(bDel);
     box.appendChild(row);
@@ -1911,9 +2102,11 @@ function renderProduits(){
     const bDel = document.createElement('button'); bDel.className = 'ghost'; bDel.type = 'button';
     bDel.title = 'Supprimer ce produit'; bDel.textContent = '✕';
     bDel.addEventListener('click', ()=>{
-      if(!confirm('Supprimer « ' + p.nom + ' » de la bibliothèque ?\n(Les journées déjà enregistrées sont conservées.)')) return;
+      const avant = produits.slice();
       produits = produits.filter(x=>x.id!==p.id);
       save(); renderProduits(); renderDlProduits();
+      annulable('🗑 « ' + p.nom + ' » retiré de la bibliothèque',
+        ()=>{ produits = avant; save(); renderProduits(); renderDlProduits(); });
     });
     row.appendChild(bDel);
     box.appendChild(row);
@@ -1989,9 +2182,11 @@ function renderHisto(){
       const bLD = document.createElement('button'); bLD.className = 'ghost'; bLD.type = 'button'; bLD.textContent = '✕';
       bLD.title = 'Supprimer cette livraison';
       bLD.addEventListener('click', ()=>{
-        if(!confirm('Supprimer cette livraison (' + (liv.destination||'') + ') de l\'historique ?')) return;
+        const avant = j.livraisons.slice();
         j.livraisons = j.livraisons.filter(x=>x.id!==liv.id);
-        save(); renderHisto();
+        save(); renderHisto(); renderAccueil();
+        annulable('🗑 Livraison ' + (liv.destination||'') + ' supprimée',
+          ()=>{ j.livraisons = avant; save(); renderHisto(); renderAccueil(); });
       });
       lr.appendChild(bLD);
       box.appendChild(lr);
@@ -2398,12 +2593,14 @@ function activerOnglet(id){
   try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); }
   if(id==='entremets'){ renderSelComposant(); renderEntremetsJour(); }   // rafraîchit les produits récents
   if(id==='livraison'){ renderSelLivraison(); }
+  if(id==='accueil'){ renderAccueil(); }
   try{ localStorage.setItem('trac_tab', id); }catch(e){}
 }
 function renderTout(){
   renderPhotos(); renderDlProduits(); renderLiens(); renderProdJour(); renderProduits(); renderHisto();
   renderSelComposant(); renderDlEntremets(); renderComposants(); renderEntremetsJour();
   renderSelLivraison(); renderLivraison();
+  renderAccueil();
 }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
@@ -2414,9 +2611,14 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   el('jourLivraison').value = aujourdhui();
 
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>activerOnglet(t.dataset.tab)));
-  let tab0 = 'matin';
-  try{ tab0 = localStorage.getItem('trac_tab') || 'matin'; }catch(e){}
+  let tab0 = 'accueil';
+  try{ tab0 = localStorage.getItem('trac_tab') || 'accueil'; }catch(e){}
+  if(!document.querySelector('.panel[data-panel="' + tab0 + '"]')) tab0 = 'accueil';   // onglet supprimé entre-temps
   activerOnglet(tab0);
+
+  /* accueil : raccourcis vers les onglets + feuille du jour */
+  document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click', ()=>activerOnglet(b.dataset.go)));
+  el('accFeuille').addEventListener('click', ()=>telechargerPDF(aujourdhui()));
 
   /* photos du matin */
   el('casesTexte').value = casesRisque.join('\n');
